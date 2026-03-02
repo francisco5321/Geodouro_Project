@@ -4,13 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.geodouro_project.ui.screens.HomeScreen
+import com.example.geodouro_project.ui.screens.CaptureScreen
 import com.example.geodouro_project.ui.theme.Geodouro_ProjectTheme
 
 class MainActivity : ComponentActivity() {
@@ -19,29 +18,26 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             Geodouro_ProjectTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                AppNavigation()
             }
         }
     }
 }
 
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello Testing $name!",
-        modifier = modifier
-    )
-}
+fun AppNavigation() {
+    val navController = rememberNavController()
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    Geodouro_ProjectTheme {
-        Greeting("Android")
+    NavHost(navController = navController, startDestination = "home") {
+        composable("home") {
+            HomeScreen(
+                onNavigateToCapture = { navController.navigate("capture") },
+                onNavigateToMap = { /* navController.navigate("map") */ }
+            )
+        }
+        composable("capture") {
+            CaptureScreen()
+        }
+        // Quando criar a MapScreen, adicione o composable("map") aqui
     }
 }

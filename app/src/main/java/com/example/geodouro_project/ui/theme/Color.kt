@@ -2,10 +2,9 @@ package com.example.geodouro_project.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
-
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+// Cores Oficiais extraídas do site geodouro.pt
+val GeodouroBlue = Color(0xFF005696)      // Azul principal (Confiança/Engenharia)
+val GeodouroLightBlue = Color(0xFF00ABEB) // Azul acento (Inovação/Tecnologia)
+val GeodouroGrey = Color(0xFF575756)      // Texto e ícones secundários
+val GeodouroBg = Color(0xFFF8F9FA)        // Cinza muito claro para o fundo das telas
+val GeodouroWhite = Color(0xFFFFFFFF)
