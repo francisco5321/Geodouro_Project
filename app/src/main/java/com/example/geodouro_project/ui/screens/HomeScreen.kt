@@ -1,81 +1,158 @@
 package com.example.geodouro_project.ui.screens
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddAPhoto
-import androidx.compose.material.icons.filled.Eco
-import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.geodouro_project.ui.theme.GeodouroBg
-import com.example.geodouro_project.ui.theme.GeodouroBlue
-import com.example.geodouro_project.ui.theme.GeodouroLightBlue
-import com.example.geodouro_project.ui.theme.GeodouroWhite
+import com.example.geodouro_project.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onNavigateToCapture: () -> Unit, onNavigateToMap: () -> Unit) {
+fun HomeScreen() {
+    val recentSpecies = listOf(
+        Species("Lavandula stoechas", "Rosmaninho", "Lamiaceae", "Lavandula", 89),
+        Species("Cistus ladanifer", "Esteva", "Cistaceae", "Cistus", 164),
+        Species("Quercus suber", "Sobreiro", "Fagaceae", "Quercus", 124)
+    )
+
     Scaffold(
-        containerColor = GeodouroBg,
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    // Aqui você pode colocar o logótipo da Geodouro
-                    Text("GEODOURO", style = MaterialTheme.typography.headlineSmall.copy(
+                    Text(
+                        "GEODOURO Flora",
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
-                    ))
+                        color = GeodouroTextPrimary
+                    )
+                },
+                actions = {
+                    IconButton(onClick = { /* Search */ }) {
+                        Icon(Icons.Default.Search, "Pesquisar", tint = GeodouroGrey)
+                    }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = GeodouroWhite,
-                    titleContentColor = GeodouroBlue
+                    containerColor = GeodouroWhite
                 )
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).padding(16.dp)) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(GeodouroWhite),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                // Card de boas-vindas
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = GeodouroLightGreen.copy(alpha = 0.2f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(
+                            "Identificação de Flora",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = GeodouroTextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Capture e identifique espécies da flora portuguesa com inteligência artificial",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GeodouroTextSecondary
+                        )
+                    }
+                }
+            }
 
-            Text(
-                "SISTEMAS DE INFORMAÇÃO GEOGRÁFICA",
-                style = MaterialTheme.typography.labelSmall,
-                color = GeodouroLightBlue
+            item {
+                // Estatísticas
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatCard(
+                        icon = Icons.Default.Eco,
+                        value = "2.450",
+                        label = "Espécies",
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatCard(
+                        icon = Icons.Default.Check,
+                        value = "18.367",
+                        label = "Observações",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            item {
+                Text(
+                    "Espécies Recentes",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = GeodouroTextPrimary
+                )
+            }
+
+            items(recentSpecies) { species ->
+                SpeciesCard(species = species)
+            }
+        }
+    }
+}
+
+@Composable
+fun StatCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
+        elevation = CardDefaults.cardElevation(2.dp),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = GeodouroGreen,
+                modifier = Modifier.size(32.dp)
             )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Botão Principal - Estilo "Call to Action" do site
-            Button(
-                onClick = onNavigateToCapture,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = GeodouroBlue)
-            ) {
-                Icon(Icons.Default.AddAPhoto, null)
-                Spacer(Modifier.width(8.dp))
-                Text("EFETUAR LEVANTAMENTO")
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Seção de Mapa
-            OutlinedButton(
-                onClick = onNavigateToMap,
-                modifier = Modifier.fillMaxWidth(),
-                border = BorderStroke(1.dp, GeodouroBlue),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(Icons.Default.Map, null, tint = GeodouroBlue)
-                Text(" CONSULTAR MAPA SIG", color = GeodouroBlue)
-            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = GeodouroTextPrimary
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.bodySmall,
+                color = GeodouroTextSecondary
+            )
         }
     }
 }

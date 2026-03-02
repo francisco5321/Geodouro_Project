@@ -2,9 +2,13 @@ package com.example.geodouro_project.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Cores Oficiais extraídas do site geodouro.pt
-val GeodouroBlue = Color(0xFF005696)      // Azul principal (Confiança/Engenharia)
-val GeodouroLightBlue = Color(0xFF00ABEB) // Azul acento (Inovação/Tecnologia)
-val GeodouroGrey = Color(0xFF575756)      // Texto e ícones secundários
-val GeodouroBg = Color(0xFFF8F9FA)        // Cinza muito claro para o fundo das telas
-val GeodouroWhite = Color(0xFFFFFFFF)
+// Cores baseadas no World Flora adaptadas para Geodouro
+val GeodouroGreen = Color(0xFF7CB342)      // Verde principal (botão identificar)
+val GeodouroLightGreen = Color(0xFF9CCC65) // Verde claro (acentos)
+val GeodouroGrey = Color(0xFF757575)       // Texto e ícones secundários
+val GeodouroBg = Color(0xFFFFFFFF)         // Fundo branco limpo
+val GeodouroWhite = Color(0xFFFFFFFF)      // Branco puro
+val GeodouroDarkGreen = Color(0xFF558B2F)  // Verde escuro (bottom bar selecionado)
+val GeodouroLightBg = Color(0xFFF5F5F5)    // Fundo claro para cards
+val GeodouroTextPrimary = Color(0xFF212121) // Texto principal
+val GeodouroTextSecondary = Color(0xFF757575) // Texto secundário

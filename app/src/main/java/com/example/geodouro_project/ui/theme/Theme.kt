@@ -9,20 +9,29 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = GeodouroLightBlue,
+    primary = GeodouroLightGreen,
     secondary = GeodouroGrey,
-    tertiary = GeodouroWhite
+    tertiary = GeodouroWhite,
+    background = GeodouroTextPrimary,
+    surface = Color(0xFF1E1E1E),
+    onPrimary = GeodouroWhite,
+    onSecondary = GeodouroWhite
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = GeodouroBlue,
+    primary = GeodouroGreen,
     secondary = GeodouroGrey,
-    tertiary = GeodouroLightBlue,
+    tertiary = GeodouroLightGreen,
     background = GeodouroBg,
-    surface = GeodouroWhite
+    surface = GeodouroWhite,
+    onPrimary = GeodouroWhite,
+    onSecondary = GeodouroWhite,
+    onBackground = GeodouroTextPrimary,
+    onSurface = GeodouroTextPrimary
 )
 
 @Composable

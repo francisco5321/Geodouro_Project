@@ -31,7 +31,7 @@ fun FloraCard(observation: FloraObservation) {
                 modifier = Modifier
                     .width(4.dp)
                     .height(40.dp)
-                    .background(GeodouroLightBlue)
+                    .background(GeodouroLightGreen)
             )
 
             Spacer(Modifier.width(12.dp))
@@ -41,7 +41,7 @@ fun FloraCard(observation: FloraObservation) {
                 Text(
                     text = (observation.scientificName ?: "Espécie Desconhecida").uppercase(),
                     style = MaterialTheme.typography.labelLarge,
-                    color = GeodouroBlue
+                    color = GeodouroGreen
                 )
 
                 // Formatamos a latitude e longitude para parecer uma coordenada SIG
