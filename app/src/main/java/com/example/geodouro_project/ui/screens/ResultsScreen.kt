@@ -17,8 +17,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.geodouro_project.R
 import com.example.geodouro_project.ui.theme.*
 
 data class IdentificationResult(
@@ -33,9 +35,9 @@ data class IdentificationResult(
 @Composable
 fun ResultsScreen(onBackClick: () -> Unit, onConfirmResult: (IdentificationResult) -> Unit) {
     val results = listOf(
-        IdentificationResult("Lavandula stoechas", "Rosmaninho", "Lamiaceae", 0.67f),
-        IdentificationResult("Digitalis purpurea", "Dedaleira", "Plantaginaceae", 0.28f),
-        IdentificationResult("Erica australis", "Urze", "Ericaceae", 0.15f)
+        IdentificationResult("Nome cientifico 1", "Nome comum 1", "Familia 1", 0.67f),
+        IdentificationResult("Nome cientifico 2", "Nome comum 2", "Familia 2", 0.28f),
+        IdentificationResult("Nome cientifico 3", "Nome comum 3", "Familia 3", 0.15f)
     )
 
     Scaffold(
@@ -46,23 +48,19 @@ fun ResultsScreen(onBackClick: () -> Unit, onConfirmResult: (IdentificationResul
                         Text(
                             "Identificação - Resultados",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = GeodouroBrandGreen,
                         )
-                        Text(
-                            "GEODOURO",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = GeodouroGrey
+                        Image(
+                            painter = painterResource(id = R.drawable.logo_s_fundo),
+                            contentDescription = "Geodouro",
+                            modifier = Modifier.height(28.dp)
                         )
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, "Voltar")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* Filter */ }) {
-                        Icon(Icons.Default.Close, "Fechar", tint = GeodouroGrey)
+                        Icon(Icons.Default.ArrowBack, "Voltar", tint = GeodouroTextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -70,7 +68,8 @@ fun ResultsScreen(onBackClick: () -> Unit, onConfirmResult: (IdentificationResul
                 )
             )
         }
-    ) { padding ->
+    ) {
+        padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -88,7 +87,6 @@ fun ResultsScreen(onBackClick: () -> Unit, onConfirmResult: (IdentificationResul
         }
     }
 }
-
 @Composable
 fun ResultCard(result: IdentificationResult, onConfirm: () -> Unit) {
     Card(
@@ -98,7 +96,7 @@ fun ResultCard(result: IdentificationResult, onConfirm: () -> Unit) {
         shape = RoundedCornerShape(8.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // Grid de imagens (placeholder)
+            // placeholder imagens
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -116,7 +114,7 @@ fun ResultCard(result: IdentificationResult, onConfirm: () -> Unit) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Nome científico
+            // nome cientifico
             Text(
                 result.scientificName,
                 style = MaterialTheme.typography.titleMedium,
@@ -124,7 +122,7 @@ fun ResultCard(result: IdentificationResult, onConfirm: () -> Unit) {
                 color = GeodouroTextPrimary
             )
 
-            // Nome comum
+            // nome comum
             Text(
                 result.commonName,
                 style = MaterialTheme.typography.bodyMedium,
@@ -133,7 +131,7 @@ fun ResultCard(result: IdentificationResult, onConfirm: () -> Unit) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Família
+            // familia
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -145,17 +143,12 @@ fun ResultCard(result: IdentificationResult, onConfirm: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 
-                // Ícone e percentagem de confiança
+                // percentagem de confiança
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = null,
-                        tint = GeodouroGreen,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    
                     Text(
                         "${(result.confidence * 100).toInt()}%",
                         style = MaterialTheme.typography.labelLarge,
@@ -167,7 +160,7 @@ fun ResultCard(result: IdentificationResult, onConfirm: () -> Unit) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Barra de progresso
+            // barra de progresso
             LinearProgressIndicator(
                 progress = { result.confidence },
                 modifier = Modifier
@@ -180,7 +173,7 @@ fun ResultCard(result: IdentificationResult, onConfirm: () -> Unit) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Botão confirmar
+            // botão confirmar
             Button(
                 onClick = onConfirm,
                 modifier = Modifier.fillMaxWidth(),

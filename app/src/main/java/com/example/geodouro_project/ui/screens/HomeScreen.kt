@@ -12,36 +12,32 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
+import com.example.geodouro_project.R
 import com.example.geodouro_project.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen() {
     val recentSpecies = listOf(
-        Species("Lavandula stoechas", "Rosmaninho", "Lamiaceae", "Lavandula", 89),
-        Species("Cistus ladanifer", "Esteva", "Cistaceae", "Cistus", 164),
-        Species("Quercus suber", "Sobreiro", "Fagaceae", "Quercus", 124)
+        Species("Nome cientifico 1", "Nome comum 1", "Familia 1", "Genus 1", 89),
+        Species("Nome cientifico 2", "Nome comum 2", "Familia 2", "Genus 2", 164),
+        Species("Nome cientifico 3", "Nome comum 3", "Familia 3", "Genus 3", 124)
     )
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Text(
-                        text = buildAnnotatedString {
-                            withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = GeodouroGreen)) {
-                                append("GEO")
-                            }
-                            withStyle(style = SpanStyle(color = GeodouroGreen)) {
-                                append("DOURO")
-                            }
-                        },
-                        style = MaterialTheme.typography.titleLarge
+                    androidx.compose.foundation.Image(
+                        painter = painterResource(id = R.drawable.logo_s_fundo),
+                        contentDescription = "Geodouro",
+                        modifier = Modifier.height(80.dp)
                     )
                 },
                 actions = {

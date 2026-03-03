@@ -22,17 +22,15 @@ data class CommunityPost(
     val speciesName: String,
     val location: String,
     val timeAgo: String,
-    val likes: Int,
-    val comments: Int
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommunityScreen() {
     val posts = listOf(
-        CommunityPost("João Silva", "Lavandula stoechas", "Serra da Estrela", "2h atrás", 15, 3),
-        CommunityPost("Maria Costa", "Quercus suber", "Alentejo", "5h atrás", 23, 7),
-        CommunityPost("Pedro Santos", "Arbutus unedo", "Serra do Gerês", "1d atrás", 42, 12)
+        CommunityPost("João Silva", "Lavandula stoechas", "Serra da Estrela", "2h atrás"),
+        CommunityPost("Maria Costa", "Quercus suber", "Alentejo", "5h atrás"),
+        CommunityPost("Pedro Santos", "Arbutus unedo", "Serra do Gerês", "1d atrás")
     )
 
     Scaffold(
@@ -43,7 +41,7 @@ fun CommunityScreen() {
                         "Comunidade",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = GeodouroGreen
+                        color = GeodouroBrandGreen
                     )
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(

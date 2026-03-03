@@ -28,9 +28,12 @@ fun ProfileScreen() {
                         "Perfil",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = GeodouroGreen
+                        color = GeodouroBrandGreen
                     )
                 },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = GeodouroWhite
+                )
             )
         }
     ) { padding ->
