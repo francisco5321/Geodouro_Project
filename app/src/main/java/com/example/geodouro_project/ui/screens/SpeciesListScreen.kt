@@ -16,7 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
 import com.example.geodouro_project.ui.theme.*
 
@@ -52,18 +55,20 @@ fun SpeciesListScreen() {
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        "GEODOURO Flora",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = GeodouroTextPrimary
+                        text = buildAnnotatedString {
+                            withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = GeodouroGreen)) {
+                                append("GEO")
+                            }
+                            withStyle(style = SpanStyle(color = GeodouroGreen)) {
+                                append("DOURO")
+                            }
+                        },
+                        style = MaterialTheme.typography.titleLarge
                     )
                 },
                 actions = {
                     IconButton(onClick = { /* Search */ }) {
                         Icon(Icons.Default.Search, "Pesquisar", tint = GeodouroGrey)
-                    }
-                    IconButton(onClick = { /* Filter */ }) {
-                        Icon(Icons.Default.FilterList, "Filtrar", tint = GeodouroGrey)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -100,12 +105,12 @@ fun SpeciesListScreen() {
 @Composable
 fun FilterTabRow(
     selectedFilter: SpeciesFilter,
-    onFilterSelected: (SpeciesFilter) -> Unit
+    onFilterSelected: (speciesFilter: SpeciesFilter) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         SpeciesFilter.entries.forEach { filter ->
@@ -115,7 +120,7 @@ fun FilterTabRow(
                 label = {
                     Text(
                         filter.name,
-                        style = MaterialTheme.typography.labelLarge
+                        style = MaterialTheme.typography.labelLarge,
                     )
                 },
                 enabled = true,
@@ -134,7 +139,7 @@ fun FilterTabRow(
             )
         }
     }
-}
+  }
 
 @Composable
 fun SpeciesCard(species: Species) {

@@ -28,17 +28,9 @@ fun ProfileScreen() {
                         "Perfil",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = GeodouroTextPrimary
+                        color = GeodouroGreen
                     )
                 },
-                actions = {
-                    IconButton(onClick = { /* Settings */ }) {
-                        Icon(Icons.Default.Settings, "Definições", tint = GeodouroGrey)
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = GeodouroWhite
-                )
             )
         }
     ) { padding ->
@@ -83,7 +75,7 @@ fun ProfileScreen() {
                         Spacer(modifier = Modifier.height(16.dp))
 
                         Text(
-                            "Utilizador GEODOURO",
+                            "Utilizador",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = GeodouroTextPrimary
@@ -122,22 +114,6 @@ fun ProfileScreen() {
 
             item {
                 ProfileMenuItem(
-                    icon = Icons.Default.Person,
-                    title = "Editar Perfil",
-                    onClick = { /* Edit profile */ }
-                )
-            }
-
-            item {
-                ProfileMenuItem(
-                    icon = Icons.Default.Notifications,
-                    title = "Notificações",
-                    onClick = { /* Notifications */ }
-                )
-            }
-
-            item {
-                ProfileMenuItem(
                     icon = Icons.Default.LocationOn,
                     title = "Localização",
                     onClick = { /* Location settings */ }
@@ -147,7 +123,7 @@ fun ProfileScreen() {
             item {
                 ProfileMenuItem(
                     icon = Icons.Default.Help,
-                    title = "Ajuda e Suporte",
+                    title = "Ajuda",
                     onClick = { /* Help */ }
                 )
             }

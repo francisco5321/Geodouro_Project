@@ -15,8 +15,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.geodouro_project.ui.theme.*
@@ -29,25 +32,20 @@ fun IdentifyScreen(onIdentifyClick: () -> Unit) {
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        "GEODOURO Flora",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = GeodouroTextPrimary
+                        text = buildAnnotatedString {
+                            withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = GeodouroGreen)) {
+                                append("GEO")
+                            }
+                            withStyle(style = SpanStyle(color = GeodouroGreen)) {
+                                append("DOURO")
+                            }
+                        },
+                        style = MaterialTheme.typography.titleLarge
                     )
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = GeodouroWhite
                 ),
-                actions = {
-                    IconButton(onClick = { /* Search */ }) {
-                        Icon(
-                            Icons.Default.FilterList,
-                            contentDescription = "Filtrar",
-                            tint = GeodouroGrey
-                        )
-                    }
-                }
             )
         }
     ) { padding ->

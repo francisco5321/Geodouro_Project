@@ -13,35 +13,35 @@ fun CaptureScreen() {
         .padding(16.dp)) {
         Text("Nova Observação", style = MaterialTheme.typography.headlineMedium)
 
-        // Placeholder para a Câmera/Preview da Imagem
+        //Placeholder da camera
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(300.dp),
             color = MaterialTheme.colorScheme.surfaceVariant
         ) {
-            Text("Preview da Câmera / Imagem Selecionada", modifier = Modifier.padding(16.dp))
+            Text("aqui vai ficar a imnagem capturada", modifier = Modifier.padding(16.dp))
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Simulação de Identificação por IA
+        //aqui vai ser a identificação por AI
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Sugestão da IA (Base Flora-On):", style = MaterialTheme.typography.labelLarge)
+                Text("Sugestão da AI:", style = MaterialTheme.typography.labelLarge)
                 Text("Lavandula stoechas (Rosmaninho)", style = MaterialTheme.typography.bodyLarge)
-                LinearProgressIndicator(progress = { 0.85f }, modifier = Modifier.fillMaxWidth())
-                Text("Confiança: 85%", style = MaterialTheme.typography.labelSmall)
+                LinearProgressIndicator(progress = { 0.85f}, modifier = Modifier.fillMaxWidth())
+                Text("90% de confiança", style = MaterialTheme.typography.labelSmall)
             }
         }
 
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
-            onClick = { /* Lógica para salvar e georreferenciar */ },
+            onClick = { /* guardar e georreferenciar*/ },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Confirmar e Enviar")
+            Text("Confirmar e enviar")
         }
     }
 }

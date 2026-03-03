@@ -43,7 +43,7 @@ fun CommunityScreen() {
                         "Comunidade",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = GeodouroTextPrimary
+                        color = GeodouroGreen
                     )
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -113,9 +113,7 @@ fun CommunityPostCard(post: CommunityPost) {
                     )
                 }
                 
-                IconButton(onClick = { /* More options */ }) {
-                    Icon(Icons.Default.MoreVert, "Mais opções", tint = GeodouroGrey)
-                }
+
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -156,50 +154,16 @@ fun CommunityPostCard(post: CommunityPost) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Ações (likes, comentários)
+            // Possíveis ações (likes, comentários)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { /* Like */ }) {
-                        Icon(
-                            Icons.Default.Favorite,
-                            contentDescription = "Gosto",
-                            tint = GeodouroGrey
-                        )
-                    }
-                    Text(
-                        post.likes.toString(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = GeodouroTextSecondary
-                    )
+
                 }
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { /* Comment */ }) {
-                        Icon(
-                            Icons.Default.Comment,
-                            contentDescription = "Comentar",
-                            tint = GeodouroGrey
-                        )
-                    }
-                    Text(
-                        post.comments.toString(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = GeodouroTextSecondary
-                    )
-                }
-                
                 Spacer(modifier = Modifier.weight(1f))
-                
-                IconButton(onClick = { /* Share */ }) {
-                    Icon(
-                        Icons.Default.Share,
-                        contentDescription = "Partilhar",
-                        tint = GeodouroGrey
-                    )
-                }
+
             }
         }
     }

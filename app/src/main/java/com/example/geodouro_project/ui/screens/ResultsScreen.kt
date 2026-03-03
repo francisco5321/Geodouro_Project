@@ -49,7 +49,7 @@ fun ResultsScreen(onBackClick: () -> Unit, onConfirmResult: (IdentificationResul
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "GEODOURO Flora",
+                            "GEODOURO",
                             style = MaterialTheme.typography.labelSmall,
                             color = GeodouroGrey
                         )
