@@ -2,6 +2,8 @@ package com.example.geodouro_project.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -40,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -47,8 +51,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.geodouro_project.R
 import com.example.geodouro_project.domain.model.LocalInferenceResult
+import com.example.geodouro_project.domain.model.LocalPredictionCandidate
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
@@ -143,6 +149,7 @@ fun ResultsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .background(GeodouroWhite)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -233,20 +240,10 @@ fun ResultCard(
         shape = RoundedCornerShape(8.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                repeat(4) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(GeodouroLightBg)
-                    )
-                }
-            }
+            ResultPhotosSection(
+                capturedImageUri = result.capturedImageUri,
+                referencePhotoUrl = result.photoUrl
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -319,6 +316,13 @@ fun ResultCard(
                 )
             }
 
+            if (result.alternativePredictions.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                AlternativePredictionsSection(
+                    predictions = result.alternativePredictions
+                )
+            }
+
             if (!saveMessage.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
@@ -359,6 +363,139 @@ fun ResultCard(
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(text = "Tentar sincronizar pendentes")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResultPhotosSection(
+    capturedImageUri: String,
+    referencePhotoUrl: String?
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        ResultPhotoCard(
+            title = "Foto capturada",
+            imageModel = capturedImageUri,
+            emptyMessage = "Sem foto capturada."
+        )
+
+        ResultPhotoCard(
+            title = "Foto de referencia",
+            imageModel = referencePhotoUrl,
+            emptyMessage = "Sem foto remota disponivel para esta especie."
+        )
+    }
+}
+
+@Composable
+private fun ResultPhotoCard(
+    title: String,
+    imageModel: String?,
+    emptyMessage: String
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = GeodouroTextPrimary
+        )
+
+        if (imageModel.isNullOrBlank()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.5f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(GeodouroLightBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Image,
+                        contentDescription = null,
+                        tint = GeodouroTextSecondary
+                    )
+                    Text(
+                        text = emptyMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GeodouroTextSecondary
+                    )
+                }
+            }
+        } else {
+            AsyncImage(
+                model = imageModel,
+                contentDescription = title,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.5f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(GeodouroLightBg),
+                contentScale = ContentScale.Crop
+            )
+        }
+    }
+}
+
+@Composable
+private fun AlternativePredictionsSection(predictions: List<LocalPredictionCandidate>) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "Outras previsoes do modelo acima de 30%",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = GeodouroTextPrimary
+        )
+
+        predictions.forEach { prediction ->
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = GeodouroLightBg,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = prediction.species,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GeodouroTextPrimary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = "${(prediction.confidence * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = GeodouroGreen,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    LinearProgressIndicator(
+                        progress = { prediction.confidence.coerceIn(0f, 1f) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(5.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                        color = GeodouroGreen,
+                        trackColor = GeodouroWhite
+                    )
+                }
             }
         }
     }

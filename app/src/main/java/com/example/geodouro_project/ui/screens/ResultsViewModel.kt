@@ -9,6 +9,7 @@ import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.EnrichedSpeciesData
 import com.example.geodouro_project.domain.model.EnrichmentOrigin
 import com.example.geodouro_project.domain.model.LocalInferenceResult
+import com.example.geodouro_project.domain.model.LocalPredictionCandidate
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,8 +21,10 @@ data class ResultUiModel(
     val commonName: String,
     val family: String,
     val confidence: Float,
+    val capturedImageUri: String,
     val wikipediaUrl: String?,
-    val photoUrl: String?
+    val photoUrl: String?,
+    val alternativePredictions: List<LocalPredictionCandidate>
 )
 
 sealed class ResultsUiState {
@@ -50,17 +53,22 @@ class ResultsViewModel(
     private var lastEnrichedData: EnrichedSpeciesData? = null
 
     fun loadHybridResult(localInferenceResult: LocalInferenceResult) {
-        lastInferenceResult = localInferenceResult
-
         viewModelScope.launch {
             _uiState.value = ResultsUiState.Loading
 
+            val rerankedInference = runCatching {
+                repository.rerankLowConfidenceInference(localInferenceResult)
+            }.getOrDefault(localInferenceResult)
+            val rerankApplied = rerankedInference.predictedSpecies != localInferenceResult.predictedSpecies
+
+            lastInferenceResult = rerankedInference
+
             val enrichmentResult = try {
-                repository.enrichSpecies(localInferenceResult.predictedSpecies)
+                repository.enrichSpecies(rerankedInference.predictedSpecies)
             } catch (_: Exception) {
                 lastEnrichedData = null
                 _uiState.value = ResultsUiState.Success(
-                    result = buildUiModel(localInferenceResult, null),
+                    result = buildUiModel(rerankedInference, null),
                     sourceLabel = "Falha na API. A mostrar apenas resultado local."
                 )
                 return@launch
@@ -68,8 +76,11 @@ class ResultsViewModel(
 
             lastEnrichedData = enrichmentResult.data
             _uiState.value = ResultsUiState.Success(
-                result = buildUiModel(localInferenceResult, enrichmentResult.data),
-                sourceLabel = enrichmentOriginLabel(enrichmentResult.origin)
+                result = buildUiModel(rerankedInference, enrichmentResult.data),
+                sourceLabel = enrichmentOriginLabel(
+                    origin = enrichmentResult.origin,
+                    rerankApplied = rerankApplied
+                )
             )
         }
     }
@@ -120,20 +131,32 @@ class ResultsViewModel(
             commonName = enrichedData?.commonName ?: "Nome comum indisponivel",
             family = enrichedData?.family ?: "Familia indisponivel",
             confidence = localInferenceResult.confidence,
+            capturedImageUri = localInferenceResult.imageUri,
             wikipediaUrl = enrichedData?.wikipediaUrl,
-            photoUrl = enrichedData?.photoUrl
+            photoUrl = enrichedData?.photoUrl,
+            alternativePredictions = localInferenceResult.candidatePredictions
+                .drop(1)
+                .filter { it.confidence >= DISPLAY_ALTERNATIVE_THRESHOLD }
         )
     }
 
-    private fun enrichmentOriginLabel(origin: EnrichmentOrigin): String {
-        return when (origin) {
+    private fun enrichmentOriginLabel(origin: EnrichmentOrigin, rerankApplied: Boolean): String {
+        val baseLabel = when (origin) {
             EnrichmentOrigin.CACHE -> "Dados enriquecidos via cache local."
             EnrichmentOrigin.NETWORK -> "Dados enriquecidos via iNaturalist online."
-            EnrichmentOrigin.LOCAL_ONLY -> "Sem internet: apenas inferencia local disponivel."
+            EnrichmentOrigin.LOCAL_ONLY -> "Sem dados remotos para esta especie. A mostrar apenas inferencia local."
+        }
+
+        return if (rerankApplied) {
+            "$baseLabel Revalidado por similaridade visual devido a baixa confianca."
+        } else {
+            baseLabel
         }
     }
 
     companion object {
+        private const val DISPLAY_ALTERNATIVE_THRESHOLD = 0.30f
+
         fun factory(context: Context): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")

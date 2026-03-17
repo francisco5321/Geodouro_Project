@@ -55,6 +55,7 @@ import androidx.core.content.ContextCompat
 import com.example.geodouro_project.R
 import com.example.geodouro_project.ai.MobileNetV3Classifier
 import com.example.geodouro_project.domain.model.LocalInferenceResult
+import com.example.geodouro_project.domain.model.LocalPredictionCandidate
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroGrey
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
@@ -92,8 +93,13 @@ fun IdentifyScreen(onIdentifyClick: (LocalInferenceResult) -> Unit) {
                 val imageUri = saveCapturedBitmap(context, bitmap)
 
                 if (!prediction.fromModel) {
+                    val diagnostic = classifier.getModelLoadDiagnostic()
                     snackbarHostState.showSnackbar(
-                        "Modelo MobileNetV3-Small ainda indisponivel. Resultado de fallback aplicado."
+                        if (diagnostic.isNullOrBlank()) {
+                            "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} ainda indisponivel. Resultado de fallback aplicado."
+                        } else {
+                            "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} indisponivel: $diagnostic"
+                        }
                     )
                 }
 
@@ -103,7 +109,13 @@ fun IdentifyScreen(onIdentifyClick: (LocalInferenceResult) -> Unit) {
                         latitude = null,
                         longitude = null,
                         predictedSpecies = prediction.label,
-                        confidence = prediction.confidence
+                        confidence = prediction.confidence,
+                        candidatePredictions = prediction.candidates.map { candidate ->
+                            LocalPredictionCandidate(
+                                species = candidate.label,
+                                confidence = candidate.confidence
+                            )
+                        }
                     )
                 )
             }.onFailure {
@@ -194,9 +206,10 @@ fun IdentifyScreen(onIdentifyClick: (LocalInferenceResult) -> Unit) {
 
                 Text(
                     text = if (classifier.isModelAvailable()) {
-                        "Modelo MobileNetV3-Small pronto"
+                        "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} pronto"
                     } else {
-                        "Modelo ainda nao encontrado (assets/mobilenetv3_small.tflite)"
+                        classifier.getModelLoadDiagnostic()
+                            ?: "Modelo ainda nao encontrado (assets/${MobileNetV3Classifier.DEFAULT_MODEL_FILE})"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = GeodouroTextSecondary,
@@ -274,7 +287,7 @@ fun IdentifyScreen(onIdentifyClick: (LocalInferenceResult) -> Unit) {
                                 color = GeodouroTextPrimary
                             )
                             Text(
-                                text = "Adicione mobilenetv3_small.tflite e labels para inferencia final.",
+                                text = "Adicione ${MobileNetV3Classifier.DEFAULT_MODEL_FILE} e labels para inferencia final.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = GeodouroTextSecondary
                             )

@@ -42,10 +42,12 @@ object AppContainer {
         val apiService = retrofit.create(INaturalistApiService::class.java)
 
         return PlantRepository(
+            appContext = appContext,
             taxonCacheDao = database.taxonCacheDao(),
             observationDao = database.observationDao(),
             apiService = apiService,
-            connectivityChecker = ConnectivityChecker(appContext)
+            connectivityChecker = ConnectivityChecker(appContext),
+            imageHttpClient = okHttpClient
         )
     }
 }

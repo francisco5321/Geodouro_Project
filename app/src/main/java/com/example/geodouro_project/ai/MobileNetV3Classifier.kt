@@ -2,20 +2,26 @@ package com.example.geodouro_project.ai
 
 import android.content.Context
 import android.graphics.Bitmap
-import java.io.FileInputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.MappedByteBuffer
-import java.nio.channels.FileChannel
+import java.io.File
+import java.io.FileOutputStream
 import kotlin.math.exp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.tensorflow.lite.Interpreter
+import org.pytorch.IValue
+import org.pytorch.Module
+import org.pytorch.Tensor
+import org.pytorch.torchvision.TensorImageUtils
+
+data class InferenceCandidate(
+    val label: String,
+    val confidence: Float
+)
 
 data class InferencePrediction(
     val label: String,
     val confidence: Float,
-    val fromModel: Boolean
+    val fromModel: Boolean,
+    val candidates: List<InferenceCandidate> = emptyList()
 )
 
 class MobileNetV3Classifier(
@@ -26,52 +32,142 @@ class MobileNetV3Classifier(
 ) {
 
     private val labels: List<String> by lazy { loadLabels() }
-    private val interpreter: Interpreter? by lazy { createInterpreterOrNull() }
+    private val resolvedModelFileName: String by lazy { resolveModelFileName() }
+    private val module: Module? by lazy { createModuleOrNull() }
+    @Volatile
+    private var modelLoadDiagnostic: String? = null
 
-    fun isModelAvailable(): Boolean = interpreter != null
+    fun isModelAvailable(): Boolean = module != null
+    fun getModelLoadDiagnostic(): String? = modelLoadDiagnostic
+
+    suspend fun extractEmbedding(bitmap: Bitmap): FloatArray? = withContext(Dispatchers.Default) {
+        runModelProbabilities(bitmap)
+    }
 
     suspend fun classify(bitmap: Bitmap): InferencePrediction = withContext(Dispatchers.Default) {
-        val localInterpreter = interpreter
+        val probabilities = runModelProbabilities(bitmap)
             ?: return@withContext InferencePrediction(
                 label = FALLBACK_LABEL,
                 confidence = 0f,
-                fromModel = false
+                fromModel = false,
+                candidates = emptyList()
             )
 
-        val input = preprocessBitmap(bitmap)
-        val classCount = localInterpreter.getOutputTensor(0).shape().last()
-        val output = Array(1) { FloatArray(classCount) }
+        if (probabilities.isEmpty()) {
+            return@withContext InferencePrediction(
+                label = FALLBACK_LABEL,
+                confidence = 0f,
+                fromModel = false,
+                candidates = emptyList()
+            )
+        }
 
-        localInterpreter.run(input, output)
+        val rankedCandidates = probabilities.indices
+            .map { index ->
+                InferenceCandidate(
+                    label = labels.getOrNull(index) ?: "classe_$index",
+                    confidence = probabilities[index]
+                )
+            }
+            .sortedByDescending { it.confidence }
 
-        val probabilities = toProbabilities(output[0])
-        val bestIndex = probabilities.indices.maxByOrNull { probabilities[it] } ?: 0
-        val label = labels.getOrNull(bestIndex) ?: "classe_$bestIndex"
+        val bestPrediction = rankedCandidates.firstOrNull()
+            ?: return@withContext InferencePrediction(
+                label = FALLBACK_LABEL,
+                confidence = 0f,
+                fromModel = false,
+                candidates = emptyList()
+            )
+
+        val confidentCandidates = rankedCandidates
+            .filter { it.confidence >= MIN_DISPLAY_CONFIDENCE }
+            .take(MAX_DISPLAY_CANDIDATES)
+
+        val exportCandidates = if (confidentCandidates.isNotEmpty()) {
+            confidentCandidates
+        } else {
+            rankedCandidates.take(MAX_DISPLAY_CANDIDATES)
+        }
 
         InferencePrediction(
-            label = label,
-            confidence = probabilities.getOrNull(bestIndex) ?: 0f,
-            fromModel = true
+            label = bestPrediction.label,
+            confidence = bestPrediction.confidence,
+            fromModel = true,
+            candidates = exportCandidates
         )
     }
 
-    private fun createInterpreterOrNull(): Interpreter? {
+    private fun runModelProbabilities(bitmap: Bitmap): FloatArray? {
+        val localModule = module ?: return null
+        val inputTensor = preprocessBitmap(bitmap)
+        val outputTensor = localModule
+            .forward(IValue.from(inputTensor))
+            .toTensor()
+        val rawOutput = outputTensor.dataAsFloatArray
+
+        if (rawOutput.isEmpty()) {
+            return null
+        }
+
+        return toProbabilities(rawOutput)
+    }
+
+    private fun createModuleOrNull(): Module? {
+        val modelPath = try {
+            copyAssetToFilesDir(resolvedModelFileName)
+        } catch (exception: Exception) {
+            modelLoadDiagnostic = "Asset do modelo nao encontrado em assets/$resolvedModelFileName"
+            return null
+        }
+
         return try {
-            Interpreter(loadModelFile())
-        } catch (_: Exception) {
+            Module.load(modelPath).also {
+                modelLoadDiagnostic = null
+            }
+        } catch (loaderException: Exception) {
+            modelLoadDiagnostic = buildLoadDiagnostic(loaderException)
             null
         }
     }
 
-    private fun loadModelFile(): MappedByteBuffer {
-        val fileDescriptor = context.assets.openFd(modelFileName)
-        FileInputStream(fileDescriptor.fileDescriptor).channel.use { fileChannel ->
-            return fileChannel.map(
-                FileChannel.MapMode.READ_ONLY,
-                fileDescriptor.startOffset,
-                fileDescriptor.declaredLength
-            )
+    private fun buildLoadDiagnostic(loaderException: Exception): String {
+        val errorMessage = loaderException.message?.trim().orEmpty()
+
+        val probablyNotTorchScript =
+            errorMessage.contains("PytorchStreamReader", ignoreCase = true) ||
+                errorMessage.contains("constants.pkl", ignoreCase = true)
+
+        if (probablyNotTorchScript) {
+            return "Arquivo invalido para PyTorch Android. Exporte para TorchScript (.pt ou .ptl)."
         }
+
+        if (errorMessage.isNotBlank()) {
+            return "Falha ao abrir o modelo: $errorMessage"
+        }
+
+        return "Falha ao abrir o modelo no Android (Module.load)."
+    }
+
+    private fun resolveModelFileName(): String {
+        val assetNames = context.assets.list("")?.toSet().orEmpty()
+
+        return when {
+            assetNames.contains(modelFileName) -> modelFileName
+            assetNames.contains(DEFAULT_MODEL_FILE) -> DEFAULT_MODEL_FILE
+            assetNames.contains(LEGACY_MODEL_FILE) -> LEGACY_MODEL_FILE
+            else -> modelFileName
+        }
+    }
+
+    private fun copyAssetToFilesDir(assetName: String): String {
+        val destinationFile = File(context.filesDir, assetName)
+        context.assets.open(assetName).use { inputStream ->
+            FileOutputStream(destinationFile, false).use { outputStream ->
+                inputStream.copyTo(outputStream)
+            }
+        }
+
+        return destinationFile.absolutePath
     }
 
     private fun loadLabels(): List<String> {
@@ -87,32 +183,19 @@ class MobileNetV3Classifier(
         }
     }
 
-    private fun preprocessBitmap(bitmap: Bitmap): ByteBuffer {
+    private fun preprocessBitmap(bitmap: Bitmap): Tensor {
         val scaled = Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, true)
-        val byteBuffer = ByteBuffer
-            .allocateDirect(1 * inputSize * inputSize * 3 * 4)
-            .order(ByteOrder.nativeOrder())
-
-        val pixels = IntArray(inputSize * inputSize)
-        scaled.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize)
-
-        for (pixel in pixels) {
-            val r = ((pixel shr 16) and 0xFF) / 255f
-            val g = ((pixel shr 8) and 0xFF) / 255f
-            val b = (pixel and 0xFF) / 255f
-
-            // MobileNetV3 geralmente usa normalizacao em [-1, 1].
-            byteBuffer.putFloat((r - 0.5f) / 0.5f)
-            byteBuffer.putFloat((g - 0.5f) / 0.5f)
-            byteBuffer.putFloat((b - 0.5f) / 0.5f)
-        }
-
-        return byteBuffer
+        return TensorImageUtils.bitmapToFloat32Tensor(scaled, TORCHVISION_MEAN_RGB, TORCHVISION_STD_RGB)
     }
 
     private fun toProbabilities(rawOutput: FloatArray): FloatArray {
+        if (rawOutput.isEmpty()) {
+            return rawOutput
+        }
+
         val appearsProbability = rawOutput.all { it in 0f..1f }
-        if (appearsProbability) {
+        val probabilitySum = rawOutput.sum()
+        if (appearsProbability && probabilitySum in 0.99f..1.01f) {
             return rawOutput
         }
 
@@ -134,9 +217,17 @@ class MobileNetV3Classifier(
     }
 
     companion object {
-        const val DEFAULT_MODEL_FILE = "mobilenetv3_small.tflite"
+        const val DEFAULT_MODEL_FILE = "mobilenetv3_small_best_android.pt"
+        const val LEGACY_MODEL_FILE = "mobilenetv3_small_best.pt"
         const val DEFAULT_LABELS_FILE = "species_labels.txt"
         const val DEFAULT_INPUT_SIZE = 224
-        const val FALLBACK_LABEL = "Modelo MobileNetV3-Small ainda nao treinado"
+        const val MODEL_DISPLAY_NAME = "MobileNetV3 (PyTorch)"
+        const val FALLBACK_LABEL = "Modelo PyTorch ainda indisponivel"
+        const val MIN_DISPLAY_CONFIDENCE = 0.30f
+
+        private const val MAX_DISPLAY_CANDIDATES = 5
+
+        private val TORCHVISION_MEAN_RGB = floatArrayOf(0.485f, 0.456f, 0.406f)
+        private val TORCHVISION_STD_RGB = floatArrayOf(0.229f, 0.224f, 0.225f)
     }
 }

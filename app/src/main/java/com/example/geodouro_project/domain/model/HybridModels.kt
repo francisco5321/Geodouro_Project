@@ -23,13 +23,19 @@ data class EnrichedSpeciesData(
     val updatedAt: Long
 )
 
+data class LocalPredictionCandidate(
+    val species: String,
+    val confidence: Float
+)
+
 data class LocalInferenceResult(
     val imageUri: String,
     val capturedAt: Long = System.currentTimeMillis(),
     val latitude: Double?,
     val longitude: Double?,
     val predictedSpecies: String,
-    val confidence: Float
+    val confidence: Float,
+    val candidatePredictions: List<LocalPredictionCandidate> = emptyList()
 )
 
 data class EnrichmentResult(
