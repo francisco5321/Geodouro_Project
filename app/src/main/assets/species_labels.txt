@@ -1,0 +1,4 @@
+# Rotulos placeholder.
+# Substituir por labels reais apos treino do MobileNetV3-Small.
+
+classe_0
