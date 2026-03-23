@@ -32,6 +32,7 @@ fun AppNavigation() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "home"
     var latestInferenceResult by remember { mutableStateOf<LocalInferenceResult?>(null) }
+    var latestMultiImageUris by remember { mutableStateOf<List<String>>(emptyList()) }
     
     // Rotas que mostram bottom navigation
     val bottomNavRoutes = listOf("home", "community", "identify", "list", "profile")
@@ -73,6 +74,12 @@ fun AppNavigation() {
                 IdentifyScreen(
                     onIdentifyClick = { inferenceResult ->
                         latestInferenceResult = inferenceResult
+                        latestMultiImageUris = emptyList()
+                        navController.navigate("results")
+                    },
+                    onIdentifyMultipleClick = { imageUris ->
+                        latestInferenceResult = null
+                        latestMultiImageUris = imageUris
                         navController.navigate("results")
                     }
                 )
@@ -95,6 +102,7 @@ fun AppNavigation() {
                         // Navegar para detalhes ou voltar
                         navController.popBackStack()
                     },
+                    multiImageUris = latestMultiImageUris,
                     localInferenceResult = latestInferenceResult ?: LocalInferenceResult(
                         imageUri = "",
                         latitude = null,

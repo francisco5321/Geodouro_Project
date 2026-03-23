@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -31,6 +32,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -38,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -64,16 +67,21 @@ import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
 import java.io.File
 import java.io.FileOutputStream
+import android.graphics.BitmapFactory
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun IdentifyScreen(onIdentifyClick: (LocalInferenceResult) -> Unit) {
+fun IdentifyScreen(
+    onIdentifyClick: (LocalInferenceResult) -> Unit,
+    onIdentifyMultipleClick: (List<String>) -> Unit = {}
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val classifier = remember { MobileNetV3Classifier(context.applicationContext) }
     val snackbarHostState = remember { SnackbarHostState() }
     var isProcessing by rememberSaveable { mutableStateOf(false) }
+    val capturedImageUris = remember { mutableStateListOf<String>() }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -86,45 +94,17 @@ fun IdentifyScreen(onIdentifyClick: (LocalInferenceResult) -> Unit) {
         }
 
         scope.launch {
-            isProcessing = true
-
             runCatching {
-                val prediction = classifier.classify(bitmap)
                 val imageUri = saveCapturedBitmap(context, bitmap)
-
-                if (!prediction.fromModel) {
-                    val diagnostic = classifier.getModelLoadDiagnostic()
-                    snackbarHostState.showSnackbar(
-                        if (diagnostic.isNullOrBlank()) {
-                            "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} ainda indisponivel. Resultado de fallback aplicado."
-                        } else {
-                            "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} indisponivel: $diagnostic"
-                        }
-                    )
-                }
-
-                onIdentifyClick(
-                    LocalInferenceResult(
-                        imageUri = imageUri,
-                        latitude = null,
-                        longitude = null,
-                        predictedSpecies = prediction.label,
-                        confidence = prediction.confidence,
-                        candidatePredictions = prediction.candidates.map { candidate ->
-                            LocalPredictionCandidate(
-                                species = candidate.label,
-                                confidence = candidate.confidence
-                            )
-                        }
-                    )
+                capturedImageUris.add(imageUri)
+                snackbarHostState.showSnackbar(
+                    "Imagem ${capturedImageUris.size} capturada."
                 )
             }.onFailure {
                 snackbarHostState.showSnackbar(
-                    "Falha na identificacao local: ${it.message ?: "erro desconhecido"}"
+                    "Falha ao guardar captura: ${it.message ?: "erro desconhecido"}"
                 )
             }
-
-            isProcessing = false
         }
     }
 
@@ -217,9 +197,16 @@ fun IdentifyScreen(onIdentifyClick: (LocalInferenceResult) -> Unit) {
                 )
 
                 Text(
-                    text = if (isProcessing) "A identificar..." else "Toque para identificar",
+                    text = if (isProcessing) "A identificar..." else "Toque para capturar",
                     style = MaterialTheme.typography.bodyLarge,
                     color = GeodouroTextSecondary,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                Text(
+                    text = "Imagens capturadas: ${capturedImageUris.size}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = GeodouroTextPrimary,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
@@ -262,6 +249,83 @@ fun IdentifyScreen(onIdentifyClick: (LocalInferenceResult) -> Unit) {
 
                 Spacer(modifier = Modifier.height(32.dp))
 
+                Button(
+                    onClick = {
+                        if (isProcessing || capturedImageUris.isEmpty()) {
+                            return@Button
+                        }
+
+                        scope.launch {
+                            isProcessing = true
+
+                            runCatching {
+                                if (capturedImageUris.size >= 2) {
+                                    onIdentifyMultipleClick(capturedImageUris.toList())
+                                } else {
+                                    val imageUri = capturedImageUris.first()
+                                    val bitmap = decodeCapturedBitmap(context, imageUri)
+                                        ?: throw IllegalStateException("Nao foi possivel ler a imagem capturada")
+                                    val prediction = classifier.classify(bitmap)
+
+                                    if (!prediction.fromModel) {
+                                        val diagnostic = classifier.getModelLoadDiagnostic()
+                                        snackbarHostState.showSnackbar(
+                                            if (diagnostic.isNullOrBlank()) {
+                                                "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} ainda indisponivel. Resultado de fallback aplicado."
+                                            } else {
+                                                "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} indisponivel: $diagnostic"
+                                            }
+                                        )
+                                    }
+
+                                    onIdentifyClick(
+                                        LocalInferenceResult(
+                                            imageUri = imageUri,
+                                            latitude = null,
+                                            longitude = null,
+                                            predictedSpecies = prediction.label,
+                                            confidence = prediction.confidence,
+                                            candidatePredictions = prediction.candidates.map { candidate ->
+                                                LocalPredictionCandidate(
+                                                    species = candidate.label,
+                                                    confidence = candidate.confidence
+                                                )
+                                            }
+                                        )
+                                    )
+                                }
+                            }.onFailure {
+                                snackbarHostState.showSnackbar(
+                                    "Falha na identificacao local: ${it.message ?: "erro desconhecido"}"
+                                )
+                            }
+
+                            isProcessing = false
+                        }
+                    },
+                    enabled = !isProcessing && capturedImageUris.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val label = if (capturedImageUris.size >= 2) {
+                        "Analisar ${capturedImageUris.size} imagens"
+                    } else {
+                        "Analisar 1 imagem"
+                    }
+                    Text(label)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = { capturedImageUris.clear() },
+                    enabled = !isProcessing && capturedImageUris.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Limpar capturas")
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -287,7 +351,7 @@ fun IdentifyScreen(onIdentifyClick: (LocalInferenceResult) -> Unit) {
                                 color = GeodouroTextPrimary
                             )
                             Text(
-                                text = "Adicione ${MobileNetV3Classifier.DEFAULT_MODEL_FILE} e labels para inferencia final.",
+                                text = "Capture 2+ imagens para usar o modo multi-imagem com consenso.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = GeodouroTextSecondary
                             )
@@ -297,6 +361,15 @@ fun IdentifyScreen(onIdentifyClick: (LocalInferenceResult) -> Unit) {
             }
         }
     }
+}
+
+private fun decodeCapturedBitmap(context: Context, imageUri: String): Bitmap? {
+    val parsedUri = Uri.parse(imageUri)
+    return runCatching {
+        context.contentResolver.openInputStream(parsedUri)?.use { inputStream ->
+            BitmapFactory.decodeStream(inputStream)
+        }
+    }.getOrNull()
 }
 
 private fun saveCapturedBitmap(context: Context, bitmap: Bitmap): String {

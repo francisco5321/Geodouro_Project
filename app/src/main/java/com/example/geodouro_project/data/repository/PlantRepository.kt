@@ -12,11 +12,16 @@ import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.local.entity.TaxonCacheEntity
 import com.example.geodouro_project.data.remote.api.INaturalistApiService
 import com.example.geodouro_project.data.remote.model.InaturalistTaxonDto
+import com.example.geodouro_project.domain.model.ConfidencePolicy
+import com.example.geodouro_project.domain.model.ConfidenceState
 import com.example.geodouro_project.domain.model.EnrichedSpeciesData
 import com.example.geodouro_project.domain.model.EnrichmentOrigin
 import com.example.geodouro_project.domain.model.EnrichmentResult
+import com.example.geodouro_project.domain.model.ImageInferenceResult
 import com.example.geodouro_project.domain.model.LocalInferenceResult
 import com.example.geodouro_project.domain.model.LocalPredictionCandidate
+import com.example.geodouro_project.domain.model.MultiImageAggregationConfig
+import com.example.geodouro_project.domain.model.MultiImageAggregationResult
 import com.example.geodouro_project.domain.model.ObservationSaveResult
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
 import java.util.Locale
@@ -328,6 +333,166 @@ class PlantRepository(
         val similarity: Float,
         val fusedScore: Float
     )
+
+    /**
+     * Classifica múltiplas imagens em paralelo e agrega os resultados
+     * com votação ponderada por confiança
+     */
+    suspend fun inferMultipleImages(
+        imageUris: List<String>,
+        config: MultiImageAggregationConfig = MultiImageAggregationConfig()
+    ): MultiImageAggregationResult = withContext(Dispatchers.Default) {
+        if (imageUris.isEmpty() || imageUris.size < config.minImagesRequired) {
+            throw IllegalArgumentException(
+                "Número de imagens inválido: ${imageUris.size}. " +
+                "Requerido: ${config.minImagesRequired}-${config.maxImagesRequired}"
+            )
+        }
+
+        val imagesToProcess = imageUris.take(config.maxImagesRequired)
+        val startTime = System.currentTimeMillis()
+
+        // Classifica todas as imagens em paralelo
+        val imageResults = imagesToProcess.map { imageUri ->
+            runCatching {
+                val bitmap = decodeLocalBitmap(imageUri)
+                    ?: return@runCatching ImageInferenceResult(
+                        imageUri = imageUri,
+                        predictedSpecies = "UNKNOWN",
+                        confidence = 0f,
+                        candidatePredictions = emptyList()
+                    )
+
+                val prediction = classifier.classify(bitmap)
+                val embedding = classifier.extractEmbedding(bitmap)
+
+                ImageInferenceResult(
+                    imageUri = imageUri,
+                    predictedSpecies = prediction.label,
+                    confidence = prediction.confidence,
+                    candidatePredictions = prediction.candidates.map { candidate ->
+                        LocalPredictionCandidate(
+                            species = candidate.label,
+                            confidence = candidate.confidence
+                        )
+                    },
+                    embedding = embedding,
+                    capturedAt = System.currentTimeMillis()
+                )
+            }.getOrNull() ?: ImageInferenceResult(
+                imageUri = imageUri,
+                predictedSpecies = "ERROR",
+                confidence = 0f,
+                candidatePredictions = emptyList()
+            )
+        }
+
+        val processingTimeMs = System.currentTimeMillis() - startTime
+
+        return@withContext aggregateMultipleInferences(
+            imageResults = imageResults,
+            config = config,
+            processingTimeMs = processingTimeMs
+        )
+    }
+
+    /**
+     * Agrega múltiplas inferências com votação ponderada ou simples
+     */
+    suspend fun aggregateMultipleInferences(
+        imageResults: List<ImageInferenceResult>,
+        config: MultiImageAggregationConfig = MultiImageAggregationConfig(),
+        processingTimeMs: Long = 0
+    ): MultiImageAggregationResult = withContext(Dispatchers.Default) {
+        if (imageResults.isEmpty()) {
+            throw IllegalArgumentException("Lista de imagens não pode estar vazia")
+        }
+
+        // Filtra resultados válidos
+        val validResults = imageResults.filter { it.predictedSpecies != "ERROR" && it.predictedSpecies != "UNKNOWN" }
+        if (validResults.isEmpty()) {
+            throw IllegalArgumentException("Nenhuma imagem foi classificada com sucesso")
+        }
+
+        // Calcula votos (simples ou ponderado)
+        val speciesVotes = mutableMapOf<String, Int>()
+        val confidencePerSpecies = mutableMapOf<String, MutableList<Float>>()
+
+        validResults.forEach { result ->
+            val species = result.predictedSpecies
+            if (config.confidenceWeightedVoting) {
+                // Votação ponderada: cada imagem vota com peso = confiança
+                speciesVotes[species] = (speciesVotes[species] ?: 0) + 1
+                confidencePerSpecies.getOrPut(species) { mutableListOf() }.add(result.confidence)
+            } else {
+                // Votação simples: cada imagem = 1 voto
+                speciesVotes[species] = (speciesVotes[species] ?: 0) + 1
+                confidencePerSpecies.getOrPut(species) { mutableListOf() }.add(result.confidence)
+            }
+        }
+
+        // Ordena por número de votos (depois por confiança média)
+        val sortedSpecies = speciesVotes.entries
+            .sortedWith(compareBy<Map.Entry<String, Int>> { -it.value }
+                .thenBy { -(confidencePerSpecies[it.key]?.average() ?: 0.0) })
+
+        val finalSpecies = sortedSpecies.firstOrNull()?.key ?: "UNKNOWN"
+        val finalConfidences = confidencePerSpecies[finalSpecies] ?: emptyList()
+        val aggregatedConfidence = if (finalConfidences.isNotEmpty()) {
+            finalConfidences.average().toFloat()
+        } else {
+            0f
+        }
+
+        // Resultado da segunda melhor espécie
+        val topAlternative = sortedSpecies.getOrNull(1)?.key
+        val topAlternativeConfidences = topAlternative?.let { confidencePerSpecies[it] } ?: emptyList()
+        val topAlternativeConfidence = if (topAlternativeConfidences.isNotEmpty()) {
+            topAlternativeConfidences.average().toFloat()
+        } else {
+            null
+        }
+
+        // Avalia estado de confiança
+        val policy = ConfidencePolicy()
+        val confidenceState = policy.evaluate(aggregatedConfidence, topAlternativeConfidence)
+
+        // Valida consenso se requerido
+        val consensusScore = if (speciesVotes.isNotEmpty()) {
+            (speciesVotes[finalSpecies] ?: 0).toFloat() / validResults.size
+        } else {
+            0f
+        }
+
+        if (config.requireConsensus && consensusScore < config.minConsensusScore) {
+            // Se exigir consenso e não conseguir, retorna estado AMBIGUOUS
+            return@withContext MultiImageAggregationResult(
+                finalPredictedSpecies = finalSpecies,
+                aggregatedConfidence = aggregatedConfidence,
+                confidenceState = ConfidenceState.AMBIGUOUS,
+                speciesVotes = speciesVotes,
+                confidencePerSpecies = confidencePerSpecies.mapValues { it.value.average().toFloat() },
+                processedImages = validResults,
+                totalImagesAnalyzed = imageResults.size,
+                topAlternative = topAlternative,
+                topAlternativeConfidence = topAlternativeConfidence,
+                processingTimeMs = processingTimeMs
+            )
+        }
+
+        return@withContext MultiImageAggregationResult(
+            finalPredictedSpecies = finalSpecies,
+            aggregatedConfidence = aggregatedConfidence,
+            confidenceState = confidenceState,
+            speciesVotes = speciesVotes,
+            confidencePerSpecies = confidencePerSpecies.mapValues { it.value.average().toFloat() },
+            processedImages = validResults,
+            totalImagesAnalyzed = imageResults.size,
+            topAlternative = topAlternative,
+            topAlternativeConfidence = topAlternativeConfidence,
+            processingTimeMs = processingTimeMs
+        )
+    }
 
     companion object {
         private const val LOW_CONFIDENCE_THRESHOLD = 0.30f

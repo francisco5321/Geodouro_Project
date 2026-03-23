@@ -2,6 +2,9 @@ package com.example.geodouro_project.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -45,10 +49,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -77,6 +84,7 @@ data class IdentificationResult(
 fun ResultsScreen(
     onBackClick: () -> Unit,
     onConfirmResult: (IdentificationResult) -> Unit,
+    multiImageUris: List<String> = emptyList(),
     localInferenceResult: LocalInferenceResult = LocalInferenceResult(
         imageUri = "",
         latitude = null,
@@ -93,8 +101,12 @@ fun ResultsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var shouldNavigateAfterSave by remember { mutableStateOf(false) }
 
-    LaunchedEffect(localInferenceResult) {
-        viewModel.loadHybridResult(localInferenceResult)
+    LaunchedEffect(localInferenceResult, multiImageUris) {
+        if (multiImageUris.size >= 2) {
+            viewModel.loadMultiImageResult(multiImageUris)
+        } else {
+            viewModel.loadHybridResult(localInferenceResult)
+        }
     }
 
     LaunchedEffect(uiState, shouldNavigateAfterSave) {
@@ -102,12 +114,21 @@ fun ResultsScreen(
             return@LaunchedEffect
         }
 
-        val currentState = uiState as? ResultsUiState.Success ?: return@LaunchedEffect
-        if (currentState.saveMessage == null) {
-            return@LaunchedEffect
+        when (val state = uiState) {
+            is ResultsUiState.Success -> {
+                if (state.saveMessage == null) {
+                    return@LaunchedEffect
+                }
+                onConfirmResult(state.result.toIdentificationResult(state.sourceLabel))
+            }
+            is ResultsUiState.MultiImageSuccess -> {
+                if (state.saveMessage == null) {
+                    return@LaunchedEffect
+                }
+                onConfirmResult(state.result.toIdentificationResult(state.sourceLabel))
+            }
+            else -> return@LaunchedEffect
         }
-
-        onConfirmResult(currentState.result.toIdentificationResult(currentState.sourceLabel))
         shouldNavigateAfterSave = false
     }
 
@@ -165,6 +186,19 @@ fun ResultsScreen(
 
                 is ResultsUiState.Success -> {
                     ResultCard(
+                        result = state.result,
+                        sourceLabel = state.sourceLabel,
+                        saveMessage = state.saveMessage,
+                        onSyncPending = { viewModel.syncPendingObservations() },
+                        onConfirm = {
+                            shouldNavigateAfterSave = true
+                            viewModel.confirmObservation()
+                        }
+                    )
+                }
+
+                is ResultsUiState.MultiImageSuccess -> {
+                    MultiImageResultCard(
                         result = state.result,
                         sourceLabel = state.sourceLabel,
                         saveMessage = state.saveMessage,
@@ -501,12 +535,388 @@ private fun AlternativePredictionsSection(predictions: List<LocalPredictionCandi
     }
 }
 
+@Composable
+fun MultiImageResultCard(
+    result: MultiImageResultUiModel,
+    sourceLabel: String,
+    saveMessage: String?,
+    onSyncPending: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
+        elevation = CardDefaults.cardElevation(2.dp),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Mostrar consenso e número de imagens
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = GeodouroLightBg,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Análise de ${result.imagesCount} imagem(ns)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = GeodouroTextPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Consenso: ${(result.consensus * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = GeodouroTextSecondary
+                        )
+                    }
+                    Text(
+                        text = "${result.processingTimeMs}ms",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = GeodouroTextSecondary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            MultiImagePhotosSection(
+                capturedImageUris = result.imageUris,
+                referencePhotoUrl = result.photoUrl,
+                referenceTitle = "Foto da planta mais parecida"
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = result.finalSpecies,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = GeodouroTextPrimary
+            )
+
+            Text(
+                text = result.commonName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = GeodouroTextSecondary
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = result.family,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GeodouroTextSecondary
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "${(result.aggregatedConfidence * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = GeodouroGreen,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LinearProgressIndicator(
+                progress = { result.aggregatedConfidence },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = GeodouroGreen,
+                trackColor = GeodouroLightBg
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = GeodouroLightBg,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = sourceLabel,
+                    modifier = Modifier.padding(10.dp),
+                    color = GeodouroTextPrimary,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            if (!result.wikipediaUrl.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Wikipedia: ${result.wikipediaUrl}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GeodouroTextSecondary
+                )
+            }
+
+            // Mostrar alternativa se existir
+            if (!result.topAlternative.isNullOrBlank() && result.topAlternativeConfidence != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color(0xFFFFF3E0),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Alternativa:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = GeodouroTextSecondary
+                            )
+                            Text(
+                                text = result.topAlternative ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = GeodouroTextPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            text = "${(result.topAlternativeConfidence!! * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = GeodouroTextPrimary
+                        )
+                    }
+                }
+            }
+
+            if (!saveMessage.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = GeodouroGreen
+                    )
+                    Text(
+                        text = saveMessage,
+                        color = GeodouroTextPrimary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = onConfirm,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = GeodouroGreen
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(text = "Confirmar e guardar", color = Color.White)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedButton(
+                onClick = onSyncPending,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(text = "Tentar sincronizar pendentes")
+            }
+        }
+    }
+}
+
+@Composable
+private fun MultiImagePhotosSection(
+    capturedImageUris: List<String>,
+    referencePhotoUrl: String?,
+    referenceTitle: String
+) {
+    var selectedImageIndex by remember { mutableStateOf<Int?>(null) }
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = "Fotos capturadas",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = GeodouroTextPrimary
+        )
+
+        if (capturedImageUris.isEmpty()) {
+            ResultPhotoCard(
+                title = "Capturas",
+                imageModel = null,
+                emptyMessage = "Sem fotos capturadas para mostrar."
+            )
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                capturedImageUris.forEachIndexed { index, imageUri ->
+                    Box {
+                        AsyncImage(
+                            model = imageUri,
+                            contentDescription = "Foto capturada ${index + 1}",
+                            modifier = Modifier
+                                .size(110.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(GeodouroLightBg)
+                                .clickable { selectedImageIndex = index },
+                            contentScale = ContentScale.Crop
+                        )
+
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(6.dp),
+                            shape = RoundedCornerShape(999.dp),
+                            color = GeodouroWhite.copy(alpha = 0.9f)
+                        ) {
+                            Text(
+                                text = "Foto ${index + 1}",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = GeodouroTextPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        ResultPhotoCard(
+            title = referenceTitle,
+            imageModel = referencePhotoUrl,
+            emptyMessage = "Sem foto remota disponivel para esta especie."
+        )
+    }
+
+    if (selectedImageIndex != null && capturedImageUris.isNotEmpty()) {
+        val currentIndex = selectedImageIndex!!.coerceIn(0, capturedImageUris.lastIndex)
+        val currentImageUri = capturedImageUris[currentIndex]
+
+        Dialog(
+            onDismissRequest = { selectedImageIndex = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = Color.Black
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp)
+                ) {
+                    AsyncImage(
+                        model = currentImageUri,
+                        contentDescription = "Foto capturada ampliada",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .pointerInput(currentIndex, capturedImageUris.size) {
+                                detectHorizontalDragGestures(
+                                    onHorizontalDrag = { _, dragAmount ->
+                                        when {
+                                            dragAmount > 20f && currentIndex > 0 -> {
+                                                selectedImageIndex = currentIndex - 1
+                                            }
+                                            dragAmount < -20f && currentIndex < capturedImageUris.lastIndex -> {
+                                                selectedImageIndex = currentIndex + 1
+                                            }
+                                        }
+                                    }
+                                )
+                            },
+                        contentScale = ContentScale.Fit
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = { selectedImageIndex = (currentIndex - 1).coerceAtLeast(0) },
+                            enabled = currentIndex > 0
+                        ) {
+                            Text("Anterior")
+                        }
+
+                        Text(
+                            text = "${currentIndex + 1} / ${capturedImageUris.size}",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+
+                        OutlinedButton(
+                            onClick = { selectedImageIndex = (currentIndex + 1).coerceAtMost(capturedImageUris.lastIndex) },
+                            enabled = currentIndex < capturedImageUris.lastIndex
+                        ) {
+                            Text("Seguinte")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = { selectedImageIndex = null },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = GeodouroGreen)
+                    ) {
+                        Text("Fechar", color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}
+
 private fun ResultUiModel.toIdentificationResult(sourceLabel: String): IdentificationResult {
     return IdentificationResult(
         scientificName = scientificName,
         commonName = commonName,
         family = family,
         confidence = confidence,
+        sourceLabel = sourceLabel,
+        wikipediaUrl = wikipediaUrl,
+        photoUrl = photoUrl
+    )
+}
+
+private fun MultiImageResultUiModel.toIdentificationResult(sourceLabel: String): IdentificationResult {
+    return IdentificationResult(
+        scientificName = finalSpecies,
+        commonName = commonName,
+        family = family,
+        confidence = aggregatedConfidence,
         sourceLabel = sourceLabel,
         wikipediaUrl = wikipediaUrl,
         photoUrl = photoUrl

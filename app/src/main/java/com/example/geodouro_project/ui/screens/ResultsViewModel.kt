@@ -10,6 +10,8 @@ import com.example.geodouro_project.domain.model.EnrichedSpeciesData
 import com.example.geodouro_project.domain.model.EnrichmentOrigin
 import com.example.geodouro_project.domain.model.LocalInferenceResult
 import com.example.geodouro_project.domain.model.LocalPredictionCandidate
+import com.example.geodouro_project.domain.model.MultiImageAggregationConfig
+import com.example.geodouro_project.domain.model.MultiImageAggregationResult
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,12 +29,33 @@ data class ResultUiModel(
     val alternativePredictions: List<LocalPredictionCandidate>
 )
 
+data class MultiImageResultUiModel(
+    val finalSpecies: String,
+    val commonName: String,
+    val family: String,
+    val aggregatedConfidence: Float,
+    val imagesCount: Int,
+    val consensus: Float,
+    val topAlternative: String?,
+    val topAlternativeConfidence: Float?,
+    val wikipediaUrl: String?,
+    val photoUrl: String?,
+    val imageUris: List<String>,
+    val processingTimeMs: Long
+)
+
 sealed class ResultsUiState {
     data object Idle : ResultsUiState()
     data object Loading : ResultsUiState()
 
     data class Success(
         val result: ResultUiModel,
+        val sourceLabel: String,
+        val saveMessage: String? = null
+    ) : ResultsUiState()
+
+    data class MultiImageSuccess(
+        val result: MultiImageResultUiModel,
         val sourceLabel: String,
         val saveMessage: String? = null
     ) : ResultsUiState()
@@ -51,6 +74,7 @@ class ResultsViewModel(
 
     private var lastInferenceResult: LocalInferenceResult? = null
     private var lastEnrichedData: EnrichedSpeciesData? = null
+    private var lastMultiImageResult: MultiImageAggregationResult? = null
 
     fun loadHybridResult(localInferenceResult: LocalInferenceResult) {
         viewModelScope.launch {
@@ -85,22 +109,95 @@ class ResultsViewModel(
         }
     }
 
-    fun confirmObservation() {
-        val inference = lastInferenceResult
+    /**
+     * Carrega resultado de múltiplas imagens com agregação por votação
+     */
+    fun loadMultiImageResult(
+        imageUris: List<String>,
+        config: MultiImageAggregationConfig = MultiImageAggregationConfig()
+    ) {
+        viewModelScope.launch {
+            _uiState.value = ResultsUiState.Loading
 
-        if (inference == null) {
-            _uiState.value = ResultsUiState.Error("Sem inferencia local para guardar.")
-            return
+            val aggregationResult = try {
+                repository.inferMultipleImages(imageUris, config)
+            } catch (e: Exception) {
+                _uiState.value = ResultsUiState.Error(
+                    message = "Erro ao processar múltiplas imagens: ${e.message ?: "Desconhecido"}"
+                )
+                return@launch
+            }
+
+            lastMultiImageResult = aggregationResult
+
+            val enrichmentResult = try {
+                repository.enrichSpecies(aggregationResult.finalPredictedSpecies)
+            } catch (_: Exception) {
+                lastEnrichedData = null
+                _uiState.value = ResultsUiState.MultiImageSuccess(
+                    result = buildMultiImageUiModel(aggregationResult, null),
+                    sourceLabel = "Falha na API. A mostrar apenas resultado local."
+                )
+                return@launch
+            }
+
+            lastEnrichedData = enrichmentResult.data
+            _uiState.value = ResultsUiState.MultiImageSuccess(
+                result = buildMultiImageUiModel(aggregationResult, enrichmentResult.data),
+                sourceLabel = multiImageSourceLabel(aggregationResult)
+            )
         }
+    }
 
+    fun confirmObservation() {
         viewModelScope.launch {
             val current = _uiState.value
-            if (current !is ResultsUiState.Success) {
+
+            val inferenceToPersist = when (current) {
+                is ResultsUiState.Success -> {
+                    lastInferenceResult
+                }
+                is ResultsUiState.MultiImageSuccess -> {
+                    val multi = lastMultiImageResult
+                    if (multi == null) {
+                        _uiState.value = ResultsUiState.Error("Sem resultado multi-imagem para guardar.")
+                        return@launch
+                    }
+
+                    LocalInferenceResult(
+                        imageUri = multi.processedImages.firstOrNull()?.imageUri.orEmpty(),
+                        latitude = null,
+                        longitude = null,
+                        predictedSpecies = multi.finalPredictedSpecies,
+                        confidence = multi.aggregatedConfidence,
+                        candidatePredictions = buildList {
+                            add(
+                                LocalPredictionCandidate(
+                                    species = multi.finalPredictedSpecies,
+                                    confidence = multi.aggregatedConfidence
+                                )
+                            )
+                            if (!multi.topAlternative.isNullOrBlank() && multi.topAlternativeConfidence != null) {
+                                add(
+                                    LocalPredictionCandidate(
+                                        species = multi.topAlternative,
+                                        confidence = multi.topAlternativeConfidence
+                                    )
+                                )
+                            }
+                        }
+                    )
+                }
+                else -> return@launch
+            }
+
+            if (inferenceToPersist == null || inferenceToPersist.imageUri.isBlank()) {
+                _uiState.value = ResultsUiState.Error("Sem inferencia local para guardar.")
                 return@launch
             }
 
             val saveResult = repository.saveObservation(
-                localResult = inference,
+                localResult = inferenceToPersist,
                 enrichedData = lastEnrichedData
             )
 
@@ -110,7 +207,17 @@ class ResultsViewModel(
                 ObservationSyncStatus.FAILED -> "Observacao guardada. Sync falhou, sera tentado novamente."
             }
 
-            _uiState.value = current.copy(saveMessage = message)
+            _uiState.value = when (current) {
+                is ResultsUiState.Success -> {
+                    current.copy(saveMessage = message)
+                }
+                is ResultsUiState.MultiImageSuccess -> {
+                    current.copy(saveMessage = message)
+                }
+                else -> {
+                    current
+                }
+            }
         }
     }
 
@@ -140,6 +247,26 @@ class ResultsViewModel(
         )
     }
 
+    private fun buildMultiImageUiModel(
+        multiImageResult: MultiImageAggregationResult,
+        enrichedData: EnrichedSpeciesData?
+    ): MultiImageResultUiModel {
+        return MultiImageResultUiModel(
+            finalSpecies = enrichedData?.scientificName ?: multiImageResult.finalPredictedSpecies,
+            commonName = enrichedData?.commonName ?: "Nome comum indisponivel",
+            family = enrichedData?.family ?: "Familia indisponivel",
+            aggregatedConfidence = multiImageResult.aggregatedConfidence,
+            imagesCount = multiImageResult.totalImagesAnalyzed,
+            consensus = multiImageResult.consensusScore,
+            topAlternative = multiImageResult.topAlternative,
+            topAlternativeConfidence = multiImageResult.topAlternativeConfidence,
+            wikipediaUrl = enrichedData?.wikipediaUrl,
+            photoUrl = enrichedData?.photoUrl,
+            imageUris = multiImageResult.processedImages.map { it.imageUri },
+            processingTimeMs = multiImageResult.processingTimeMs
+        )
+    }
+
     private fun enrichmentOriginLabel(origin: EnrichmentOrigin, rerankApplied: Boolean): String {
         val baseLabel = when (origin) {
             EnrichmentOrigin.CACHE -> "Dados enriquecidos via cache local."
@@ -152,6 +279,17 @@ class ResultsViewModel(
         } else {
             baseLabel
         }
+    }
+
+    private fun multiImageSourceLabel(result: MultiImageAggregationResult): String {
+        val baseLabel = when {
+            result.isUnanimous -> "✓ Consenso total: todas as ${result.totalImagesAnalyzed} imagens concordam."
+            result.consensusScore >= 0.8f -> "✓ Consenso forte: ${(result.consensusScore * 100).toInt()}% das imagens."
+            result.consensusScore >= 0.6f -> "⚠  Consenso moderado: ${(result.consensusScore * 100).toInt()}% das imagens."
+            else -> "⚠  Consenso baixo: ${(result.consensusScore * 100).toInt()}% das imagens."
+        }
+
+        return "$baseLabel\nTempo de processamento: ${result.processingTimeMs}ms"
     }
 
     companion object {
