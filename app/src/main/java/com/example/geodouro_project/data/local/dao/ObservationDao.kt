@@ -12,17 +12,20 @@ interface ObservationDao {
     @Upsert
     suspend fun upsert(entity: ObservationEntity)
 
-    @Query("SELECT * FROM observations WHERE id = :id LIMIT 1")
+    @Query("SELECT * FROM observation WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): ObservationEntity?
 
-    @Query("SELECT * FROM observations WHERE syncStatus = :syncStatus ORDER BY capturedAt ASC")
+    @Query("SELECT * FROM observation WHERE syncStatus = :syncStatus ORDER BY capturedAt ASC")
     suspend fun getBySyncStatus(syncStatus: String): List<ObservationEntity>
 
+    @Query("SELECT * FROM observation WHERE syncStatus IN (:syncStatuses) ORDER BY capturedAt ASC")
+    suspend fun getBySyncStatuses(syncStatuses: List<String>): List<ObservationEntity>
+
     @Query(
-        "UPDATE observations SET syncStatus = :syncStatus, lastSyncAttemptAt = :syncTimestamp WHERE id = :id"
+        "UPDATE observation SET syncStatus = :syncStatus, lastSyncAttemptAt = :syncTimestamp WHERE id = :id"
     )
     suspend fun updateSyncStatus(id: String, syncStatus: String, syncTimestamp: Long)
 
-    @Query("SELECT * FROM observations ORDER BY capturedAt DESC")
+    @Query("SELECT * FROM observation ORDER BY capturedAt DESC")
     fun observeAll(): Flow<List<ObservationEntity>>
 }

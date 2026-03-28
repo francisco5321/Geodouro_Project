@@ -1,6 +1,7 @@
-package com.example.geodouro_project.ui.screens
+﻿package com.example.geodouro_project.ui.screens
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -109,9 +110,6 @@ class ResultsViewModel(
         }
     }
 
-    /**
-     * Carrega resultado de múltiplas imagens com agregação por votação
-     */
     fun loadMultiImageResult(
         imageUris: List<String>,
         config: MultiImageAggregationConfig = MultiImageAggregationConfig()
@@ -123,7 +121,7 @@ class ResultsViewModel(
                 repository.inferMultipleImages(imageUris, config)
             } catch (e: Exception) {
                 _uiState.value = ResultsUiState.Error(
-                    message = "Erro ao processar múltiplas imagens: ${e.message ?: "Desconhecido"}"
+                    message = "Erro ao processar multiplas imagens: ${e.message ?: "Desconhecido"}"
                 )
                 return@launch
             }
@@ -151,72 +149,76 @@ class ResultsViewModel(
 
     fun confirmObservation() {
         viewModelScope.launch {
-            val current = _uiState.value
+            try {
+                Log.d(TAG, "confirmObservation tapped")
+                val current = _uiState.value
 
-            val inferenceToPersist = when (current) {
-                is ResultsUiState.Success -> {
-                    lastInferenceResult
-                }
-                is ResultsUiState.MultiImageSuccess -> {
-                    val multi = lastMultiImageResult
-                    if (multi == null) {
-                        _uiState.value = ResultsUiState.Error("Sem resultado multi-imagem para guardar.")
-                        return@launch
+                val inferenceToPersist = when (current) {
+                    is ResultsUiState.Success -> {
+                        lastInferenceResult
                     }
+                    is ResultsUiState.MultiImageSuccess -> {
+                        val multi = lastMultiImageResult
+                        if (multi == null) {
+                            _uiState.value = ResultsUiState.Error("Sem resultado multi-imagem para guardar.")
+                            return@launch
+                        }
 
-                    LocalInferenceResult(
-                        imageUri = multi.processedImages.firstOrNull()?.imageUri.orEmpty(),
-                        latitude = null,
-                        longitude = null,
-                        predictedSpecies = multi.finalPredictedSpecies,
-                        confidence = multi.aggregatedConfidence,
-                        candidatePredictions = buildList {
-                            add(
-                                LocalPredictionCandidate(
-                                    species = multi.finalPredictedSpecies,
-                                    confidence = multi.aggregatedConfidence
-                                )
-                            )
-                            if (!multi.topAlternative.isNullOrBlank() && multi.topAlternativeConfidence != null) {
+                        LocalInferenceResult(
+                            imageUri = multi.processedImages.firstOrNull()?.imageUri.orEmpty(),
+                            latitude = null,
+                            longitude = null,
+                            predictedSpecies = multi.finalPredictedSpecies,
+                            confidence = multi.aggregatedConfidence,
+                            candidatePredictions = buildList {
                                 add(
                                     LocalPredictionCandidate(
-                                        species = multi.topAlternative,
-                                        confidence = multi.topAlternativeConfidence
+                                        species = multi.finalPredictedSpecies,
+                                        confidence = multi.aggregatedConfidence
                                     )
                                 )
+                                if (!multi.topAlternative.isNullOrBlank() && multi.topAlternativeConfidence != null) {
+                                    add(
+                                        LocalPredictionCandidate(
+                                            species = multi.topAlternative,
+                                            confidence = multi.topAlternativeConfidence
+                                        )
+                                    )
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
+                    else -> return@launch
                 }
-                else -> return@launch
-            }
 
-            if (inferenceToPersist == null || inferenceToPersist.imageUri.isBlank()) {
-                _uiState.value = ResultsUiState.Error("Sem inferencia local para guardar.")
-                return@launch
-            }
-
-            val saveResult = repository.saveObservation(
-                localResult = inferenceToPersist,
-                enrichedData = lastEnrichedData
-            )
-
-            val message = when (saveResult.syncStatus) {
-                ObservationSyncStatus.SYNCED -> "Observacao guardada e sincronizada."
-                ObservationSyncStatus.PENDING -> "Observacao guardada localmente. Sync pendente."
-                ObservationSyncStatus.FAILED -> "Observacao guardada. Sync falhou, sera tentado novamente."
-            }
-
-            _uiState.value = when (current) {
-                is ResultsUiState.Success -> {
-                    current.copy(saveMessage = message)
+                if (inferenceToPersist == null || inferenceToPersist.imageUri.isBlank()) {
+                    _uiState.value = ResultsUiState.Error("Sem inferencia local para guardar.")
+                    return@launch
                 }
-                is ResultsUiState.MultiImageSuccess -> {
-                    current.copy(saveMessage = message)
+
+                Log.d(TAG, "Saving observation imageUri=${inferenceToPersist.imageUri} species=${inferenceToPersist.predictedSpecies}")
+                val saveResult = repository.saveObservation(
+                    localResult = inferenceToPersist,
+                    enrichedData = lastEnrichedData
+                )
+
+                Log.d(TAG, "saveObservation result observationId=${saveResult.observationId} syncStatus=${saveResult.syncStatus}")
+                val message = when (saveResult.syncStatus) {
+                    ObservationSyncStatus.SYNCED -> "Observacao guardada e sincronizada."
+                    ObservationSyncStatus.PENDING -> "Observacao guardada localmente. Sync pendente."
+                    ObservationSyncStatus.FAILED -> "Observacao guardada. Sync falhou, sera tentado novamente."
                 }
-                else -> {
-                    current
+
+                _uiState.value = when (current) {
+                    is ResultsUiState.Success -> current.copy(saveMessage = message)
+                    is ResultsUiState.MultiImageSuccess -> current.copy(saveMessage = message)
+                    else -> current
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error while confirming observation", e)
+                _uiState.value = ResultsUiState.Error(
+                    "Erro ao guardar observacao: ${e.message ?: "Desconhecido"}"
+                )
             }
         }
     }
@@ -283,10 +285,10 @@ class ResultsViewModel(
 
     private fun multiImageSourceLabel(result: MultiImageAggregationResult): String {
         val baseLabel = when {
-            result.isUnanimous -> "✓ Consenso total: todas as ${result.totalImagesAnalyzed} imagens concordam."
-            result.consensusScore >= 0.8f -> "✓ Consenso forte: ${(result.consensusScore * 100).toInt()}% das imagens."
-            result.consensusScore >= 0.6f -> "⚠  Consenso moderado: ${(result.consensusScore * 100).toInt()}% das imagens."
-            else -> "⚠  Consenso baixo: ${(result.consensusScore * 100).toInt()}% das imagens."
+            result.isUnanimous -> "Consenso total: todas as ${result.totalImagesAnalyzed} imagens concordam."
+            result.consensusScore >= 0.8f -> "Consenso forte: ${(result.consensusScore * 100).toInt()}% das imagens."
+            result.consensusScore >= 0.6f -> "Consenso moderado: ${(result.consensusScore * 100).toInt()}% das imagens."
+            else -> "Consenso baixo: ${(result.consensusScore * 100).toInt()}% das imagens."
         }
 
         return "$baseLabel\nTempo de processamento: ${result.processingTimeMs}ms"
@@ -294,6 +296,7 @@ class ResultsViewModel(
 
     companion object {
         private const val DISPLAY_ALTERNATIVE_THRESHOLD = 0.30f
+        private const val TAG = "ResultsViewModel"
 
         fun factory(context: Context): ViewModelProvider.Factory {
             return object : ViewModelProvider.Factory {

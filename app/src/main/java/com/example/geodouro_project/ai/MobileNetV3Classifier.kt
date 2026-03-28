@@ -106,10 +106,32 @@ class MobileNetV3Classifier(
         val rawOutput = outputTensor.dataAsFloatArray
 
         if (rawOutput.isEmpty()) {
+            modelLoadDiagnostic = "Saida vazia do modelo PyTorch."
             return null
         }
 
+        if (!validateOutputAgainstLabels(rawOutput.size)) {
+            return null
+        }
+
+        modelLoadDiagnostic = null
         return toProbabilities(rawOutput)
+    }
+
+    private fun validateOutputAgainstLabels(outputSize: Int): Boolean {
+        if (labels.isEmpty()) {
+            modelLoadDiagnostic =
+                "Ficheiro de labels vazio ou ausente (assets/$labelsFileName)."
+            return false
+        }
+
+        if (labels.size != outputSize) {
+            modelLoadDiagnostic =
+                "Incompatibilidade modelo/labels: output=$outputSize labels=${labels.size} (assets/$labelsFileName)."
+            return false
+        }
+
+        return true
     }
 
     private fun createModuleOrNull(): Module? {
@@ -221,9 +243,9 @@ class MobileNetV3Classifier(
         const val LEGACY_MODEL_FILE = "mobilenetv3_small_best.pt"
         const val DEFAULT_LABELS_FILE = "species_labels.txt"
         const val DEFAULT_INPUT_SIZE = 224
-        const val MODEL_DISPLAY_NAME = "MobileNetV3 (PyTorch)"
+        const val MODEL_DISPLAY_NAME = "MobileNetV3-Small (PyTorch)"
         const val FALLBACK_LABEL = "Modelo PyTorch ainda indisponivel"
-        const val MIN_DISPLAY_CONFIDENCE = 0.30f
+        const val MIN_DISPLAY_CONFIDENCE = 0.15f
 
         private const val MAX_DISPLAY_CANDIDATES = 5
 

@@ -1,15 +1,17 @@
-package com.example.geodouro_project.data.repository
+﻿package com.example.geodouro_project.data.repository
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import com.example.geodouro_project.ai.MobileNetV3Classifier
 import com.example.geodouro_project.core.network.ConnectivityChecker
 import com.example.geodouro_project.data.local.dao.ObservationDao
 import com.example.geodouro_project.data.local.dao.TaxonCacheDao
 import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.local.entity.TaxonCacheEntity
+import com.example.geodouro_project.data.remote.RemoteObservationSyncService
 import com.example.geodouro_project.data.remote.api.INaturalistApiService
 import com.example.geodouro_project.data.remote.model.InaturalistTaxonDto
 import com.example.geodouro_project.domain.model.ConfidencePolicy
@@ -28,7 +30,6 @@ import java.util.Locale
 import java.util.UUID
 import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -40,7 +41,8 @@ class PlantRepository(
     private val observationDao: ObservationDao,
     private val apiService: INaturalistApiService,
     private val connectivityChecker: ConnectivityChecker,
-    private val imageHttpClient: OkHttpClient
+    private val imageHttpClient: OkHttpClient,
+    private val remoteObservationSyncService: RemoteObservationSyncService
 ) {
 
     private val classifier by lazy { MobileNetV3Classifier(appContext) }
@@ -147,9 +149,13 @@ class PlantRepository(
             lastSyncAttemptAt = null
         )
 
+        Log.d(TAG, "Persisting observation locally id=${newObservation.id} species=${newObservation.predictedSpecies}")
         observationDao.upsert(newObservation)
 
-        if (connectivityChecker.hasInternetConnection()) {
+        val hasInternet = connectivityChecker.hasInternetConnection()
+        val isConfigured = remoteObservationSyncService.isConfigured()
+        Log.d(TAG, "saveObservation connectivity=$hasInternet backendConfigured=$isConfigured")
+        if (hasInternet && isConfigured) {
             syncPendingObservations()
         }
 
@@ -158,6 +164,7 @@ class PlantRepository(
             ?.let { ObservationSyncStatus.valueOf(it) }
             ?: ObservationSyncStatus.PENDING
 
+        Log.d(TAG, "Local observation persisted id=${newObservation.id} finalStatus=$finalStatus")
         return ObservationSaveResult(
             observationId = newObservation.id,
             syncStatus = finalStatus
@@ -165,16 +172,26 @@ class PlantRepository(
     }
 
     suspend fun syncPendingObservations(): Int {
-        if (!connectivityChecker.hasInternetConnection()) {
+        val hasInternet = connectivityChecker.hasInternetConnection()
+        val isConfigured = remoteObservationSyncService.isConfigured()
+        Log.d(TAG, "syncPendingObservations connectivity=$hasInternet backendConfigured=$isConfigured")
+        if (!hasInternet || !isConfigured) {
             return 0
         }
 
-        val pendingObservations = observationDao.getBySyncStatus(ObservationSyncStatus.PENDING.name)
+        val pendingObservations = observationDao.getBySyncStatuses(
+            listOf(
+                ObservationSyncStatus.PENDING.name,
+                ObservationSyncStatus.FAILED.name
+            )
+        )
+        Log.d(TAG, "syncPendingObservations found ${pendingObservations.size} pending/failed observations")
         var syncedCount = 0
 
         pendingObservations.forEach { observation ->
-            val success = uploadObservationToRemote(observation)
             val attemptTime = System.currentTimeMillis()
+            Log.d(TAG, "Uploading observation id=${observation.id} species=${observation.predictedSpecies}")
+            val success = uploadObservationToRemote(observation, attemptTime)
 
             if (success) {
                 observationDao.updateSyncStatus(
@@ -183,12 +200,14 @@ class PlantRepository(
                     syncTimestamp = attemptTime
                 )
                 syncedCount++
+                Log.d(TAG, "Observation synced successfully id=${observation.id}")
             } else {
                 observationDao.updateSyncStatus(
                     id = observation.id,
                     syncStatus = ObservationSyncStatus.FAILED.name,
                     syncTimestamp = attemptTime
                 )
+                Log.w(TAG, "Observation sync failed id=${observation.id}")
             }
         }
 
@@ -296,10 +315,14 @@ class PlantRepository(
         return (dotProduct / denominator).toFloat()
     }
 
-    private suspend fun uploadObservationToRemote(observation: ObservationEntity): Boolean {
-        // Placeholder de sincronizacao remota: integrar endpoint real quando disponivel.
-        delay(150)
-        return observation.predictedSpecies.isNotBlank()
+    private suspend fun uploadObservationToRemote(
+        observation: ObservationEntity,
+        syncAttemptAt: Long
+    ): Boolean = withContext(Dispatchers.IO) {
+        remoteObservationSyncService.uploadObservation(
+            observation = observation,
+            syncAttemptAt = syncAttemptAt
+        )
     }
 
     private fun InaturalistTaxonDto.toCacheEntity(query: String): TaxonCacheEntity {
@@ -334,25 +357,20 @@ class PlantRepository(
         val fusedScore: Float
     )
 
-    /**
-     * Classifica múltiplas imagens em paralelo e agrega os resultados
-     * com votação ponderada por confiança
-     */
     suspend fun inferMultipleImages(
         imageUris: List<String>,
         config: MultiImageAggregationConfig = MultiImageAggregationConfig()
     ): MultiImageAggregationResult = withContext(Dispatchers.Default) {
         if (imageUris.isEmpty() || imageUris.size < config.minImagesRequired) {
             throw IllegalArgumentException(
-                "Número de imagens inválido: ${imageUris.size}. " +
-                "Requerido: ${config.minImagesRequired}-${config.maxImagesRequired}"
+                "Numero de imagens invalido: ${imageUris.size}. " +
+                    "Requerido: ${config.minImagesRequired}-${config.maxImagesRequired}"
             )
         }
 
         val imagesToProcess = imageUris.take(config.maxImagesRequired)
         val startTime = System.currentTimeMillis()
 
-        // Classifica todas as imagens em paralelo
         val imageResults = imagesToProcess.map { imageUri ->
             runCatching {
                 val bitmap = decodeLocalBitmap(imageUri)
@@ -396,42 +414,29 @@ class PlantRepository(
         )
     }
 
-    /**
-     * Agrega múltiplas inferências com votação ponderada ou simples
-     */
     suspend fun aggregateMultipleInferences(
         imageResults: List<ImageInferenceResult>,
         config: MultiImageAggregationConfig = MultiImageAggregationConfig(),
         processingTimeMs: Long = 0
     ): MultiImageAggregationResult = withContext(Dispatchers.Default) {
         if (imageResults.isEmpty()) {
-            throw IllegalArgumentException("Lista de imagens não pode estar vazia")
+            throw IllegalArgumentException("Lista de imagens nao pode estar vazia")
         }
 
-        // Filtra resultados válidos
         val validResults = imageResults.filter { it.predictedSpecies != "ERROR" && it.predictedSpecies != "UNKNOWN" }
         if (validResults.isEmpty()) {
             throw IllegalArgumentException("Nenhuma imagem foi classificada com sucesso")
         }
 
-        // Calcula votos (simples ou ponderado)
         val speciesVotes = mutableMapOf<String, Int>()
         val confidencePerSpecies = mutableMapOf<String, MutableList<Float>>()
 
         validResults.forEach { result ->
             val species = result.predictedSpecies
-            if (config.confidenceWeightedVoting) {
-                // Votação ponderada: cada imagem vota com peso = confiança
-                speciesVotes[species] = (speciesVotes[species] ?: 0) + 1
-                confidencePerSpecies.getOrPut(species) { mutableListOf() }.add(result.confidence)
-            } else {
-                // Votação simples: cada imagem = 1 voto
-                speciesVotes[species] = (speciesVotes[species] ?: 0) + 1
-                confidencePerSpecies.getOrPut(species) { mutableListOf() }.add(result.confidence)
-            }
+            speciesVotes[species] = (speciesVotes[species] ?: 0) + 1
+            confidencePerSpecies.getOrPut(species) { mutableListOf() }.add(result.confidence)
         }
 
-        // Ordena por número de votos (depois por confiança média)
         val sortedSpecies = speciesVotes.entries
             .sortedWith(compareBy<Map.Entry<String, Int>> { -it.value }
                 .thenBy { -(confidencePerSpecies[it.key]?.average() ?: 0.0) })
@@ -444,7 +449,6 @@ class PlantRepository(
             0f
         }
 
-        // Resultado da segunda melhor espécie
         val topAlternative = sortedSpecies.getOrNull(1)?.key
         val topAlternativeConfidences = topAlternative?.let { confidencePerSpecies[it] } ?: emptyList()
         val topAlternativeConfidence = if (topAlternativeConfidences.isNotEmpty()) {
@@ -453,11 +457,9 @@ class PlantRepository(
             null
         }
 
-        // Avalia estado de confiança
         val policy = ConfidencePolicy()
         val confidenceState = policy.evaluate(aggregatedConfidence, topAlternativeConfidence)
 
-        // Valida consenso se requerido
         val consensusScore = if (speciesVotes.isNotEmpty()) {
             (speciesVotes[finalSpecies] ?: 0).toFloat() / validResults.size
         } else {
@@ -465,7 +467,6 @@ class PlantRepository(
         }
 
         if (config.requireConsensus && consensusScore < config.minConsensusScore) {
-            // Se exigir consenso e não conseguir, retorna estado AMBIGUOUS
             return@withContext MultiImageAggregationResult(
                 finalPredictedSpecies = finalSpecies,
                 aggregatedConfidence = aggregatedConfidence,
@@ -495,6 +496,7 @@ class PlantRepository(
     }
 
     companion object {
+        private const val TAG = "PlantRepository"
         private const val LOW_CONFIDENCE_THRESHOLD = 0.30f
         private const val MAX_RERANK_CANDIDATES = 5
         private const val MODEL_WEIGHT = 0.60f

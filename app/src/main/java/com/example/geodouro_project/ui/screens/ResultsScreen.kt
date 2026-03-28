@@ -1,4 +1,4 @@
-package com.example.geodouro_project.ui.screens
+﻿package com.example.geodouro_project.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -99,7 +99,6 @@ fun ResultsScreen(
     )
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var shouldNavigateAfterSave by remember { mutableStateOf(false) }
 
     LaunchedEffect(localInferenceResult, multiImageUris) {
         if (multiImageUris.size >= 2) {
@@ -107,29 +106,6 @@ fun ResultsScreen(
         } else {
             viewModel.loadHybridResult(localInferenceResult)
         }
-    }
-
-    LaunchedEffect(uiState, shouldNavigateAfterSave) {
-        if (!shouldNavigateAfterSave) {
-            return@LaunchedEffect
-        }
-
-        when (val state = uiState) {
-            is ResultsUiState.Success -> {
-                if (state.saveMessage == null) {
-                    return@LaunchedEffect
-                }
-                onConfirmResult(state.result.toIdentificationResult(state.sourceLabel))
-            }
-            is ResultsUiState.MultiImageSuccess -> {
-                if (state.saveMessage == null) {
-                    return@LaunchedEffect
-                }
-                onConfirmResult(state.result.toIdentificationResult(state.sourceLabel))
-            }
-            else -> return@LaunchedEffect
-        }
-        shouldNavigateAfterSave = false
     }
 
     Scaffold(
@@ -190,10 +166,7 @@ fun ResultsScreen(
                         sourceLabel = state.sourceLabel,
                         saveMessage = state.saveMessage,
                         onSyncPending = { viewModel.syncPendingObservations() },
-                        onConfirm = {
-                            shouldNavigateAfterSave = true
-                            viewModel.confirmObservation()
-                        }
+                        onConfirm = { viewModel.confirmObservation() }
                     )
                 }
 
@@ -203,10 +176,7 @@ fun ResultsScreen(
                         sourceLabel = state.sourceLabel,
                         saveMessage = state.saveMessage,
                         onSyncPending = { viewModel.syncPendingObservations() },
-                        onConfirm = {
-                            shouldNavigateAfterSave = true
-                            viewModel.confirmObservation()
-                        }
+                        onConfirm = { viewModel.confirmObservation() }
                     )
                 }
             }
@@ -550,7 +520,7 @@ fun MultiImageResultCard(
         shape = RoundedCornerShape(8.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // Mostrar consenso e número de imagens
+            // Mostrar consenso e nÃºmero de imagens
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = GeodouroLightBg,
@@ -565,7 +535,7 @@ fun MultiImageResultCard(
                 ) {
                     Column {
                         Text(
-                            text = "Análise de ${result.imagesCount} imagem(ns)",
+                            text = "AnÃ¡lise de ${result.imagesCount} imagem(ns)",
                             style = MaterialTheme.typography.bodySmall,
                             color = GeodouroTextPrimary,
                             fontWeight = FontWeight.Bold
@@ -922,3 +892,5 @@ private fun MultiImageResultUiModel.toIdentificationResult(sourceLabel: String):
         photoUrl = photoUrl
     )
 }
+
+

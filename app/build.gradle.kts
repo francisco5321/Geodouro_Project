@@ -1,9 +1,17 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.kapt)
 }
+
+fun stringBuildConfigField(value: String): String {
+    return "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+}
+
+val backendBaseUrl = providers.gradleProperty("BACKEND_BASE_URL").orNull ?: "http://192.168.1.67:8080"
+val backendGuestLabel = providers.gradleProperty("BACKEND_GUEST_LABEL").orNull ?: "android-emulator"
+val backendDefaultUserId = providers.gradleProperty("BACKEND_DEFAULT_USER_ID").orNull ?: "0"
 
 android {
     namespace = "com.example.geodouro_project"
@@ -17,6 +25,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "BACKEND_BASE_URL", stringBuildConfigField(backendBaseUrl))
+        buildConfigField("String", "BACKEND_GUEST_LABEL", stringBuildConfigField(backendGuestLabel))
+        buildConfigField("int", "BACKEND_DEFAULT_USER_ID", backendDefaultUserId)
     }
 
     buildTypes {
@@ -37,6 +48,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

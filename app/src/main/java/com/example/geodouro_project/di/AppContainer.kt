@@ -1,10 +1,14 @@
-package com.example.geodouro_project.di
+﻿package com.example.geodouro_project.di
 
 import android.content.Context
+import com.example.geodouro_project.BuildConfig
 import com.example.geodouro_project.core.network.ConnectivityChecker
 import com.example.geodouro_project.data.local.GeodouroDatabase
+import com.example.geodouro_project.data.remote.RemoteDbConfig
+import com.example.geodouro_project.data.remote.RemoteObservationSyncService
 import com.example.geodouro_project.data.remote.api.INaturalistApiService
 import com.example.geodouro_project.data.repository.PlantRepository
+import com.google.gson.Gson
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -40,6 +44,15 @@ object AppContainer {
             .build()
 
         val apiService = retrofit.create(INaturalistApiService::class.java)
+        val remoteDbSyncService = RemoteObservationSyncService(
+            httpClient = okHttpClient,
+            gson = Gson(),
+            config = RemoteDbConfig(
+                baseUrl = BuildConfig.BACKEND_BASE_URL,
+                guestLabel = BuildConfig.BACKEND_GUEST_LABEL,
+                defaultUserId = BuildConfig.BACKEND_DEFAULT_USER_ID
+            )
+        )
 
         return PlantRepository(
             appContext = appContext,
@@ -47,7 +60,8 @@ object AppContainer {
             observationDao = database.observationDao(),
             apiService = apiService,
             connectivityChecker = ConnectivityChecker(appContext),
-            imageHttpClient = okHttpClient
+            imageHttpClient = okHttpClient,
+            remoteObservationSyncService = remoteDbSyncService
         )
     }
 }

@@ -5,7 +5,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(
-    tableName = "observations",
+    tableName = "observation",
     indices = [Index(value = ["syncStatus"]), Index(value = ["capturedAt"])]
 )
 data class ObservationEntity(
