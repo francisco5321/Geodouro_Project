@@ -1,10 +1,15 @@
 package com.example.geodouro_project.data.repository
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.location.LocationManager
 import android.net.Uri
+import android.os.CancellationSignal
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.example.geodouro_project.ai.MobileNetV3Classifier
 import com.example.geodouro_project.core.network.ConnectivityChecker
 import com.example.geodouro_project.data.local.dao.ObservationDao
@@ -26,11 +31,15 @@ import com.example.geodouro_project.domain.model.MultiImageAggregationConfig
 import com.example.geodouro_project.domain.model.MultiImageAggregationResult
 import com.example.geodouro_project.domain.model.ObservationSaveResult
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import java.util.Locale
 import java.util.UUID
+import kotlin.coroutines.resume
 import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -46,6 +55,7 @@ class PlantRepository(
 ) {
 
     private val classifier by lazy { MobileNetV3Classifier(appContext) }
+    private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(appContext) }
 
     suspend fun rerankLowConfidenceInference(localResult: LocalInferenceResult): LocalInferenceResult {
         if (isNonPlantPrediction(localResult.predictedSpecies) || localResult.confidence >= LOW_CONFIDENCE_THRESHOLD) {
@@ -142,6 +152,7 @@ class PlantRepository(
             "Nao e possivel guardar uma observacao sem planta reconhecida"
         }
 
+        val resolvedLocation = resolveBestEffortLocation(localResult.latitude, localResult.longitude)
         val normalizedImageUris = imageUris
             .map { it.trim() }
             .filter { it.isNotBlank() }
@@ -154,8 +165,8 @@ class PlantRepository(
             imageUri = primaryImageUri,
             imageUrisSerialized = ObservationEntity.serializeImageUris(normalizedImageUris, primaryImageUri),
             capturedAt = localResult.capturedAt,
-            latitude = localResult.latitude,
-            longitude = localResult.longitude,
+            latitude = resolvedLocation?.first,
+            longitude = resolvedLocation?.second,
             predictedSpecies = localResult.predictedSpecies,
             confidence = localResult.confidence,
             enrichedScientificName = enrichedData?.scientificName,
@@ -169,7 +180,7 @@ class PlantRepository(
 
         Log.d(
             TAG,
-            "Persisting observation locally id=${newObservation.id} species=${newObservation.predictedSpecies} imageCount=${normalizedImageUris.size}"
+            "Persisting observation locally id=${newObservation.id} species=${newObservation.predictedSpecies} imageCount=${normalizedImageUris.size} lat=${newObservation.latitude} lon=${newObservation.longitude}"
         )
         observationDao.upsert(newObservation)
 
@@ -213,7 +224,7 @@ class PlantRepository(
             val attemptTime = System.currentTimeMillis()
             Log.d(
                 TAG,
-                "Uploading observation id=${observation.id} species=${observation.predictedSpecies} imageCount=${observation.allImageUris().size}"
+                "Uploading observation id=${observation.id} species=${observation.predictedSpecies} imageCount=${observation.allImageUris().size} lat=${observation.latitude} lon=${observation.longitude}"
             )
             val success = uploadObservationToRemote(observation, attemptTime)
 
@@ -240,6 +251,110 @@ class PlantRepository(
 
     fun observeObservations(): Flow<List<ObservationEntity>> {
         return observationDao.observeAll()
+    }
+
+    private suspend fun resolveBestEffortLocation(
+        fallbackLatitude: Double?,
+        fallbackLongitude: Double?
+    ): Pair<Double, Double>? = withContext(Dispatchers.Main) {
+        if (fallbackLatitude != null && fallbackLongitude != null) {
+            return@withContext fallbackLatitude to fallbackLongitude
+        }
+
+        if (!hasLocationPermission()) {
+            return@withContext null
+        }
+
+        fetchCurrentLocationCoordinates() ?: fallbackLatitude?.let { latitude ->
+            fallbackLongitude?.let { longitude -> latitude to longitude }
+        }
+    }
+
+    private fun hasLocationPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            appContext,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+            appContext,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private suspend fun fetchCurrentLocationCoordinates(): Pair<Double, Double>? {
+        val fusedCoordinates = fetchFusedLocationCoordinates()
+        if (fusedCoordinates != null) {
+            return fusedCoordinates
+        }
+
+        val locationManager = appContext.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            ?: return null
+
+        val provider = when {
+            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+            locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+            else -> null
+        } ?: return lastKnownLocationCoordinates(locationManager)
+
+        return suspendCancellableCoroutine { continuation ->
+            val executor = ContextCompat.getMainExecutor(appContext)
+            val cancellationSignal = CancellationSignal()
+            continuation.invokeOnCancellation { cancellationSignal.cancel() }
+
+            runCatching {
+                locationManager.getCurrentLocation(provider, cancellationSignal, executor) { location ->
+                    if (continuation.isActive) {
+                        continuation.resume(location?.let { it.latitude to it.longitude })
+                    }
+                }
+            }.onFailure {
+                if (continuation.isActive) {
+                    continuation.resume(lastKnownLocationCoordinates(locationManager))
+                }
+            }
+        }
+    }
+
+    private suspend fun fetchFusedLocationCoordinates(): Pair<Double, Double>? {
+        return suspendCancellableCoroutine { continuation ->
+            runCatching {
+                fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                    .addOnSuccessListener { location ->
+                        if (continuation.isActive) {
+                            continuation.resume(location?.let { it.latitude to it.longitude })
+                        }
+                    }
+                    .addOnFailureListener {
+                        if (continuation.isActive) {
+                            continuation.resume(null)
+                        }
+                    }
+            }.onFailure {
+                if (continuation.isActive) {
+                    continuation.resume(null)
+                }
+            }
+        } ?: suspendCancellableCoroutine { continuation ->
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location ->
+                    if (continuation.isActive) {
+                        continuation.resume(location?.let { it.latitude to it.longitude })
+                    }
+                }
+                .addOnFailureListener {
+                    if (continuation.isActive) {
+                        continuation.resume(null)
+                    }
+                }
+        }
+    }
+
+    private fun lastKnownLocationCoordinates(locationManager: LocationManager): Pair<Double, Double>? {
+        return sequenceOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            .mapNotNull { provider ->
+                runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull()
+            }
+            .maxByOrNull { it.time }
+            ?.let { it.latitude to it.longitude }
     }
 
     private suspend fun fetchTopTaxon(speciesName: String): InaturalistTaxonDto? {
@@ -554,3 +669,4 @@ class PlantRepository(
         private const val MIN_RERANK_GAIN = 0.02f
     }
 }
+

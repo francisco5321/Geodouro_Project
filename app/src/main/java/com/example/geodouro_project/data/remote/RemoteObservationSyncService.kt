@@ -55,7 +55,10 @@ class RemoteObservationSyncService(
             ?: return false
 
         val url = buildObservationUrl()
-        Log.d(TAG, "Uploading observation with ${imageUris.size} image(s) to $url deviceObservationId=${observation.id}")
+        Log.d(
+            TAG,
+            "Uploading observation with ${imageUris.size} image(s) to $url deviceObservationId=${observation.id} lat=${observation.latitude} lon=${observation.longitude}"
+        )
         val request = Request.Builder()
             .url(url)
             .post(multipartBody)
@@ -139,3 +142,4 @@ class RemoteObservationSyncService(
         private val JSON_MEDIA_TYPE = "application/json".toMediaType()
     }
 }
+

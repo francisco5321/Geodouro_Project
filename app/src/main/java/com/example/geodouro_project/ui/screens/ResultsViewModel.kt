@@ -29,6 +29,8 @@ data class ResultUiModel(
     val wikipediaUrl: String?,
     val photoUrl: String?,
     val alternativePredictions: List<LocalPredictionCandidate>,
+    val latitude: Double?,
+    val longitude: Double?,
     val isPlantDetected: Boolean
 )
 
@@ -45,6 +47,8 @@ data class MultiImageResultUiModel(
     val photoUrl: String?,
     val imageUris: List<String>,
     val processingTimeMs: Long,
+    val latitude: Double?,
+    val longitude: Double?,
     val isPlantDetected: Boolean
 )
 
@@ -79,10 +83,14 @@ class ResultsViewModel(
     private var lastInferenceResult: LocalInferenceResult? = null
     private var lastEnrichedData: EnrichedSpeciesData? = null
     private var lastMultiImageResult: MultiImageAggregationResult? = null
+    private var lastCaptureLatitude: Double? = null
+    private var lastCaptureLongitude: Double? = null
 
     fun loadHybridResult(localInferenceResult: LocalInferenceResult) {
         viewModelScope.launch {
             _uiState.value = ResultsUiState.Loading
+            lastCaptureLatitude = localInferenceResult.latitude
+            lastCaptureLongitude = localInferenceResult.longitude
 
             if (isNonPlantPrediction(localInferenceResult.predictedSpecies)) {
                 lastInferenceResult = localInferenceResult
@@ -100,6 +108,8 @@ class ResultsViewModel(
             val rerankApplied = rerankedInference.predictedSpecies != localInferenceResult.predictedSpecies
 
             lastInferenceResult = rerankedInference
+            lastCaptureLatitude = rerankedInference.latitude
+            lastCaptureLongitude = rerankedInference.longitude
 
             if (isNonPlantPrediction(rerankedInference.predictedSpecies)) {
                 lastEnrichedData = null
@@ -134,10 +144,14 @@ class ResultsViewModel(
 
     fun loadMultiImageResult(
         imageUris: List<String>,
+        latitude: Double? = null,
+        longitude: Double? = null,
         config: MultiImageAggregationConfig = MultiImageAggregationConfig()
     ) {
         viewModelScope.launch {
             _uiState.value = ResultsUiState.Loading
+            lastCaptureLatitude = latitude
+            lastCaptureLongitude = longitude
 
             val aggregationResult = try {
                 repository.inferMultipleImages(imageUris, config)
@@ -197,8 +211,8 @@ class ResultsViewModel(
 
                         LocalInferenceResult(
                             imageUri = multi.processedImages.firstOrNull()?.imageUri.orEmpty(),
-                            latitude = null,
-                            longitude = null,
+                            latitude = lastCaptureLatitude,
+                            longitude = lastCaptureLongitude,
                             predictedSpecies = multi.finalPredictedSpecies,
                             confidence = multi.aggregatedConfidence,
                             candidatePredictions = buildList {
@@ -309,6 +323,8 @@ class ResultsViewModel(
             } else {
                 emptyList()
             },
+            latitude = localInferenceResult.latitude,
+            longitude = localInferenceResult.longitude,
             isPlantDetected = isPlantDetected
         )
     }
@@ -343,6 +359,8 @@ class ResultsViewModel(
             photoUrl = if (isPlantDetected) enrichedData?.photoUrl else null,
             imageUris = multiImageResult.processedImages.map { it.imageUri },
             processingTimeMs = multiImageResult.processingTimeMs,
+            latitude = lastCaptureLatitude,
+            longitude = lastCaptureLongitude,
             isPlantDetected = isPlantDetected
         )
     }
@@ -391,4 +409,3 @@ class ResultsViewModel(
         }
     }
 }
-

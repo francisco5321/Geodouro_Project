@@ -6,12 +6,24 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.navigation.compose.*
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.example.geodouro_project.domain.model.LocalInferenceResult
 import com.example.geodouro_project.ui.components.BottomNavigationBar
-import com.example.geodouro_project.ui.screens.*
+import com.example.geodouro_project.ui.screens.CaptureScreen
+import com.example.geodouro_project.ui.screens.CommunityScreen
+import com.example.geodouro_project.ui.screens.HomeScreen
+import com.example.geodouro_project.ui.screens.IdentifyScreen
+import com.example.geodouro_project.ui.screens.ProfileScreen
+import com.example.geodouro_project.ui.screens.ResultsScreen
+import com.example.geodouro_project.ui.screens.SpeciesListScreen
 import com.example.geodouro_project.ui.theme.Geodouro_ProjectTheme
 
 class MainActivity : ComponentActivity() {
@@ -26,15 +38,16 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable
+@androidx.compose.runtime.Composable
 fun AppNavigation() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "home"
     var latestInferenceResult by remember { mutableStateOf<LocalInferenceResult?>(null) }
     var latestMultiImageUris by remember { mutableStateOf<List<String>>(emptyList()) }
-    
-    // Rotas que mostram bottom navigation
+    var latestCaptureLatitude by remember { mutableStateOf<Double?>(null) }
+    var latestCaptureLongitude by remember { mutableStateOf<Double?>(null) }
+
     val bottomNavRoutes = listOf("home", "community", "identify", "list", "profile")
     val showBottomBar = currentRoute in bottomNavRoutes
 
@@ -45,7 +58,6 @@ fun AppNavigation() {
                     currentRoute = currentRoute,
                     onNavigate = { route ->
                         navController.navigate(route) {
-                            // Pop até home para evitar pilha de navegação grande
                             popUpTo("home") {
                                 saveState = true
                             }
@@ -65,54 +77,59 @@ fun AppNavigation() {
             composable("home") {
                 HomeScreen()
             }
-            
+
             composable("community") {
                 CommunityScreen()
             }
-            
+
             composable("identify") {
                 IdentifyScreen(
                     onIdentifyClick = { inferenceResult ->
                         latestInferenceResult = inferenceResult
                         latestMultiImageUris = emptyList()
+                        latestCaptureLatitude = inferenceResult.latitude
+                        latestCaptureLongitude = inferenceResult.longitude
                         navController.navigate("results")
                     },
-                    onIdentifyMultipleClick = { imageUris ->
+                    onIdentifyMultipleClick = { imageUris, latitude, longitude ->
                         latestInferenceResult = null
                         latestMultiImageUris = imageUris
+                        latestCaptureLatitude = latitude
+                        latestCaptureLongitude = longitude
                         navController.navigate("results")
                     }
                 )
             }
-            
+
             composable("list") {
                 SpeciesListScreen()
             }
-            
+
             composable("profile") {
                 ProfileScreen()
             }
-            
+
             composable("results") {
                 ResultsScreen(
                     onBackClick = {
                         navController.popBackStack()
                     },
-                    onConfirmResult = { result ->
-                        // Navegar para detalhes ou voltar
+                    onConfirmResult = {
                         navController.popBackStack()
                     },
                     multiImageUris = latestMultiImageUris,
+                    captureLatitude = latestCaptureLatitude,
+                    captureLongitude = latestCaptureLongitude,
                     localInferenceResult = latestInferenceResult ?: LocalInferenceResult(
                         imageUri = "",
-                        latitude = null,
-                        longitude = null,
+                        latitude = latestCaptureLatitude,
+                        longitude = latestCaptureLongitude,
                         predictedSpecies = "Sem inferencia local",
                         confidence = 0f
                     )
                 )
             }
-            
+
             composable("capture") {
                 CaptureScreen()
             }

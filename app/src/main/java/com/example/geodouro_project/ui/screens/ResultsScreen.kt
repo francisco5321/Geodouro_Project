@@ -85,6 +85,8 @@ fun ResultsScreen(
     onBackClick: () -> Unit,
     onConfirmResult: (IdentificationResult) -> Unit,
     multiImageUris: List<String> = emptyList(),
+    captureLatitude: Double? = null,
+    captureLongitude: Double? = null,
     localInferenceResult: LocalInferenceResult = LocalInferenceResult(
         imageUri = "",
         latitude = null,
@@ -100,9 +102,13 @@ fun ResultsScreen(
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(localInferenceResult, multiImageUris) {
+    LaunchedEffect(localInferenceResult, multiImageUris, captureLatitude, captureLongitude) {
         if (multiImageUris.size >= 2) {
-            viewModel.loadMultiImageResult(multiImageUris)
+            viewModel.loadMultiImageResult(
+                imageUris = multiImageUris,
+                latitude = captureLatitude,
+                longitude = captureLongitude
+            )
         } else {
             viewModel.loadHybridResult(localInferenceResult)
         }
@@ -328,6 +334,11 @@ fun ResultCard(
                 )
             }
 
+            CoordinatesSection(
+                latitude = result.latitude,
+                longitude = result.longitude
+            )
+
             if (!saveMessage.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
@@ -458,6 +469,30 @@ private fun ResultPhotoCard(
                 contentScale = ContentScale.Crop
             )
         }
+    }
+}
+
+@Composable
+private fun CoordinatesSection(
+    latitude: Double?,
+    longitude: Double?
+) {
+    Spacer(modifier = Modifier.height(12.dp))
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = GeodouroLightBg,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Text(
+            text = if (latitude != null && longitude != null) {
+                "Coordenadas: %.6f, %.6f".format(latitude, longitude)
+            } else {
+                "Coordenadas: localizacao indisponivel"
+            },
+            modifier = Modifier.padding(10.dp),
+            color = GeodouroTextPrimary,
+            style = MaterialTheme.typography.bodySmall
+        )
     }
 }
 
@@ -681,6 +716,11 @@ fun MultiImageResultCard(
                     }
                 }
             }
+
+            CoordinatesSection(
+                latitude = result.latitude,
+                longitude = result.longitude
+            )
 
             if (!saveMessage.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(12.dp))
@@ -914,6 +954,12 @@ private fun MultiImageResultUiModel.toIdentificationResult(sourceLabel: String):
         photoUrl = photoUrl
     )
 }
+
+
+
+
+
+
 
 
 
