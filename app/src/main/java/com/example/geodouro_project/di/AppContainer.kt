@@ -1,4 +1,4 @@
-﻿package com.example.geodouro_project.di
+package com.example.geodouro_project.di
 
 import android.content.Context
 import com.example.geodouro_project.BuildConfig
@@ -45,6 +45,7 @@ object AppContainer {
 
         val apiService = retrofit.create(INaturalistApiService::class.java)
         val remoteDbSyncService = RemoteObservationSyncService(
+            appContext = appContext,
             httpClient = okHttpClient,
             gson = Gson(),
             config = RemoteDbConfig(

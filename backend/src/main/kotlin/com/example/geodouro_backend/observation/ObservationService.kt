@@ -1,4 +1,4 @@
-﻿package com.example.geodouro_backend.observation
+package com.example.geodouro_backend.observation
 
 import java.sql.Timestamp
 import java.util.UUID
@@ -8,14 +8,30 @@ import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Service
+import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.server.ResponseStatusException
 
 @Service
 class ObservationService(
-    private val jdbcTemplate: NamedParameterJdbcTemplate
+    private val jdbcTemplate: NamedParameterJdbcTemplate,
+    private val observationStorageService: ObservationStorageService
 ) {
 
     fun upsertObservation(request: UpsertObservationRequest): ObservationResponse {
+        val sanitizedImagePath = request.imageUri?.takeUnless { it.startsWith("content://") }
+        return upsertObservationInternal(request, sanitizedImagePath)
+    }
+
+    fun upsertObservation(request: UpsertObservationRequest, image: MultipartFile): ObservationResponse {
+        val deviceObservationId = request.deviceObservationId ?: UUID.randomUUID()
+        val storedImagePath = observationStorageService.storeObservationImage(deviceObservationId, image)
+        return upsertObservationInternal(request.copy(deviceObservationId = deviceObservationId), storedImagePath)
+    }
+
+    private fun upsertObservationInternal(
+        request: UpsertObservationRequest,
+        storedImagePath: String?
+    ): ObservationResponse {
         validateCoordinates(request.latitude, request.longitude)
 
         val deviceObservationId = request.deviceObservationId ?: UUID.randomUUID()
@@ -25,20 +41,21 @@ class ObservationService(
         val observedAtTimestamp = Timestamp.from(observedAt)
 
         logger.debug(
-            "Preparing upsert deviceObservationId={} userId={} capturedAt={} confidence={} lat={} lon={}",
+            "Preparing upsert deviceObservationId={} userId={} capturedAt={} confidence={} lat={} lon={} storedImagePath={}",
             deviceObservationId,
             userId,
             request.capturedAt,
             request.confidence,
             request.latitude,
-            request.longitude
+            request.longitude,
+            storedImagePath
         )
 
         val parameters = MapSqlParameterSource()
             .addValue("deviceObservationId", deviceObservationId)
             .addValue("userId", userId)
             .addValue("plantSpeciesId", null)
-            .addValue("imageUri", request.imageUri)
+            .addValue("imageUri", storedImagePath)
             .addValue("capturedAt", request.capturedAt)
             .addValue("predictedScientificName", request.predictedScientificName.trim())
             .addValue("confidence", request.confidence)
@@ -49,7 +66,7 @@ class ObservationService(
             .addValue("enrichedPhotoUrl", request.enrichedPhotoUrl)
             .addValue("latitude", request.latitude)
             .addValue("longitude", request.longitude)
-             .addValue("observedAt", observedAtTimestamp)
+            .addValue("observedAt", observedAtTimestamp)
             .addValue("isPublished", request.isPublished)
             .addValue("isSynced", syncStatus == "SYNCED")
             .addValue("syncStatus", syncStatus)
@@ -59,11 +76,12 @@ class ObservationService(
         val response = jdbcTemplate.query(UPSERT_OBSERVATION_SQL, parameters, observationRowMapper).first()
 
         logger.info(
-            "Upsert finished observationId={} deviceObservationId={} userId={} syncStatus={}",
+            "Upsert finished observationId={} deviceObservationId={} userId={} syncStatus={} storedImagePath={}",
             response.observationId,
             response.deviceObservationId,
             response.userId,
-            response.syncStatus
+            response.syncStatus,
+            response.storedImagePath
         )
 
         return response
@@ -79,7 +97,8 @@ class ObservationService(
                    confidence,
                    sync_status,
                    is_published,
-                   observed_at
+                   observed_at,
+                   image_uri
             FROM observation
             WHERE device_observation_id = :deviceObservationId
             """.trimIndent(),
@@ -164,7 +183,8 @@ class ObservationService(
             confidence = rs.getObject("confidence")?.toString()?.toFloat(),
             syncStatus = rs.getString("sync_status"),
             isPublished = rs.getBoolean("is_published"),
-            observedAt = rs.getTimestamp("observed_at").toInstant()
+            observedAt = rs.getTimestamp("observed_at").toInstant(),
+            storedImagePath = rs.getString("image_uri")
         )
     }
 
@@ -244,9 +264,8 @@ class ObservationService(
                       confidence,
                       sync_status,
                       is_published,
-                      observed_at
+                      observed_at,
+                      image_uri
         """.trimIndent()
     }
 }
-
-

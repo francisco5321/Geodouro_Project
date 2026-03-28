@@ -1,4 +1,4 @@
-﻿package com.example.geodouro_backend.observation
+package com.example.geodouro_backend.observation
 
 import jakarta.validation.constraints.DecimalMax
 import jakarta.validation.constraints.DecimalMin
@@ -41,5 +41,6 @@ data class ObservationResponse(
     val confidence: Float?,
     val syncStatus: String,
     val isPublished: Boolean,
-    val observedAt: Instant
+    val observedAt: Instant,
+    val storedImagePath: String?
 )
