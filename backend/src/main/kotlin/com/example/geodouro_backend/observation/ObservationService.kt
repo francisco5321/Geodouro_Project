@@ -29,23 +29,33 @@ class ObservationService(
     }
 
     fun upsertObservation(request: UpsertObservationRequest, images: List<MultipartFile>): ObservationResponse {
+        validateCoordinates(request.latitude, request.longitude)
+
         val deviceObservationId = request.deviceObservationId ?: UUID.randomUUID()
-        val storedImagePaths = observationStorageService.storeObservationImages(deviceObservationId, images)
+        val plantSpeciesId = resolvePlantSpeciesId(request)
+        val storedImagePaths = observationStorageService.storeObservationImages(
+            plantSpeciesId = plantSpeciesId,
+            deviceObservationId = deviceObservationId,
+            images = images
+        )
+
         return upsertObservationInternal(
-            request.copy(deviceObservationId = deviceObservationId),
-            storedImagePaths
+            request = request.copy(deviceObservationId = deviceObservationId),
+            storedImagePaths = storedImagePaths,
+            resolvedPlantSpeciesId = plantSpeciesId
         )
     }
 
     private fun upsertObservationInternal(
         request: UpsertObservationRequest,
-        storedImagePaths: List<String>
+        storedImagePaths: List<String>,
+        resolvedPlantSpeciesId: Int? = null
     ): ObservationResponse {
         validateCoordinates(request.latitude, request.longitude)
 
         val deviceObservationId = request.deviceObservationId ?: UUID.randomUUID()
         val userId = resolveUserId(request)
-        val plantSpeciesId = resolvePlantSpeciesId(request)
+        val plantSpeciesId = resolvedPlantSpeciesId ?: resolvePlantSpeciesId(request)
         val syncStatus = normalizeSyncStatus(request.syncStatus)
         val observedAt = request.observedAt ?: java.time.Instant.now()
         val observedAtTimestamp = Timestamp.from(observedAt)

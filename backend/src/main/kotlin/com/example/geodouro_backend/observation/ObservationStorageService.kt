@@ -20,18 +20,22 @@ class ObservationStorageService(
         Files.createDirectories(rootPath)
     }
 
-    fun storeObservationImages(deviceObservationId: UUID, images: List<MultipartFile>): List<String> {
+    fun storeObservationImages(
+        plantSpeciesId: Int,
+        deviceObservationId: UUID,
+        images: List<MultipartFile>
+    ): List<String> {
         val validImages = images.filterNot { it.isEmpty }
         if (validImages.isEmpty()) {
             return emptyList()
         }
 
-        val observationDirectory = rootPath.resolve(deviceObservationId.toString())
-        Files.createDirectories(observationDirectory)
+        val speciesDirectory = rootPath.resolve(plantSpeciesId.toString())
+        Files.createDirectories(speciesDirectory)
 
         return validImages.mapIndexed { index, image ->
             val extension = resolveExtension(image)
-            val targetFile = observationDirectory.resolve("image-${index + 1}$extension")
+            val targetFile = speciesDirectory.resolve("${deviceObservationId}-image-${index + 1}$extension")
             image.inputStream.use { inputStream ->
                 copyReplacing(inputStream, targetFile)
             }
