@@ -65,4 +65,6 @@ class ObservationStorageService(
     private fun copyReplacing(inputStream: InputStream, targetFile: Path) {
         Files.copy(inputStream, targetFile, StandardCopyOption.REPLACE_EXISTING)
     }
+
+    fun storageRootPath(): Path = rootPath
 }

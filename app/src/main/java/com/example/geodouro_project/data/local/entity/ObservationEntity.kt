@@ -23,6 +23,7 @@ data class ObservationEntity(
     val enrichedFamily: String?,
     val enrichedWikipediaUrl: String?,
     val enrichedPhotoUrl: String?,
+    val isPublished: Boolean,
     val syncStatus: String,
     val lastSyncAttemptAt: Long?
 ) {

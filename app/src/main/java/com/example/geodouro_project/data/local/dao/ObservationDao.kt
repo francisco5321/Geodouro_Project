@@ -26,6 +26,15 @@ interface ObservationDao {
     )
     suspend fun updateSyncStatus(id: String, syncStatus: String, syncTimestamp: Long)
 
+    @Query("UPDATE observation SET isPublished = :isPublished WHERE id = :id")
+    suspend fun updatePublicationStatus(id: String, isPublished: Boolean)
+
     @Query("SELECT * FROM observation ORDER BY capturedAt DESC")
     fun observeAll(): Flow<List<ObservationEntity>>
+
+    @Query("SELECT * FROM observation WHERE isPublished = 1 ORDER BY capturedAt DESC")
+    fun observePublished(): Flow<List<ObservationEntity>>
+
+    @Query("SELECT * FROM observation WHERE isPublished = 1 ORDER BY capturedAt DESC")
+    suspend fun getPublished(): List<ObservationEntity>
 }

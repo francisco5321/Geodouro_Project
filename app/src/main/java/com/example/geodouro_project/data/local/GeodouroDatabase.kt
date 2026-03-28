@@ -13,7 +13,7 @@ import com.example.geodouro_project.data.local.entity.TaxonCacheEntity
 
 @Database(
     entities = [TaxonCacheEntity::class, ObservationEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class GeodouroDatabase : RoomDatabase() {
@@ -33,7 +33,7 @@ abstract class GeodouroDatabase : RoomDatabase() {
                     GeodouroDatabase::class.java,
                     "geodouro.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { INSTANCE = it }
             }
@@ -51,6 +51,12 @@ abstract class GeodouroDatabase : RoomDatabase() {
                 database.execSQL(
                     "UPDATE observation SET imageUrisSerialized = imageUri WHERE imageUrisSerialized = '' AND imageUri IS NOT NULL"
                 )
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE observation ADD COLUMN isPublished INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

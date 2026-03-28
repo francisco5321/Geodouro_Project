@@ -17,6 +17,8 @@ import com.example.geodouro_project.data.local.dao.TaxonCacheDao
 import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.local.entity.TaxonCacheEntity
 import com.example.geodouro_project.data.remote.RemoteObservationSyncService
+import com.example.geodouro_project.data.remote.RemoteCommunityPublication
+import com.example.geodouro_project.data.remote.RemotePublicationService
 import com.example.geodouro_project.data.remote.api.INaturalistApiService
 import com.example.geodouro_project.data.remote.model.InaturalistTaxonDto
 import com.example.geodouro_project.domain.model.ConfidencePolicy
@@ -35,10 +37,12 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import java.util.Locale
 import java.util.UUID
+import java.time.Instant
 import kotlin.coroutines.resume
 import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -51,7 +55,8 @@ class PlantRepository(
     private val apiService: INaturalistApiService,
     private val connectivityChecker: ConnectivityChecker,
     private val imageHttpClient: OkHttpClient,
-    private val remoteObservationSyncService: RemoteObservationSyncService
+    private val remoteObservationSyncService: RemoteObservationSyncService,
+    private val remotePublicationService: RemotePublicationService
 ) {
 
     private val classifier by lazy { MobileNetV3Classifier(appContext) }
@@ -174,6 +179,7 @@ class PlantRepository(
             enrichedFamily = enrichedData?.family,
             enrichedWikipediaUrl = enrichedData?.wikipediaUrl,
             enrichedPhotoUrl = enrichedData?.photoUrl,
+            isPublished = false,
             syncStatus = ObservationSyncStatus.PENDING.name,
             lastSyncAttemptAt = null
         )
@@ -251,6 +257,72 @@ class PlantRepository(
 
     fun observeObservations(): Flow<List<ObservationEntity>> {
         return observationDao.observeAll()
+    }
+
+    fun observePublishedObservations(): Flow<List<ObservationEntity>> {
+        return observationDao.observePublished()
+    }
+
+    suspend fun publishObservation(observationId: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            val observation = observationDao.getById(observationId) ?: return@withContext false
+            if (observation.syncStatus != ObservationSyncStatus.SYNCED.name) {
+                return@withContext false
+            }
+
+            if (!connectivityChecker.hasInternetConnection() || !remotePublicationService.isConfigured()) {
+                return@withContext false
+            }
+
+            val published = remotePublicationService.publishObservation(observation)
+            if (published) {
+                observationDao.updatePublicationStatus(observationId, true)
+            }
+            published
+        }
+    }
+
+    fun observeObservationStats(): Flow<ObservationStats> {
+        return observationDao.observeAll().map { observations ->
+            ObservationStats(
+                observationsCount = observations.size,
+                publishedCount = observations.count { it.isPublished },
+                speciesCount = observations
+                    .map { it.enrichedScientificName ?: it.predictedSpecies }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                    .size
+            )
+        }
+    }
+
+    suspend fun fetchCommunityPublications(): List<CommunityPublication> {
+        return withContext(Dispatchers.IO) {
+            val remotePublications = if (
+                connectivityChecker.hasInternetConnection() && remotePublicationService.isConfigured()
+            ) {
+                remotePublicationService.fetchPublications()
+            } else {
+                emptyList()
+            }
+
+            if (remotePublications.isNotEmpty()) {
+                return@withContext remotePublications.map { it.toDomain() }
+            }
+
+            observationDao.getPublished().map { observation ->
+                CommunityPublication(
+                    id = observation.id,
+                    scientificName = observation.enrichedScientificName ?: observation.predictedSpecies,
+                    commonName = observation.enrichedCommonName,
+                    userDisplayName = "Utilizador",
+                    latitude = observation.latitude,
+                    longitude = observation.longitude,
+                    publishedAt = Instant.ofEpochMilli(observation.capturedAt).toString(),
+                    imageUrl = observation.imageUri
+                )
+            }
+        }
     }
 
     private suspend fun resolveBestEffortLocation(
@@ -499,6 +571,36 @@ class PlantRepository(
         val similarity: Float,
         val fusedScore: Float
     )
+
+    data class ObservationStats(
+        val observationsCount: Int,
+        val publishedCount: Int,
+        val speciesCount: Int
+    )
+
+    data class CommunityPublication(
+        val id: String,
+        val scientificName: String,
+        val commonName: String?,
+        val userDisplayName: String,
+        val latitude: Double?,
+        val longitude: Double?,
+        val publishedAt: String,
+        val imageUrl: String?
+    )
+
+    private fun RemoteCommunityPublication.toDomain(): CommunityPublication {
+        return CommunityPublication(
+            id = publicationId.toString(),
+            scientificName = scientificName,
+            commonName = commonName,
+            userDisplayName = userDisplayName,
+            latitude = latitude,
+            longitude = longitude,
+            publishedAt = publishedAt,
+            imageUrl = imageUrl
+        )
+    }
 
     suspend fun inferMultipleImages(
         imageUris: List<String>,

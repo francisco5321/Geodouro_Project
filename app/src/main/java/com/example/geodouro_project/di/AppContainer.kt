@@ -6,6 +6,7 @@ import com.example.geodouro_project.core.network.ConnectivityChecker
 import com.example.geodouro_project.data.local.GeodouroDatabase
 import com.example.geodouro_project.data.remote.RemoteDbConfig
 import com.example.geodouro_project.data.remote.RemoteObservationSyncService
+import com.example.geodouro_project.data.remote.RemotePublicationService
 import com.example.geodouro_project.data.remote.api.INaturalistApiService
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.google.gson.Gson
@@ -54,6 +55,15 @@ object AppContainer {
                 defaultUserId = BuildConfig.BACKEND_DEFAULT_USER_ID
             )
         )
+        val remotePublicationService = RemotePublicationService(
+            httpClient = okHttpClient,
+            gson = Gson(),
+            config = RemoteDbConfig(
+                baseUrl = BuildConfig.BACKEND_BASE_URL,
+                guestLabel = BuildConfig.BACKEND_GUEST_LABEL,
+                defaultUserId = BuildConfig.BACKEND_DEFAULT_USER_ID
+            )
+        )
 
         return PlantRepository(
             appContext = appContext,
@@ -62,7 +72,8 @@ object AppContainer {
             apiService = apiService,
             connectivityChecker = ConnectivityChecker(appContext),
             imageHttpClient = okHttpClient,
-            remoteObservationSyncService = remoteDbSyncService
+            remoteObservationSyncService = remoteDbSyncService,
+            remotePublicationService = remotePublicationService
         )
     }
 }
