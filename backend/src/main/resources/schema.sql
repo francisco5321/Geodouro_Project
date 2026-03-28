@@ -98,18 +98,6 @@ CREATE TABLE IF NOT EXISTS observation_image (
     FOREIGN KEY (observation_id) REFERENCES observation(observation_id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS taxon_cache (
-    species_query TEXT PRIMARY KEY,
-    taxon_id BIGINT,
-    scientific_name TEXT NOT NULL,
-    common_name TEXT,
-    family TEXT,
-    wikipedia_url TEXT,
-    photo_url TEXT,
-    updated_at BIGINT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
-
 CREATE TABLE IF NOT EXISTS publication (
     publication_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     observation_id INTEGER NOT NULL UNIQUE,
@@ -156,3 +144,4 @@ CREATE INDEX IF NOT EXISTS idx_publication_image_publication_id ON publication_i
 CREATE INDEX IF NOT EXISTS idx_plant_species_family ON plant_species(family);
 CREATE INDEX IF NOT EXISTS idx_plant_species_genus ON plant_species(genus);
 CREATE INDEX IF NOT EXISTS idx_plant_species_species ON plant_species(species);
+
