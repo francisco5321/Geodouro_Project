@@ -10,8 +10,15 @@ spring:
     init:
       mode: always
       schema-locations: classpath:schema.sql
+  servlet:
+    multipart:
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:10MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:50MB}
 server:
   port: ${SERVER_PORT:8080}
+app:
+  storage:
+    images-dir: ${OBSERVATION_IMAGES_DIR:backend-uploads}
 logging:
   level:
     com.example.geodouro_backend: DEBUG

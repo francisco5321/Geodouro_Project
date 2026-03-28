@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+.vscode/settings.json
+backend/README.md
+backend/src/main/resources/application.yml
