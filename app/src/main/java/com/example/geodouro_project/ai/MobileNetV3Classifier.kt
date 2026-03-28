@@ -79,6 +79,15 @@ class MobileNetV3Classifier(
                 candidates = emptyList()
             )
 
+        if (shouldRejectAsNonPlant(rankedCandidates)) {
+            return@withContext InferencePrediction(
+                label = NON_PLANT_LABEL,
+                confidence = rejectionConfidence(bestPrediction),
+                fromModel = true,
+                candidates = emptyList()
+            )
+        }
+
         val confidentCandidates = rankedCandidates
             .filter { it.confidence >= MIN_DISPLAY_CONFIDENCE }
             .take(MAX_DISPLAY_CANDIDATES)
@@ -95,6 +104,32 @@ class MobileNetV3Classifier(
             fromModel = true,
             candidates = exportCandidates
         )
+    }
+
+    private fun shouldRejectAsNonPlant(rankedCandidates: List<InferenceCandidate>): Boolean {
+        val bestPrediction = rankedCandidates.firstOrNull() ?: return true
+        val secondPrediction = rankedCandidates.getOrNull(1)
+        val margin = bestPrediction.confidence - (secondPrediction?.confidence ?: 0f)
+        val normalizedLabel = normalizeLabel(bestPrediction.label)
+
+        if (normalizedLabel in KNOWN_NON_PLANT_LABELS) {
+            return true
+        }
+
+        if (bestPrediction.confidence < MIN_PLANT_CONFIDENCE) {
+            return true
+        }
+
+        return bestPrediction.confidence < LOW_CONFIDENCE_PLANT_THRESHOLD && margin < MIN_CONFIDENCE_MARGIN
+    }
+
+    private fun rejectionConfidence(bestPrediction: InferenceCandidate): Float {
+        val inverted = 1f - bestPrediction.confidence
+        return inverted.coerceIn(MIN_NON_PLANT_CONFIDENCE, MAX_NON_PLANT_CONFIDENCE)
+    }
+
+    private fun normalizeLabel(label: String): String {
+        return label.trim().lowercase().replace('_', ' ')
     }
 
     private fun runModelProbabilities(bitmap: Bitmap): FloatArray? {
@@ -245,9 +280,22 @@ class MobileNetV3Classifier(
         const val DEFAULT_INPUT_SIZE = 224
         const val MODEL_DISPLAY_NAME = "MobileNetV3-Small (PyTorch)"
         const val FALLBACK_LABEL = "Modelo PyTorch ainda indisponivel"
+        const val NON_PLANT_LABEL = "Nao e uma planta"
         const val MIN_DISPLAY_CONFIDENCE = 0.15f
 
         private const val MAX_DISPLAY_CANDIDATES = 5
+        private const val MIN_PLANT_CONFIDENCE = 0.30f
+        private const val LOW_CONFIDENCE_PLANT_THRESHOLD = 0.50f
+        private const val MIN_CONFIDENCE_MARGIN = 0.12f
+        private const val MIN_NON_PLANT_CONFIDENCE = 0.55f
+        private const val MAX_NON_PLANT_CONFIDENCE = 0.95f
+
+        private val KNOWN_NON_PLANT_LABELS = setOf(
+            "actinia equina",
+            "chamaeleon gummifer",
+            "podarcis bocagei",
+            "pluvialis squatarola"
+        )
 
         private val TORCHVISION_MEAN_RGB = floatArrayOf(0.485f, 0.456f, 0.406f)
         private val TORCHVISION_STD_RGB = floatArrayOf(0.229f, 0.224f, 0.225f)

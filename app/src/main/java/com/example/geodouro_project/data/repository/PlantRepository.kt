@@ -1,4 +1,4 @@
-﻿package com.example.geodouro_project.data.repository
+package com.example.geodouro_project.data.repository
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -48,7 +48,7 @@ class PlantRepository(
     private val classifier by lazy { MobileNetV3Classifier(appContext) }
 
     suspend fun rerankLowConfidenceInference(localResult: LocalInferenceResult): LocalInferenceResult {
-        if (localResult.confidence >= LOW_CONFIDENCE_THRESHOLD) {
+        if (isNonPlantPrediction(localResult.predictedSpecies) || localResult.confidence >= LOW_CONFIDENCE_THRESHOLD) {
             return localResult
         }
 
@@ -66,6 +66,7 @@ class PlantRepository(
                 )
             }
             .take(MAX_RERANK_CANDIDATES)
+            .filterNot { isNonPlantPrediction(it.species) }
 
         if (baseCandidates.size <= 1) {
             return localResult
@@ -102,6 +103,10 @@ class PlantRepository(
     }
 
     suspend fun enrichSpecies(speciesName: String): EnrichmentResult {
+        if (isNonPlantPrediction(speciesName)) {
+            return EnrichmentResult(data = null, origin = EnrichmentOrigin.LOCAL_ONLY)
+        }
+
         val normalizedQuery = speciesName
             .replace('_', ' ')
             .trim()
@@ -130,11 +135,24 @@ class PlantRepository(
 
     suspend fun saveObservation(
         localResult: LocalInferenceResult,
-        enrichedData: EnrichedSpeciesData?
+        enrichedData: EnrichedSpeciesData?,
+        imageUris: List<String> = listOf(localResult.imageUri)
     ): ObservationSaveResult {
+        require(!isNonPlantPrediction(localResult.predictedSpecies)) {
+            "Nao e possivel guardar uma observacao sem planta reconhecida"
+        }
+
+        val normalizedImageUris = imageUris
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .ifEmpty { listOf(localResult.imageUri) }
+
+        val primaryImageUri = normalizedImageUris.firstOrNull().orEmpty()
         val newObservation = ObservationEntity(
             id = UUID.randomUUID().toString(),
-            imageUri = localResult.imageUri,
+            imageUri = primaryImageUri,
+            imageUrisSerialized = ObservationEntity.serializeImageUris(normalizedImageUris, primaryImageUri),
             capturedAt = localResult.capturedAt,
             latitude = localResult.latitude,
             longitude = localResult.longitude,
@@ -149,7 +167,10 @@ class PlantRepository(
             lastSyncAttemptAt = null
         )
 
-        Log.d(TAG, "Persisting observation locally id=${newObservation.id} species=${newObservation.predictedSpecies}")
+        Log.d(
+            TAG,
+            "Persisting observation locally id=${newObservation.id} species=${newObservation.predictedSpecies} imageCount=${normalizedImageUris.size}"
+        )
         observationDao.upsert(newObservation)
 
         val hasInternet = connectivityChecker.hasInternetConnection()
@@ -190,7 +211,10 @@ class PlantRepository(
 
         pendingObservations.forEach { observation ->
             val attemptTime = System.currentTimeMillis()
-            Log.d(TAG, "Uploading observation id=${observation.id} species=${observation.predictedSpecies}")
+            Log.d(
+                TAG,
+                "Uploading observation id=${observation.id} species=${observation.predictedSpecies} imageCount=${observation.allImageUris().size}"
+            )
             val success = uploadObservationToRemote(observation, attemptTime)
 
             if (success) {
@@ -351,6 +375,10 @@ class PlantRepository(
         )
     }
 
+    private fun isNonPlantPrediction(species: String): Boolean {
+        return species.trim().equals(MobileNetV3Classifier.NON_PLANT_LABEL, ignoreCase = true)
+    }
+
     private data class RankedCandidate(
         val candidate: LocalPredictionCandidate,
         val similarity: Float,
@@ -423,9 +451,31 @@ class PlantRepository(
             throw IllegalArgumentException("Lista de imagens nao pode estar vazia")
         }
 
-        val validResults = imageResults.filter { it.predictedSpecies != "ERROR" && it.predictedSpecies != "UNKNOWN" }
-        if (validResults.isEmpty()) {
+        val successfulResults = imageResults.filter { it.predictedSpecies != "ERROR" && it.predictedSpecies != "UNKNOWN" }
+        val validResults = successfulResults.filterNot { isNonPlantPrediction(it.predictedSpecies) }
+        if (successfulResults.isEmpty()) {
             throw IllegalArgumentException("Nenhuma imagem foi classificada com sucesso")
+        }
+
+        if (validResults.isEmpty()) {
+            val nonPlantConfidence = successfulResults
+                .filter { isNonPlantPrediction(it.predictedSpecies) }
+                .map { it.confidence }
+                .average()
+                .takeIf { !it.isNaN() }
+                ?.toFloat()
+                ?: 0.6f
+
+            return@withContext MultiImageAggregationResult(
+                finalPredictedSpecies = MobileNetV3Classifier.NON_PLANT_LABEL,
+                aggregatedConfidence = nonPlantConfidence,
+                confidenceState = ConfidenceState.ABSTAIN,
+                speciesVotes = emptyMap(),
+                confidencePerSpecies = emptyMap(),
+                processedImages = successfulResults,
+                totalImagesAnalyzed = imageResults.size,
+                processingTimeMs = processingTimeMs
+            )
         }
 
         val speciesVotes = mutableMapOf<String, Int>()

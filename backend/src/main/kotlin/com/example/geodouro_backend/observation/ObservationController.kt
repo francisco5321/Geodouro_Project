@@ -46,23 +46,26 @@ class ObservationController(
 
     @PostMapping(consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     @ResponseStatus(HttpStatus.CREATED)
-    fun upsertObservationWithImage(
+    fun upsertObservationWithImages(
         @Valid @RequestPart("metadata") request: UpsertObservationRequest,
-        @RequestPart("image") image: MultipartFile
+        @RequestPart("images", required = false) images: List<MultipartFile>?,
+        @RequestPart("image", required = false) image: MultipartFile?
     ): ObservationResponse {
+        val uploadedImages = images.orEmpty() + listOfNotNull(image)
+
         logger.info(
-            "POST /api/observations multipart deviceObservationId={} predictedScientificName={} guestLabel={} userId={} fileSize={}",
+            "POST /api/observations multipart deviceObservationId={} predictedScientificName={} guestLabel={} userId={} imageCount={}",
             request.deviceObservationId,
             request.predictedScientificName,
             request.guestLabel,
             request.userId,
-            image.size
+            uploadedImages.size
         )
 
-        val response = observationService.upsertObservation(request, image)
+        val response = observationService.upsertObservation(request, uploadedImages)
 
         logger.info(
-            "Observation with image persisted observationId={} deviceObservationId={} syncStatus={}",
+            "Observation with images persisted observationId={} deviceObservationId={} syncStatus={}",
             response.observationId,
             response.deviceObservationId,
             response.syncStatus

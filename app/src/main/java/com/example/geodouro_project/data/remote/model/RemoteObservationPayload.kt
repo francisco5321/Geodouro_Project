@@ -1,10 +1,11 @@
-﻿package com.example.geodouro_project.data.remote.model
+package com.example.geodouro_project.data.remote.model
 
 data class RemoteObservationPayload(
     val deviceObservationId: String,
     val userId: Int?,
     val guestLabel: String?,
     val imageUri: String,
+    val imageUris: List<String>,
     val capturedAt: Long,
     val predictedScientificName: String,
     val confidence: Float,

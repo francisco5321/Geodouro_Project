@@ -1,10 +1,11 @@
-﻿package com.example.geodouro_project.ui.screens
+package com.example.geodouro_project.ui.screens
 
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.geodouro_project.ai.MobileNetV3Classifier
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.EnrichedSpeciesData
@@ -27,7 +28,8 @@ data class ResultUiModel(
     val capturedImageUri: String,
     val wikipediaUrl: String?,
     val photoUrl: String?,
-    val alternativePredictions: List<LocalPredictionCandidate>
+    val alternativePredictions: List<LocalPredictionCandidate>,
+    val isPlantDetected: Boolean
 )
 
 data class MultiImageResultUiModel(
@@ -42,7 +44,8 @@ data class MultiImageResultUiModel(
     val wikipediaUrl: String?,
     val photoUrl: String?,
     val imageUris: List<String>,
-    val processingTimeMs: Long
+    val processingTimeMs: Long,
+    val isPlantDetected: Boolean
 )
 
 sealed class ResultsUiState {
@@ -81,12 +84,31 @@ class ResultsViewModel(
         viewModelScope.launch {
             _uiState.value = ResultsUiState.Loading
 
+            if (isNonPlantPrediction(localInferenceResult.predictedSpecies)) {
+                lastInferenceResult = localInferenceResult
+                lastEnrichedData = null
+                _uiState.value = ResultsUiState.Success(
+                    result = buildUiModel(localInferenceResult, null),
+                    sourceLabel = "Nao foi detetada nenhuma planta na imagem."
+                )
+                return@launch
+            }
+
             val rerankedInference = runCatching {
                 repository.rerankLowConfidenceInference(localInferenceResult)
             }.getOrDefault(localInferenceResult)
             val rerankApplied = rerankedInference.predictedSpecies != localInferenceResult.predictedSpecies
 
             lastInferenceResult = rerankedInference
+
+            if (isNonPlantPrediction(rerankedInference.predictedSpecies)) {
+                lastEnrichedData = null
+                _uiState.value = ResultsUiState.Success(
+                    result = buildUiModel(rerankedInference, null),
+                    sourceLabel = "Nao foi detetada nenhuma planta na imagem."
+                )
+                return@launch
+            }
 
             val enrichmentResult = try {
                 repository.enrichSpecies(rerankedInference.predictedSpecies)
@@ -127,6 +149,15 @@ class ResultsViewModel(
             }
 
             lastMultiImageResult = aggregationResult
+
+            if (isNonPlantPrediction(aggregationResult.finalPredictedSpecies)) {
+                lastEnrichedData = null
+                _uiState.value = ResultsUiState.MultiImageSuccess(
+                    result = buildMultiImageUiModel(aggregationResult, null),
+                    sourceLabel = "Nenhuma das imagens apresentou uma planta reconhecivel."
+                )
+                return@launch
+            }
 
             val enrichmentResult = try {
                 repository.enrichSpecies(aggregationResult.finalPredictedSpecies)
@@ -196,10 +227,31 @@ class ResultsViewModel(
                     return@launch
                 }
 
-                Log.d(TAG, "Saving observation imageUri=${inferenceToPersist.imageUri} species=${inferenceToPersist.predictedSpecies}")
+                if (isNonPlantPrediction(inferenceToPersist.predictedSpecies)) {
+                    _uiState.value = ResultsUiState.Error(
+                        "A imagem analisada nao contem uma planta reconhecivel, por isso nao sera guardada."
+                    )
+                    return@launch
+                }
+
+                val imageUrisToPersist = when (current) {
+                    is ResultsUiState.MultiImageSuccess -> lastMultiImageResult
+                        ?.processedImages
+                        ?.map { it.imageUri }
+                        ?.filter { it.isNotBlank() }
+                        ?.distinct()
+                        .orEmpty()
+                    else -> listOf(inferenceToPersist.imageUri)
+                }
+
+                Log.d(
+                    TAG,
+                    "Saving observation imageUri=${inferenceToPersist.imageUri} species=${inferenceToPersist.predictedSpecies} imageCount=${imageUrisToPersist.size}"
+                )
                 val saveResult = repository.saveObservation(
                     localResult = inferenceToPersist,
-                    enrichedData = lastEnrichedData
+                    enrichedData = lastEnrichedData,
+                    imageUris = imageUrisToPersist
                 )
 
                 Log.d(TAG, "saveObservation result observationId=${saveResult.observationId} syncStatus=${saveResult.syncStatus}")
@@ -223,29 +275,41 @@ class ResultsViewModel(
         }
     }
 
-    fun syncPendingObservations() {
-        viewModelScope.launch {
-            repository.syncPendingObservations()
-        }
-    }
-
     private fun buildUiModel(
         localInferenceResult: LocalInferenceResult,
         enrichedData: EnrichedSpeciesData?
     ): ResultUiModel {
-        val scientificName = enrichedData?.scientificName ?: localInferenceResult.predictedSpecies
+        val isPlantDetected = !isNonPlantPrediction(localInferenceResult.predictedSpecies)
+        val scientificName = if (isPlantDetected) {
+            enrichedData?.scientificName ?: localInferenceResult.predictedSpecies
+        } else {
+            MobileNetV3Classifier.NON_PLANT_LABEL
+        }
 
         return ResultUiModel(
             scientificName = scientificName,
-            commonName = enrichedData?.commonName ?: "Nome comum indisponivel",
-            family = enrichedData?.family ?: "Familia indisponivel",
+            commonName = if (isPlantDetected) {
+                enrichedData?.commonName ?: "Nome comum indisponivel"
+            } else {
+                "Objeto nao identificado como planta"
+            },
+            family = if (isPlantDetected) {
+                enrichedData?.family ?: "Familia indisponivel"
+            } else {
+                "Sem familia botanica"
+            },
             confidence = localInferenceResult.confidence,
             capturedImageUri = localInferenceResult.imageUri,
-            wikipediaUrl = enrichedData?.wikipediaUrl,
-            photoUrl = enrichedData?.photoUrl,
-            alternativePredictions = localInferenceResult.candidatePredictions
-                .drop(1)
-                .filter { it.confidence >= DISPLAY_ALTERNATIVE_THRESHOLD }
+            wikipediaUrl = if (isPlantDetected) enrichedData?.wikipediaUrl else null,
+            photoUrl = if (isPlantDetected) enrichedData?.photoUrl else null,
+            alternativePredictions = if (isPlantDetected) {
+                localInferenceResult.candidatePredictions
+                    .drop(1)
+                    .filter { it.confidence >= DISPLAY_ALTERNATIVE_THRESHOLD }
+            } else {
+                emptyList()
+            },
+            isPlantDetected = isPlantDetected
         )
     }
 
@@ -253,20 +317,38 @@ class ResultsViewModel(
         multiImageResult: MultiImageAggregationResult,
         enrichedData: EnrichedSpeciesData?
     ): MultiImageResultUiModel {
+        val isPlantDetected = !isNonPlantPrediction(multiImageResult.finalPredictedSpecies)
         return MultiImageResultUiModel(
-            finalSpecies = enrichedData?.scientificName ?: multiImageResult.finalPredictedSpecies,
-            commonName = enrichedData?.commonName ?: "Nome comum indisponivel",
-            family = enrichedData?.family ?: "Familia indisponivel",
+            finalSpecies = if (isPlantDetected) {
+                enrichedData?.scientificName ?: multiImageResult.finalPredictedSpecies
+            } else {
+                MobileNetV3Classifier.NON_PLANT_LABEL
+            },
+            commonName = if (isPlantDetected) {
+                enrichedData?.commonName ?: "Nome comum indisponivel"
+            } else {
+                "Nenhuma planta reconhecida nas imagens"
+            },
+            family = if (isPlantDetected) {
+                enrichedData?.family ?: "Familia indisponivel"
+            } else {
+                "Sem familia botanica"
+            },
             aggregatedConfidence = multiImageResult.aggregatedConfidence,
             imagesCount = multiImageResult.totalImagesAnalyzed,
             consensus = multiImageResult.consensusScore,
-            topAlternative = multiImageResult.topAlternative,
-            topAlternativeConfidence = multiImageResult.topAlternativeConfidence,
-            wikipediaUrl = enrichedData?.wikipediaUrl,
-            photoUrl = enrichedData?.photoUrl,
+            topAlternative = if (isPlantDetected) multiImageResult.topAlternative else null,
+            topAlternativeConfidence = if (isPlantDetected) multiImageResult.topAlternativeConfidence else null,
+            wikipediaUrl = if (isPlantDetected) enrichedData?.wikipediaUrl else null,
+            photoUrl = if (isPlantDetected) enrichedData?.photoUrl else null,
             imageUris = multiImageResult.processedImages.map { it.imageUri },
-            processingTimeMs = multiImageResult.processingTimeMs
+            processingTimeMs = multiImageResult.processingTimeMs,
+            isPlantDetected = isPlantDetected
         )
+    }
+
+    private fun isNonPlantPrediction(speciesName: String): Boolean {
+        return speciesName.trim().equals(MobileNetV3Classifier.NON_PLANT_LABEL, ignoreCase = true)
     }
 
     private fun enrichmentOriginLabel(origin: EnrichmentOrigin, rerankApplied: Boolean): String {
@@ -309,3 +391,4 @@ class ResultsViewModel(
         }
     }
 }
+

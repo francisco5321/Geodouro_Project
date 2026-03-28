@@ -13,6 +13,7 @@ data class UpsertObservationRequest(
     @field:Size(max = 255)
     val guestLabel: String? = null,
     val imageUri: String? = null,
+    val imageUris: List<String>? = null,
     val capturedAt: Long? = null,
     @field:NotBlank
     val predictedScientificName: String,

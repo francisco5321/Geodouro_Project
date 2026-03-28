@@ -20,19 +20,23 @@ class ObservationStorageService(
         Files.createDirectories(rootPath)
     }
 
-    fun storeObservationImage(deviceObservationId: UUID, image: MultipartFile): String {
-        require(!image.isEmpty) { "Uploaded image is empty" }
+    fun storeObservationImages(deviceObservationId: UUID, images: List<MultipartFile>): List<String> {
+        val validImages = images.filterNot { it.isEmpty }
+        if (validImages.isEmpty()) {
+            return emptyList()
+        }
 
-        val extension = resolveExtension(image)
         val observationDirectory = rootPath.resolve(deviceObservationId.toString())
         Files.createDirectories(observationDirectory)
 
-        val targetFile = observationDirectory.resolve("original$extension")
-        image.inputStream.use { inputStream ->
-            copyReplacing(inputStream, targetFile)
+        return validImages.mapIndexed { index, image ->
+            val extension = resolveExtension(image)
+            val targetFile = observationDirectory.resolve("image-${index + 1}$extension")
+            image.inputStream.use { inputStream ->
+                copyReplacing(inputStream, targetFile)
+            }
+            rootPath.relativize(targetFile).toString().replace('\\', '/')
         }
-
-        return rootPath.relativize(targetFile).toString().replace('\\', '/')
     }
 
     private fun resolveExtension(image: MultipartFile): String {

@@ -18,44 +18,57 @@ class ObservationService(
 ) {
 
     fun upsertObservation(request: UpsertObservationRequest): ObservationResponse {
-        val sanitizedImagePath = request.imageUri?.takeUnless { it.startsWith("content://") }
-        return upsertObservationInternal(request, sanitizedImagePath)
+        val sanitizedImagePaths = sanitizeImagePaths(request.imageUris)
+            .ifEmpty {
+                request.imageUri
+                    ?.takeUnless { it.startsWith("content://") }
+                    ?.let(::listOf)
+                    .orEmpty()
+            }
+        return upsertObservationInternal(request, sanitizedImagePaths)
     }
 
-    fun upsertObservation(request: UpsertObservationRequest, image: MultipartFile): ObservationResponse {
+    fun upsertObservation(request: UpsertObservationRequest, images: List<MultipartFile>): ObservationResponse {
         val deviceObservationId = request.deviceObservationId ?: UUID.randomUUID()
-        val storedImagePath = observationStorageService.storeObservationImage(deviceObservationId, image)
-        return upsertObservationInternal(request.copy(deviceObservationId = deviceObservationId), storedImagePath)
+        val storedImagePaths = observationStorageService.storeObservationImages(deviceObservationId, images)
+        return upsertObservationInternal(
+            request.copy(deviceObservationId = deviceObservationId),
+            storedImagePaths
+        )
     }
 
     private fun upsertObservationInternal(
         request: UpsertObservationRequest,
-        storedImagePath: String?
+        storedImagePaths: List<String>
     ): ObservationResponse {
         validateCoordinates(request.latitude, request.longitude)
 
         val deviceObservationId = request.deviceObservationId ?: UUID.randomUUID()
         val userId = resolveUserId(request)
+        val plantSpeciesId = resolvePlantSpeciesId(request)
         val syncStatus = normalizeSyncStatus(request.syncStatus)
         val observedAt = request.observedAt ?: java.time.Instant.now()
         val observedAtTimestamp = Timestamp.from(observedAt)
+        val primaryImagePath = storedImagePaths.firstOrNull()
 
         logger.debug(
-            "Preparing upsert deviceObservationId={} userId={} capturedAt={} confidence={} lat={} lon={} storedImagePath={}",
+            "Preparing upsert deviceObservationId={} userId={} plantSpeciesId={} capturedAt={} confidence={} lat={} lon={} imageCount={} primaryImagePath={}",
             deviceObservationId,
             userId,
+            plantSpeciesId,
             request.capturedAt,
             request.confidence,
             request.latitude,
             request.longitude,
-            storedImagePath
+            storedImagePaths.size,
+            primaryImagePath
         )
 
         val parameters = MapSqlParameterSource()
             .addValue("deviceObservationId", deviceObservationId)
             .addValue("userId", userId)
-            .addValue("plantSpeciesId", null)
-            .addValue("imageUri", storedImagePath)
+            .addValue("plantSpeciesId", plantSpeciesId)
+            .addValue("imageUri", primaryImagePath)
             .addValue("capturedAt", request.capturedAt)
             .addValue("predictedScientificName", request.predictedScientificName.trim())
             .addValue("confidence", request.confidence)
@@ -74,13 +87,17 @@ class ObservationService(
             .addValue("notes", request.notes)
 
         val response = jdbcTemplate.query(UPSERT_OBSERVATION_SQL, parameters, observationRowMapper).first()
+        replaceObservationImages(response.observationId, storedImagePaths)
+        refreshPlantSpeciesImageCount(plantSpeciesId)
 
         logger.info(
-            "Upsert finished observationId={} deviceObservationId={} userId={} syncStatus={} storedImagePath={}",
+            "Upsert finished observationId={} deviceObservationId={} userId={} plantSpeciesId={} syncStatus={} imageCount={} primaryImagePath={}",
             response.observationId,
             response.deviceObservationId,
             response.userId,
+            plantSpeciesId,
             response.syncStatus,
+            storedImagePaths.size,
             response.storedImagePath
         )
 
@@ -154,6 +171,85 @@ class ObservationService(
         return createdUserId
     }
 
+    private fun resolvePlantSpeciesId(request: UpsertObservationRequest): Int {
+        val scientificName = request.enrichedScientificName
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: request.predictedScientificName.trim()
+
+        val commonName = request.enrichedCommonName
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+        val family = request.enrichedFamily
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: "Unknown"
+        val (genus, species) = splitScientificName(scientificName)
+
+        val parameters = MapSqlParameterSource()
+            .addValue("scientificName", scientificName)
+            .addValue("commonName", commonName)
+            .addValue("family", family)
+            .addValue("genus", genus)
+            .addValue("species", species)
+
+        val plantSpeciesId = jdbcTemplate.queryForObject(
+            UPSERT_PLANT_SPECIES_SQL,
+            parameters,
+            Int::class.java
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not upsert plant species")
+
+        logger.debug(
+            "Resolved plant species scientificName={} plantSpeciesId={} family={} genus={} species={}",
+            scientificName,
+            plantSpeciesId,
+            family,
+            genus,
+            species
+        )
+
+        return plantSpeciesId
+    }
+
+    private fun replaceObservationImages(observationId: Int, storedImagePaths: List<String>) {
+        jdbcTemplate.update(
+            "DELETE FROM observation_image WHERE observation_id = :observationId",
+            MapSqlParameterSource("observationId", observationId)
+        )
+
+        storedImagePaths.forEach { imagePath ->
+            jdbcTemplate.update(
+                INSERT_OBSERVATION_IMAGE_SQL,
+                MapSqlParameterSource()
+                    .addValue("observationId", observationId)
+                    .addValue("imagePath", imagePath)
+            )
+        }
+    }
+
+    private fun refreshPlantSpeciesImageCount(plantSpeciesId: Int) {
+        jdbcTemplate.update(
+            REFRESH_PLANT_SPECIES_IMAGE_COUNT_SQL,
+            MapSqlParameterSource("plantSpeciesId", plantSpeciesId)
+        )
+    }
+
+    private fun sanitizeImagePaths(imageUris: List<String>?): List<String> {
+        return imageUris.orEmpty()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .filterNot { it.startsWith("content://") }
+            .distinct()
+    }
+
+    private fun splitScientificName(scientificName: String): Pair<String, String> {
+        val normalized = scientificName.trim().replace(Regex("\\s+"), " ")
+        val parts = normalized.split(' ')
+        val genus = parts.firstOrNull().orEmpty().ifBlank { "Unknown" }
+        val species = parts.drop(1).joinToString(" ").ifBlank { genus.lowercase() }
+        return genus to species
+    }
+
     private fun normalizeSyncStatus(syncStatus: String?): String {
         val normalized = syncStatus?.trim()?.uppercase() ?: "PENDING"
         if (normalized !in allowedSyncStatuses) {
@@ -191,6 +287,52 @@ class ObservationService(
     companion object {
         private val logger = LoggerFactory.getLogger(ObservationService::class.java)
         private val allowedSyncStatuses = setOf("PENDING", "SYNCED", "FAILED")
+
+        private val UPSERT_PLANT_SPECIES_SQL = """
+            INSERT INTO plant_species (
+                scientific_name,
+                common_name,
+                family,
+                genus,
+                species
+            ) VALUES (
+                :scientificName,
+                :commonName,
+                :family,
+                :genus,
+                :species
+            )
+            ON CONFLICT (scientific_name)
+            DO UPDATE SET
+                common_name = COALESCE(EXCLUDED.common_name, plant_species.common_name),
+                family = COALESCE(EXCLUDED.family, plant_species.family),
+                genus = COALESCE(EXCLUDED.genus, plant_species.genus),
+                species = COALESCE(EXCLUDED.species, plant_species.species),
+                updated_at = NOW()
+            RETURNING plant_species_id
+        """.trimIndent()
+
+        private val INSERT_OBSERVATION_IMAGE_SQL = """
+            INSERT INTO observation_image (
+                observation_id,
+                image_path
+            ) VALUES (
+                :observationId,
+                :imagePath
+            )
+        """.trimIndent()
+
+        private val REFRESH_PLANT_SPECIES_IMAGE_COUNT_SQL = """
+            UPDATE plant_species
+            SET image_count = (
+                SELECT COUNT(*)
+                FROM observation_image oi
+                JOIN observation o ON o.observation_id = oi.observation_id
+                WHERE o.plant_species_id = :plantSpeciesId
+            ),
+            updated_at = NOW()
+            WHERE plant_species_id = :plantSpeciesId
+        """.trimIndent()
 
         private val UPSERT_OBSERVATION_SQL = """
             INSERT INTO observation (
@@ -239,6 +381,7 @@ class ObservationService(
             ON CONFLICT (device_observation_id)
             DO UPDATE SET
                 user_id = EXCLUDED.user_id,
+                plant_species_id = EXCLUDED.plant_species_id,
                 image_uri = EXCLUDED.image_uri,
                 captured_at = EXCLUDED.captured_at,
                 predicted_scientific_name = EXCLUDED.predicted_scientific_name,

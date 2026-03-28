@@ -1,10 +1,10 @@
 package com.example.geodouro_project.data.local
 
 import android.content.Context
-import androidx.room.migration.Migration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.geodouro_project.data.local.dao.ObservationDao
 import com.example.geodouro_project.data.local.dao.TaxonCacheDao
@@ -13,7 +13,7 @@ import com.example.geodouro_project.data.local.entity.TaxonCacheEntity
 
 @Database(
     entities = [TaxonCacheEntity::class, ObservationEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class GeodouroDatabase : RoomDatabase() {
@@ -33,7 +33,7 @@ abstract class GeodouroDatabase : RoomDatabase() {
                     GeodouroDatabase::class.java,
                     "geodouro.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { INSTANCE = it }
             }
@@ -42,6 +42,15 @@ abstract class GeodouroDatabase : RoomDatabase() {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE observations RENAME TO observation")
+            }
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE observation ADD COLUMN imageUrisSerialized TEXT NOT NULL DEFAULT ''")
+                database.execSQL(
+                    "UPDATE observation SET imageUrisSerialized = imageUri WHERE imageUrisSerialized = '' AND imageUri IS NOT NULL"
+                )
             }
         }
     }

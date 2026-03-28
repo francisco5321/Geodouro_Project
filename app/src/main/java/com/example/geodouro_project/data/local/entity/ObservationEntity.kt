@@ -12,6 +12,7 @@ data class ObservationEntity(
     @PrimaryKey
     val id: String,
     val imageUri: String,
+    val imageUrisSerialized: String,
     val capturedAt: Long,
     val latitude: Double?,
     val longitude: Double?,
@@ -24,4 +25,32 @@ data class ObservationEntity(
     val enrichedPhotoUrl: String?,
     val syncStatus: String,
     val lastSyncAttemptAt: Long?
-)
+) {
+    fun allImageUris(): List<String> {
+        val parsed = imageUrisSerialized
+            .split("\n")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+
+        return if (parsed.isNotEmpty()) {
+            parsed
+        } else {
+            listOfNotNull(imageUri.takeIf { it.isNotBlank() })
+        }
+    }
+
+    companion object {
+        fun serializeImageUris(imageUris: List<String>, fallbackImageUri: String): String {
+            val normalized = imageUris
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
+
+            return if (normalized.isNotEmpty()) {
+                normalized.joinToString(separator = "\n")
+            } else {
+                fallbackImageUri.trim()
+            }
+        }
+    }
+}

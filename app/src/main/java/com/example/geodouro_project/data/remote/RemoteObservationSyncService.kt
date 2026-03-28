@@ -29,12 +29,14 @@ class RemoteObservationSyncService(
             return false
         }
 
+        val imageUris = observation.allImageUris()
         val configuredUserId = config.defaultUserId.takeIf { it > 0 }
         val payload = RemoteObservationPayload(
             deviceObservationId = observation.id,
             userId = configuredUserId,
             guestLabel = if (configuredUserId == null) config.guestLabel else null,
-            imageUri = observation.imageUri,
+            imageUri = imageUris.firstOrNull() ?: observation.imageUri,
+            imageUris = imageUris,
             capturedAt = observation.capturedAt,
             predictedScientificName = observation.predictedSpecies,
             confidence = observation.confidence,
@@ -53,7 +55,7 @@ class RemoteObservationSyncService(
             ?: return false
 
         val url = buildObservationUrl()
-        Log.d(TAG, "Uploading observation with image to $url deviceObservationId=${observation.id}")
+        Log.d(TAG, "Uploading observation with ${imageUris.size} image(s) to $url deviceObservationId=${observation.id}")
         val request = Request.Builder()
             .url(url)
             .post(multipartBody)
@@ -74,32 +76,58 @@ class RemoteObservationSyncService(
         observation: ObservationEntity,
         payload: RemoteObservationPayload
     ): MultipartBody? {
-        val imageUri = Uri.parse(observation.imageUri)
+        val multipartBuilder = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+
+        val metadataBody = gson.toJson(payload)
+            .toRequestBody(JSON_MEDIA_TYPE)
+        multipartBuilder.addFormDataPart("metadata", null, metadataBody)
+
+        val imageParts = observation.allImageUris().mapIndexedNotNull { index, imageUriString ->
+            buildImagePart(observation.id, index, imageUriString)
+        }
+
+        if (imageParts.isEmpty()) {
+            Log.w(TAG, "Observation image bytes are empty for all uris observationId=${observation.id}")
+            return null
+        }
+
+        imageParts.forEach { imagePart ->
+            multipartBuilder.addPart(imagePart)
+        }
+
+        return multipartBuilder.build()
+    }
+
+    private fun buildImagePart(
+        observationId: String,
+        index: Int,
+        imageUriString: String
+    ): MultipartBody.Part? {
+        val imageUri = Uri.parse(imageUriString)
         val contentResolver = appContext.contentResolver
         val mimeType = contentResolver.getType(imageUri)?.takeIf { it.isNotBlank() } ?: "image/jpeg"
         val imageBytes = runCatching {
             contentResolver.openInputStream(imageUri)?.use { it.readBytes() }
         }.onFailure { error ->
-            Log.e(TAG, "Failed to read observation image uri=${observation.imageUri}", error)
+            Log.e(TAG, "Failed to read observation image uri=$imageUriString", error)
         }.getOrNull()
 
         if (imageBytes == null || imageBytes.isEmpty()) {
-            Log.w(TAG, "Observation image bytes are empty uri=${observation.imageUri}")
+            Log.w(TAG, "Observation image bytes are empty uri=$imageUriString")
             return null
         }
 
         val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
             ?.takeIf { it.isNotBlank() }
             ?: "jpg"
-        val metadataBody = gson.toJson(payload)
-            .toRequestBody(JSON_MEDIA_TYPE)
         val imageBody = imageBytes.toRequestBody(mimeType.toMediaType())
 
-        return MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("metadata", null, metadataBody)
-            .addFormDataPart("image", "${observation.id}.${extension}", imageBody)
-            .build()
+        return MultipartBody.Part.createFormData(
+            "images",
+            "${observationId}-${index + 1}.$extension",
+            imageBody
+        )
     }
 
     private fun buildObservationUrl(): String {

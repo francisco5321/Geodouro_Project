@@ -1,4 +1,4 @@
-﻿package com.example.geodouro_project.ui.screens
+package com.example.geodouro_project.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -165,8 +165,8 @@ fun ResultsScreen(
                         result = state.result,
                         sourceLabel = state.sourceLabel,
                         saveMessage = state.saveMessage,
-                        onSyncPending = { viewModel.syncPendingObservations() },
-                        onConfirm = { viewModel.confirmObservation() }
+                        onConfirm = { viewModel.confirmObservation() },
+                        onRetakePhotos = onBackClick
                     )
                 }
 
@@ -175,8 +175,8 @@ fun ResultsScreen(
                         result = state.result,
                         sourceLabel = state.sourceLabel,
                         saveMessage = state.saveMessage,
-                        onSyncPending = { viewModel.syncPendingObservations() },
-                        onConfirm = { viewModel.confirmObservation() }
+                        onConfirm = { viewModel.confirmObservation() },
+                        onRetakePhotos = onBackClick
                     )
                 }
             }
@@ -234,8 +234,8 @@ fun ResultCard(
     result: ResultUiModel,
     sourceLabel: String,
     saveMessage: String?,
-    onSyncPending: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: () -> Unit,
+    onRetakePhotos: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -246,7 +246,8 @@ fun ResultCard(
         Column(modifier = Modifier.padding(12.dp)) {
             ResultPhotosSection(
                 capturedImageUri = result.capturedImageUri,
-                referencePhotoUrl = result.photoUrl
+                referencePhotoUrl = result.photoUrl,
+                isPlantDetected = result.isPlantDetected
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -349,24 +350,17 @@ fun ResultCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             Button(
-                onClick = onConfirm,
+                onClick = if (result.isPlantDetected) onConfirm else onRetakePhotos,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = GeodouroGreen
                 ),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text(text = "Confirmar e guardar", color = Color.White)
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedButton(
-                onClick = onSyncPending,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(text = "Tentar sincronizar pendentes")
+                Text(
+                    text = if (result.isPlantDetected) "Confirmar e guardar" else "Tirar novas fotos",
+                    color = Color.White
+                )
             }
         }
     }
@@ -375,7 +369,8 @@ fun ResultCard(
 @Composable
 private fun ResultPhotosSection(
     capturedImageUri: String,
-    referencePhotoUrl: String?
+    referencePhotoUrl: String?,
+    isPlantDetected: Boolean
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -386,11 +381,27 @@ private fun ResultPhotosSection(
             emptyMessage = "Sem foto capturada."
         )
 
-        ResultPhotoCard(
-            title = "Foto de referencia",
-            imageModel = referencePhotoUrl,
-            emptyMessage = "Sem foto remota disponivel para esta especie."
-        )
+        if (isPlantDetected) {
+            ResultPhotoCard(
+                title = "Foto de referencia",
+                imageModel = referencePhotoUrl,
+                emptyMessage = "Sem foto remota disponivel para esta especie."
+            )
+        } else {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = GeodouroLightBg,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = "Nenhuma planta encontrada",
+                    modifier = Modifier.padding(10.dp),
+                    color = GeodouroTextPrimary,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }
 
@@ -510,8 +521,8 @@ fun MultiImageResultCard(
     result: MultiImageResultUiModel,
     sourceLabel: String,
     saveMessage: String?,
-    onSyncPending: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: () -> Unit,
+    onRetakePhotos: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -520,7 +531,7 @@ fun MultiImageResultCard(
         shape = RoundedCornerShape(8.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // Mostrar consenso e nÃºmero de imagens
+            // Mostrar consenso e número de imagens
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = GeodouroLightBg,
@@ -535,7 +546,7 @@ fun MultiImageResultCard(
                 ) {
                     Column {
                         Text(
-                            text = "AnÃ¡lise de ${result.imagesCount} imagem(ns)",
+                            text = "Análise de ${result.imagesCount} imagem(ns)",
                             style = MaterialTheme.typography.bodySmall,
                             color = GeodouroTextPrimary,
                             fontWeight = FontWeight.Bold
@@ -559,7 +570,8 @@ fun MultiImageResultCard(
             MultiImagePhotosSection(
                 capturedImageUris = result.imageUris,
                 referencePhotoUrl = result.photoUrl,
-                referenceTitle = "Foto da planta mais parecida"
+                referenceTitle = "Foto da planta mais parecida",
+                isPlantDetected = result.isPlantDetected
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -692,24 +704,17 @@ fun MultiImageResultCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             Button(
-                onClick = onConfirm,
+                onClick = if (result.isPlantDetected) onConfirm else onRetakePhotos,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = GeodouroGreen
                 ),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text(text = "Confirmar e guardar", color = Color.White)
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedButton(
-                onClick = onSyncPending,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(text = "Tentar sincronizar pendentes")
+                Text(
+                    text = if (result.isPlantDetected) "Confirmar e guardar" else "Tirar novas fotos",
+                    color = Color.White
+                )
             }
         }
     }
@@ -719,7 +724,8 @@ fun MultiImageResultCard(
 private fun MultiImagePhotosSection(
     capturedImageUris: List<String>,
     referencePhotoUrl: String?,
-    referenceTitle: String
+    referenceTitle: String,
+    isPlantDetected: Boolean
 ) {
     var selectedImageIndex by remember { mutableStateOf<Int?>(null) }
 
@@ -779,11 +785,27 @@ private fun MultiImagePhotosSection(
             }
         }
 
-        ResultPhotoCard(
-            title = referenceTitle,
-            imageModel = referencePhotoUrl,
-            emptyMessage = "Sem foto remota disponivel para esta especie."
-        )
+        if (isPlantDetected) {
+            ResultPhotoCard(
+                title = referenceTitle,
+                imageModel = referencePhotoUrl,
+                emptyMessage = "Sem foto remota disponivel para esta especie."
+            )
+        } else {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = GeodouroLightBg,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = "Nenhuma planta encontrada",
+                    modifier = Modifier.padding(10.dp),
+                    color = GeodouroTextPrimary,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 
     if (selectedImageIndex != null && capturedImageUris.isNotEmpty()) {
@@ -892,5 +914,13 @@ private fun MultiImageResultUiModel.toIdentificationResult(sourceLabel: String):
         photoUrl = photoUrl
     )
 }
+
+
+
+
+
+
+
+
 
 
