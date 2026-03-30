@@ -85,6 +85,7 @@ data class IdentificationResult(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResultsScreen(
+    refreshTrigger: Int = 0,
     onBackClick: () -> Unit,
     onConfirmResult: (IdentificationResult) -> Unit,
     multiImageUris: List<String> = emptyList(),
@@ -106,6 +107,22 @@ fun ResultsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(localInferenceResult, multiImageUris, captureLatitude, captureLongitude) {
+        if (multiImageUris.size >= 2) {
+            viewModel.loadMultiImageResult(
+                imageUris = multiImageUris,
+                latitude = captureLatitude,
+                longitude = captureLongitude
+            )
+        } else {
+            viewModel.loadHybridResult(localInferenceResult)
+        }
+    }
+
+    LaunchedEffect(refreshTrigger) {
+        if (refreshTrigger <= 0) {
+            return@LaunchedEffect
+        }
+
         if (multiImageUris.size >= 2) {
             viewModel.loadMultiImageResult(
                 imageUris = multiImageUris,

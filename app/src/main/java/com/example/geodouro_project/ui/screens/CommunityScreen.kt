@@ -122,6 +122,7 @@ enum class CommunityFilter(val label: String) {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun CommunityScreen(
+    refreshTrigger: Int = 0,
     onSpeciesClick: (String) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -135,6 +136,13 @@ fun CommunityScreen(
         refreshing = uiState.isLoading,
         onRefresh = { viewModel.refresh() }
     )
+
+    androidx.compose.runtime.LaunchedEffect(refreshTrigger) {
+        if (refreshTrigger > 0) {
+            viewModel.refresh()
+        }
+    }
+
     val filteredPublications = uiState.publications.filter { publication ->
         val query = searchQuery.trim().lowercase(Locale.ROOT)
         val matchesQuery = query.isBlank() ||
