@@ -1,6 +1,7 @@
 package com.example.geodouro_project
 
 import android.os.Bundle
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -15,6 +16,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.geodouro_project.domain.model.LocalInferenceResult
 import com.example.geodouro_project.ui.components.BottomNavigationBar
 import com.example.geodouro_project.ui.screens.CaptureScreen
@@ -23,6 +25,7 @@ import com.example.geodouro_project.ui.screens.HomeScreen
 import com.example.geodouro_project.ui.screens.IdentifyScreen
 import com.example.geodouro_project.ui.screens.ProfileScreen
 import com.example.geodouro_project.ui.screens.ResultsScreen
+import com.example.geodouro_project.ui.screens.SpeciesDetailScreen
 import com.example.geodouro_project.ui.screens.SpeciesListScreen
 import com.example.geodouro_project.ui.theme.Geodouro_ProjectTheme
 
@@ -102,7 +105,11 @@ fun AppNavigation() {
             }
 
             composable("list") {
-                SpeciesListScreen()
+                SpeciesListScreen(
+                    onSpeciesClick = { speciesId ->
+                        navController.navigate("speciesDetail/${Uri.encode(speciesId)}")
+                    }
+                )
             }
 
             composable("profile") {
@@ -132,6 +139,16 @@ fun AppNavigation() {
 
             composable("capture") {
                 CaptureScreen()
+            }
+
+            composable(
+                route = "speciesDetail/{speciesId}",
+                arguments = listOf(navArgument("speciesId") { defaultValue = "" })
+            ) { backStackEntry ->
+                SpeciesDetailScreen(
+                    speciesId = backStackEntry.arguments?.getString("speciesId").orEmpty(),
+                    onBackClick = { navController.popBackStack() }
+                )
             }
         }
     }

@@ -24,7 +24,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
@@ -219,52 +221,50 @@ fun IdentifyScreen(
             )
         }
     ) { padding ->
-        Box(
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(GeodouroWhite),
-            contentAlignment = Alignment.Center
+                .background(GeodouroWhite)
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp)
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(32.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .background(GeodouroLightBg)
+                    .alpha(0.3f),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .background(GeodouroLightBg)
-                        .alpha(0.3f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CameraAlt,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = GeodouroGrey.copy(alpha = 0.3f)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.CameraAlt,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = GeodouroGrey.copy(alpha = 0.3f)
+                )
+            }
 
-                Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        tint = GeodouroGrey,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(
-                        text = locationLabel,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = GeodouroGrey
-                    )
-                }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = GeodouroGrey,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.size(8.dp))
+                Text(
+                    text = locationLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GeodouroGrey
+                )
+            }
 
                 OutlinedButton(
                     onClick = { refreshLocation() },
@@ -472,36 +472,35 @@ fun IdentifyScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = GeodouroLightBg
-                    )
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = GeodouroLightBg
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = null,
-                            tint = GeodouroGreen,
-                            modifier = Modifier.size(24.dp)
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = GeodouroGreen,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.size(12.dp))
+                    Column {
+                        Text(
+                            text = "Recomendacao",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = GeodouroTextPrimary
                         )
-                        Spacer(modifier = Modifier.size(12.dp))
-                        Column {
-                            Text(
-                                text = "Recomendacao",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = GeodouroTextPrimary
-                            )
-                            Text(
-                                text = "Podes combinar fotos da camara e da galeria para usar o modo multi-imagem com consenso.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = GeodouroTextSecondary
-                            )
-                        }
+                        Text(
+                            text = "Podes combinar fotos da camara e da galeria para usar o modo multi-imagem com consenso.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = GeodouroTextSecondary
+                        )
                     }
                 }
             }

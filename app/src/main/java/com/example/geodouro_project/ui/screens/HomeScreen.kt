@@ -101,9 +101,9 @@ fun HomeScreen() {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val recentSpecies = listOf(
-        Species("Nome cientifico 1", "Nome comum 1", "Familia 1", "Genus 1", 89),
-        Species("Nome cientifico 2", "Nome comum 2", "Familia 2", "Genus 2", 164),
-        Species("Nome cientifico 3", "Nome comum 3", "Familia 3", "Genus 3", 124)
+        SpeciesListItem("home_1", "Nome cientifico 1", "Nome comum 1", "Familia 1", "Genus 1", 89, null),
+        SpeciesListItem("home_2", "Nome cientifico 2", "Nome comum 2", "Familia 2", "Genus 2", 164, null),
+        SpeciesListItem("home_3", "Nome cientifico 3", "Nome comum 3", "Familia 3", "Genus 3", 124, null)
     )
 
     Scaffold(
@@ -190,7 +190,10 @@ fun HomeScreen() {
             }
 
             items(recentSpecies) { species ->
-                SpeciesCard(species = species)
+                SpeciesCard(
+                    species = species,
+                    onClick = { }
+                )
             }
         }
     }

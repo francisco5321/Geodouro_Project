@@ -1,56 +1,156 @@
 package com.example.geodouro_project.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.geodouro_project.R
-import com.example.geodouro_project.ui.theme.*
+import com.example.geodouro_project.data.local.entity.ObservationEntity
+import com.example.geodouro_project.data.repository.PlantRepository
+import com.example.geodouro_project.di.AppContainer
+import com.example.geodouro_project.ui.theme.GeodouroGreen
+import com.example.geodouro_project.ui.theme.GeodouroGrey
+import com.example.geodouro_project.ui.theme.GeodouroLightBg
+import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
+import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
+import com.example.geodouro_project.ui.theme.GeodouroWhite
+import java.util.Locale
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 enum class SpeciesFilter {
     FAMILY, GENUS, SPECIES
 }
 
-data class Species(
+data class SpeciesListItem(
+    val id: String,
     val scientificName: String,
     val commonName: String,
     val family: String,
     val genus: String,
-    val imageCount: Int
+    val imageCount: Int,
+    val thumbnailUri: String?
 )
+
+data class SpeciesListUiState(
+    val species: List<SpeciesListItem> = emptyList(),
+    val isLoading: Boolean = true
+)
+
+class SpeciesListViewModel(
+    private val repository: PlantRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(SpeciesListUiState())
+    val uiState: StateFlow<SpeciesListUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            repository.observeObservations().collect { observations ->
+                _uiState.value = SpeciesListUiState(
+                    species = observations.toSpeciesListItems(),
+                    isLoading = false
+                )
+            }
+        }
+    }
+
+    companion object {
+        fun factory(context: Context): ViewModelProvider.Factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    return SpeciesListViewModel(
+                        AppContainer.providePlantRepository(context)
+                    ) as T
+                }
+            }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SpeciesListScreen() {
-    var selectedFilter by remember { mutableStateOf(SpeciesFilter.SPECIES) }
-    
-    val speciesList = remember {
-        listOf(
-            Species("Thymus mastichina", "Tomilho", "Lamiaceae", "Thymus", 10),
-            Species("Cistus ladanifer", "Esteva", "Cistaceae", "Cistus", 164),
-            Species("Lavandula stoechas", "Rosmaninho", "Lamiaceae", "Lavandula", 89),
-            Species("Arbutus unedo", "Medronheiro", "Ericaceae", "Arbutus", 45),
-            Species("Quercus suber", "Sobreiro", "Fagaceae", "Quercus", 124)
-        )
-    }
+fun SpeciesListScreen(
+    onSpeciesClick: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val viewModel: SpeciesListViewModel = viewModel(
+        factory = SpeciesListViewModel.factory(context.applicationContext)
+    )
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var selectedFilter by rememberSaveable { mutableStateOf(SpeciesFilter.SPECIES) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+
+    val filteredSpecies = uiState.species.filter { species ->
+        val query = searchQuery.trim().lowercase(Locale.ROOT)
+        if (query.isBlank()) {
+            true
+        } else {
+            species.scientificName.lowercase(Locale.ROOT).contains(query) ||
+                species.commonName.lowercase(Locale.ROOT).contains(query) ||
+                species.family.lowercase(Locale.ROOT).contains(query) ||
+                species.genus.lowercase(Locale.ROOT).contains(query)
+        }
+    }.sortedWith(
+        when (selectedFilter) {
+            SpeciesFilter.FAMILY -> compareBy<SpeciesListItem> { it.family }.thenBy { it.scientificName }
+            SpeciesFilter.GENUS -> compareBy<SpeciesListItem> { it.genus }.thenBy { it.scientificName }
+            SpeciesFilter.SPECIES -> compareBy<SpeciesListItem> { it.scientificName }
+        }
+    )
 
     Scaffold(
         topBar = {
@@ -61,11 +161,6 @@ fun SpeciesListScreen() {
                         contentDescription = "Geodouro",
                         modifier = Modifier.height(80.dp)
                     )
-                },
-                actions = {
-                    IconButton(onClick = { /* Search */ }) {
-                        Icon(Icons.Default.Search, "Pesquisar", tint = GeodouroGrey)
-                    }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = GeodouroWhite
@@ -79,19 +174,70 @@ fun SpeciesListScreen() {
                 .padding(padding)
                 .background(GeodouroWhite)
         ) {
-            // Filtros horizontais (Family, Genus, Species)
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = GeodouroGrey)
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotBlank()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = "Limpar pesquisa",
+                                tint = GeodouroGrey
+                            )
+                        }
+                    }
+                },
+                placeholder = {
+                    Text("Pesquisar por especie, nome comum, familia...")
+                }
+            )
+
             FilterTabRow(
                 selectedFilter = selectedFilter,
                 onFilterSelected = { selectedFilter = it }
             )
 
-            // Lista de espécies
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(speciesList) { species ->
-                    SpeciesCard(species = species)
+            when {
+                uiState.isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "A carregar especies observadas...",
+                            color = GeodouroTextSecondary
+                        )
+                    }
+                }
+
+                filteredSpecies.isEmpty() -> {
+                    EmptySpeciesState(
+                        hasQuery = searchQuery.isNotBlank(),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                else -> {
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(filteredSpecies) { species ->
+                            SpeciesCard(
+                                species = species,
+                                onClick = { onSpeciesClick(species.id) }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -116,7 +262,7 @@ fun FilterTabRow(
                 label = {
                     Text(
                         filter.name,
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.labelLarge
                     )
                 },
                 enabled = true,
@@ -135,14 +281,17 @@ fun FilterTabRow(
             )
         }
     }
-  }
+}
 
 @Composable
-fun SpeciesCard(species: Species) {
+fun SpeciesCard(
+    species: SpeciesListItem,
+    onClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { /* Navigate to species detail */ },
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
         elevation = CardDefaults.cardElevation(2.dp),
         shape = RoundedCornerShape(8.dp)
@@ -151,58 +300,43 @@ fun SpeciesCard(species: Species) {
             modifier = Modifier.padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Grid de imagens (2x2)
-            Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(GeodouroLightBg),
+                contentAlignment = Alignment.BottomEnd
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .size(60.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(GeodouroLightBg)
+                if (!species.thumbnailUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = species.thumbnailUri,
+                        contentDescription = species.scientificName,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
                     )
-                    Box(
-                        modifier = Modifier
-                            .size(60.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(GeodouroLightBg)
-                    ) {
-                        // Indicador de +N imagens
-                        if (species.imageCount > 4) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.6f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "+${species.imageCount - 4}",
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = GeodouroGrey,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .size(60.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(GeodouroLightBg)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(60.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(GeodouroLightBg)
+
+                Surface(
+                    color = Color.Black.copy(alpha = 0.6f),
+                    shape = RoundedCornerShape(topStart = 8.dp)
+                ) {
+                    Text(
+                        text = species.imageCount.toString(),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            // Informação da espécie
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.SpaceBetween
@@ -220,22 +354,94 @@ fun SpeciesCard(species: Species) {
                         color = GeodouroTextSecondary
                     )
                 }
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
-                // Família
-                Surface(
-                    color = GeodouroLightBg,
-                    shape = RoundedCornerShape(4.dp)
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        species.family,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = GeodouroTextSecondary
-                    )
+                    SpeciesMetaChip(species.family)
+                    SpeciesMetaChip(species.genus)
                 }
             }
         }
     }
+}
+
+@Composable
+fun SpeciesMetaChip(label: String) {
+    Surface(
+        color = GeodouroLightBg,
+        shape = RoundedCornerShape(4.dp)
+    ) {
+        Text(
+            label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = GeodouroTextSecondary
+        )
+    }
+}
+
+@Composable
+private fun EmptySpeciesState(
+    hasQuery: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = if (hasQuery) {
+                    "Nenhuma especie encontrada para essa pesquisa."
+                } else {
+                    "Ainda nao existem especies guardadas."
+                },
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = GeodouroTextPrimary
+            )
+            Text(
+                text = if (hasQuery) {
+                    "Experimenta outro nome cientifico, comum, familia ou genero."
+                } else {
+                    "Assim que confirmares identificacoes, elas vao aparecer aqui."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = GeodouroTextSecondary
+            )
+        }
+    }
+}
+
+private fun List<ObservationEntity>.toSpeciesListItems(): List<SpeciesListItem> {
+    return groupBy { observation ->
+        observation.enrichedScientificName
+            ?.takeIf { it.isNotBlank() }
+            ?: observation.predictedSpecies
+    }.map { (scientificName, observations) ->
+        val first = observations.first()
+        SpeciesListItem(
+            id = scientificName.toSpeciesId(),
+            scientificName = scientificName,
+            commonName = first.enrichedCommonName?.takeIf { it.isNotBlank() } ?: "Sem nome comum",
+            family = first.enrichedFamily?.takeIf { it.isNotBlank() } ?: "Familia desconhecida",
+            genus = scientificName.substringBefore(" ").ifBlank { "Genero desconhecido" },
+            imageCount = observations.sumOf { it.allImageUris().size },
+            thumbnailUri = observations.firstNotNullOfOrNull { observation ->
+                observation.allImageUris().firstOrNull()
+            }
+        )
+    }
+}
+
+fun String.toSpeciesId(): String {
+    return trim()
+        .lowercase(Locale.ROOT)
+        .replace(Regex("\\s+"), "_")
 }
