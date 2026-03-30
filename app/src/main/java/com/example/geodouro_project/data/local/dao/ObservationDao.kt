@@ -29,6 +29,22 @@ interface ObservationDao {
     @Query("UPDATE observation SET isPublished = :isPublished WHERE id = :id")
     suspend fun updatePublicationStatus(id: String, isPublished: Boolean)
 
+    @Query(
+        """
+        UPDATE observation
+        SET enrichedScientificName = :scientificName,
+            enrichedCommonName = :commonName,
+            enrichedFamily = :family
+        WHERE id = :id
+        """
+    )
+    suspend fun updateObservationMetadata(
+        id: String,
+        scientificName: String?,
+        commonName: String?,
+        family: String?
+    )
+
     @Query("SELECT * FROM observation ORDER BY capturedAt DESC")
     fun observeAll(): Flow<List<ObservationEntity>>
 

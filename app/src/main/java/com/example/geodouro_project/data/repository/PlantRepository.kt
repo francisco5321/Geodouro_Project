@@ -282,6 +282,32 @@ class PlantRepository(
         }
     }
 
+    suspend fun updateObservationMetadata(
+        observationId: String,
+        scientificName: String,
+        commonName: String,
+        family: String
+    ): Boolean {
+        return withContext(Dispatchers.IO) {
+            val observation = observationDao.getById(observationId) ?: return@withContext false
+            if (observation.isPublished) {
+                return@withContext false
+            }
+
+            val normalizedScientificName = scientificName.trim().ifBlank { null }
+            val normalizedCommonName = commonName.trim().ifBlank { null }
+            val normalizedFamily = family.trim().ifBlank { null }
+
+            observationDao.updateObservationMetadata(
+                id = observationId,
+                scientificName = normalizedScientificName,
+                commonName = normalizedCommonName,
+                family = normalizedFamily
+            )
+            true
+        }
+    }
+
     fun observeObservationStats(): Flow<ObservationStats> {
         return observationDao.observeAll().map { observations ->
             ObservationStats(

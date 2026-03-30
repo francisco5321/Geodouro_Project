@@ -2,6 +2,7 @@ package com.example.geodouro_project.ui.screens
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -52,6 +54,7 @@ import com.example.geodouro_project.R
 import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.di.AppContainer
+import com.example.geodouro_project.domain.model.ObservationSyncStatus
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
@@ -80,6 +83,10 @@ data class SpeciesDetail(
     val observationCount: Int,
     val wikipediaUrl: String?,
     val heroImageUri: String?,
+    val galleryImageUris: List<String>,
+    val locationSummary: String,
+    val syncedCount: Int,
+    val publishedCount: Int,
     val observations: List<ObservationEntity>
 )
 
@@ -127,7 +134,8 @@ class SpeciesDetailViewModel(
 @Composable
 fun SpeciesDetailScreen(
     speciesId: String,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onObservationClick: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -249,6 +257,23 @@ fun SpeciesDetailScreen(
                                         SpeciesMetaChip(detail.genus)
                                     }
 
+                                    if (detail.galleryImageUris.isNotEmpty()) {
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            items(detail.galleryImageUris) { imageUri ->
+                                                AsyncImage(
+                                                    model = imageUri,
+                                                    contentDescription = detail.scientificName,
+                                                    modifier = Modifier
+                                                        .size(96.dp)
+                                                        .background(GeodouroLightBg, RoundedCornerShape(10.dp)),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            }
+                                        }
+                                    }
+
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -262,6 +287,34 @@ fun SpeciesDetailScreen(
                                             modifier = Modifier.weight(1f),
                                             value = detail.imageCount.toString(),
                                             label = "Imagens"
+                                        )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        DetailStatCard(
+                                            modifier = Modifier.weight(1f),
+                                            value = detail.syncedCount.toString(),
+                                            label = "Sincronizadas"
+                                        )
+                                        DetailStatCard(
+                                            modifier = Modifier.weight(1f),
+                                            value = detail.publishedCount.toString(),
+                                            label = "Publicadas"
+                                        )
+                                    }
+
+                                    Surface(
+                                        color = GeodouroLightBg,
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Text(
+                                            text = detail.locationSummary,
+                                            modifier = Modifier.padding(12.dp),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = GeodouroTextPrimary
                                         )
                                     }
 
@@ -294,7 +347,10 @@ fun SpeciesDetailScreen(
                     }
 
                     items(detail.observations) { observation ->
-                        ObservationPreviewCard(observation = observation)
+                        ObservationPreviewCard(
+                            observation = observation,
+                            onClick = { onObservationClick(observation.id) }
+                        )
                     }
                 }
             }
@@ -333,10 +389,15 @@ private fun DetailStatCard(
 }
 
 @Composable
-private fun ObservationPreviewCard(observation: ObservationEntity) {
+private fun ObservationPreviewCard(
+    observation: ObservationEntity,
+    onClick: () -> Unit
+) {
     val dateFormatter = rememberDateFormatter()
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
         elevation = CardDefaults.cardElevation(1.dp),
         shape = RoundedCornerShape(10.dp)
@@ -389,6 +450,11 @@ private fun ObservationPreviewCard(observation: ObservationEntity) {
                     style = MaterialTheme.typography.bodySmall,
                     color = GeodouroTextSecondary
                 )
+                Text(
+                    text = buildObservationStatusLabel(observation),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GeodouroBrandGreen
+                )
             }
         }
     }
@@ -412,6 +478,42 @@ private fun List<ObservationEntity>.toSpeciesDetail(): SpeciesDetail? {
         observationCount = size,
         wikipediaUrl = first.enrichedWikipediaUrl,
         heroImageUri = first.allImageUris().firstOrNull() ?: first.enrichedPhotoUrl,
+        galleryImageUris = flatMap { it.allImageUris() }.distinct().take(8),
+        locationSummary = buildSpeciesLocationSummary(this),
+        syncedCount = count { it.syncStatus == ObservationSyncStatus.SYNCED.name },
+        publishedCount = count { it.isPublished },
         observations = this
     )
+}
+
+private fun buildSpeciesLocationSummary(observations: List<ObservationEntity>): String {
+    val withLocation = observations.filter { it.latitude != null && it.longitude != null }
+    if (withLocation.isEmpty()) {
+        return "Sem localizacoes registadas para esta especie."
+    }
+
+    val first = withLocation.first()
+    val last = withLocation.last()
+    return if (withLocation.size == 1) {
+        "1 observacao com localizacao registada em GPS %.5f, %.5f".format(
+            first.latitude,
+            first.longitude
+        )
+    } else {
+        "Localizacoes registadas em ${withLocation.size} observacoes. Intervalo aproximado: %.5f, %.5f ate %.5f, %.5f".format(
+            first.latitude,
+            first.longitude,
+            last.latitude,
+            last.longitude
+        )
+    }
+}
+
+private fun buildObservationStatusLabel(observation: ObservationEntity): String {
+    return when {
+        observation.isPublished -> "Publicada"
+        observation.syncStatus == ObservationSyncStatus.SYNCED.name -> "Sincronizada"
+        observation.syncStatus == ObservationSyncStatus.FAILED.name -> "Falha de sincronizacao"
+        else -> "Pendente de sincronizacao"
+    }
 }

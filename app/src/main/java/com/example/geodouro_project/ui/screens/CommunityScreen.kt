@@ -2,6 +2,7 @@ package com.example.geodouro_project.ui.screens
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,19 +22,28 @@ import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +66,7 @@ import com.example.geodouro_project.ui.theme.GeodouroLightGreen
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -102,18 +113,43 @@ data class CommunityUiState(
     val isLoading: Boolean = true
 )
 
+enum class CommunityFilter(val label: String) {
+    ALL("Todas"),
+    WITH_LOCATION("Com GPS"),
+    WITHOUT_LOCATION("Sem GPS")
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
-fun CommunityScreen() {
+fun CommunityScreen(
+    onSpeciesClick: (String) -> Unit = {}
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val viewModel: CommunityViewModel = viewModel(
         factory = CommunityViewModel.factory(context.applicationContext)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var selectedFilter by rememberSaveable { mutableStateOf(CommunityFilter.ALL) }
     val pullRefreshState = rememberPullRefreshState(
         refreshing = uiState.isLoading,
         onRefresh = { viewModel.refresh() }
     )
+    val filteredPublications = uiState.publications.filter { publication ->
+        val query = searchQuery.trim().lowercase(Locale.ROOT)
+        val matchesQuery = query.isBlank() ||
+            publication.scientificName.lowercase(Locale.ROOT).contains(query) ||
+            (publication.commonName?.lowercase(Locale.ROOT)?.contains(query) == true) ||
+            publication.userDisplayName.lowercase(Locale.ROOT).contains(query)
+
+        val matchesFilter = when (selectedFilter) {
+            CommunityFilter.ALL -> true
+            CommunityFilter.WITH_LOCATION -> publication.latitude != null && publication.longitude != null
+            CommunityFilter.WITHOUT_LOCATION -> publication.latitude == null || publication.longitude == null
+        }
+
+        matchesQuery && matchesFilter
+    }
 
     Scaffold(
         topBar = {
@@ -144,6 +180,59 @@ fun CommunityScreen() {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                item {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = null)
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotBlank()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Limpar pesquisa"
+                                    )
+                                }
+                            }
+                        },
+                        placeholder = {
+                            Text("Pesquisar publicacoes")
+                        }
+                    )
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CommunityFilter.entries.forEach { filter ->
+                            FilterChip(
+                                selected = selectedFilter == filter,
+                                onClick = { selectedFilter = filter },
+                                label = { Text(filter.label) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = GeodouroBrandGreen,
+                                    selectedLabelColor = Color.White,
+                                    containerColor = GeodouroLightBg,
+                                    labelColor = GeodouroTextSecondary
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = selectedFilter == filter,
+                                    borderColor = Color.Transparent,
+                                    selectedBorderColor = Color.Transparent
+                                )
+                            )
+                        }
+                    }
+                }
+
                 if (uiState.isLoading) {
                     item {
                         Text(
@@ -168,9 +257,28 @@ fun CommunityScreen() {
                             )
                         }
                     }
+                } else if (filteredPublications.isEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
+                            elevation = CardDefaults.cardElevation(2.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "Nenhuma publicacao corresponde aos filtros atuais.",
+                                modifier = Modifier.padding(16.dp),
+                                color = GeodouroTextSecondary,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
                 } else {
-                    items(uiState.publications, key = { it.id }) { post ->
-                        CommunityPostCard(post)
+                    items(filteredPublications, key = { it.id }) { post ->
+                        CommunityPostCard(
+                            post = post,
+                            onClick = { onSpeciesClick(post.scientificName.toSpeciesId()) }
+                        )
                     }
                 }
             }
@@ -187,9 +295,14 @@ fun CommunityScreen() {
 }
 
 @Composable
-fun CommunityPostCard(post: CommunityPublication) {
+fun CommunityPostCard(
+    post: CommunityPublication,
+    onClick: () -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
         elevation = CardDefaults.cardElevation(2.dp),
         shape = RoundedCornerShape(8.dp)

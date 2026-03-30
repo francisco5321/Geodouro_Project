@@ -2,6 +2,8 @@ package com.example.geodouro_project.ui.screens
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,15 +20,22 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,6 +43,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +62,7 @@ import coil.compose.AsyncImage
 import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.di.AppContainer
+import com.example.geodouro_project.domain.model.ObservationSyncStatus
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
@@ -57,6 +70,8 @@ import com.example.geodouro_project.ui.theme.GeodouroLightGreen
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
+import com.example.geodouro_project.ui.theme.geodouroLoadingIndicatorColor
+import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -73,6 +88,13 @@ data class ProfileUiState(
     val publishingIds: Set<String> = emptySet(),
     val statusMessage: String? = null
 )
+
+enum class ProfileObservationFilter(val label: String) {
+    ALL("Todas"),
+    PENDING("Pendentes"),
+    SYNCED("Sincronizadas"),
+    PUBLISHED("Publicadas")
+}
 
 class ProfileViewModel(
     private val repository: PlantRepository
@@ -138,12 +160,40 @@ class ProfileViewModel(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(
+    onObservationClick: (String) -> Unit = {}
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val viewModel: ProfileViewModel = viewModel(
         factory = ProfileViewModel.factory(context.applicationContext)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var selectedFilter by rememberSaveable { mutableStateOf(ProfileObservationFilter.ALL) }
+
+    val filteredObservations = uiState.observations.filter { observation ->
+        val normalizedQuery = searchQuery.trim().lowercase(Locale.ROOT)
+        val matchesQuery = normalizedQuery.isBlank() ||
+            listOf(
+                observation.enrichedScientificName,
+                observation.enrichedCommonName,
+                observation.predictedSpecies,
+                observation.enrichedFamily
+            ).filterNotNull().any { it.lowercase(Locale.ROOT).contains(normalizedQuery) }
+
+        val matchesFilter = when (selectedFilter) {
+            ProfileObservationFilter.ALL -> true
+            ProfileObservationFilter.PENDING -> {
+                !observation.isPublished && observation.syncStatus != ObservationSyncStatus.SYNCED.name
+            }
+            ProfileObservationFilter.SYNCED -> {
+                !observation.isPublished && observation.syncStatus == ObservationSyncStatus.SYNCED.name
+            }
+            ProfileObservationFilter.PUBLISHED -> observation.isPublished
+        }
+
+        matchesQuery && matchesFilter
+    }
 
     Scaffold(
         topBar = {
@@ -230,6 +280,61 @@ fun ProfileScreen() {
                 )
             }
 
+            item {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotBlank()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Limpar pesquisa"
+                                )
+                            }
+                        }
+                    },
+                    placeholder = {
+                        Text("Pesquisar observacoes")
+                    }
+                )
+            }
+
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ProfileObservationFilter.entries.forEach { filter ->
+                        FilterChip(
+                            selected = selectedFilter == filter,
+                            onClick = { selectedFilter = filter },
+                            label = { Text(filter.label) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = GeodouroGreen,
+                                selectedLabelColor = Color.White,
+                                containerColor = GeodouroLightBg,
+                                labelColor = GeodouroTextSecondary
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = selectedFilter == filter,
+                                borderColor = Color.Transparent,
+                                selectedBorderColor = Color.Transparent
+                            )
+                        )
+                    }
+                }
+            }
+
             uiState.statusMessage?.let { message ->
                 item {
                     Surface(
@@ -251,12 +356,17 @@ fun ProfileScreen() {
                 item {
                     EmptyProfileState()
                 }
+            } else if (filteredObservations.isEmpty()) {
+                item {
+                    EmptyFilteredProfileState()
+                }
             } else {
-                items(uiState.observations, key = { it.id }) { observation ->
+                items(filteredObservations, key = { it.id }) { observation ->
                     ObservationProfileCard(
                         observation = observation,
                         isPublishing = uiState.publishingIds.contains(observation.id),
-                        onPublish = { viewModel.publishObservation(observation.id) }
+                        onPublish = { viewModel.publishObservation(observation.id) },
+                        onClick = { onObservationClick(observation.id) }
                     )
                 }
             }
@@ -282,13 +392,33 @@ private fun EmptyProfileState() {
 }
 
 @Composable
+private fun EmptyFilteredProfileState() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
+        elevation = CardDefaults.cardElevation(2.dp),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Text(
+            text = "Nenhuma observacao corresponde aos filtros atuais.",
+            modifier = Modifier.padding(16.dp),
+            color = GeodouroTextSecondary,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
 private fun ObservationProfileCard(
     observation: ObservationEntity,
     isPublishing: Boolean,
-    onPublish: () -> Unit
+    onPublish: () -> Unit,
+    onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
         elevation = CardDefaults.cardElevation(2.dp),
         shape = RoundedCornerShape(8.dp)
@@ -335,6 +465,20 @@ private fun ObservationProfileCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            Surface(
+                color = GeodouroLightBg,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = buildProfileObservationStatusLabel(observation),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GeodouroBrandGreen
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             if (observation.isPublished) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -356,13 +500,14 @@ private fun ObservationProfileCard(
                 Button(
                     onClick = onPublish,
                     enabled = !isPublishing,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = geodouroPrimaryButtonColors()
                 ) {
                     if (isPublishing) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
-                            color = Color.White
+                            color = geodouroLoadingIndicatorColor()
                         )
                     } else {
                         androidx.compose.material3.Icon(
@@ -388,6 +533,15 @@ private fun buildObservationMeta(observation: ObservationEntity): String {
     }
 
     return "$date\n$location"
+}
+
+private fun buildProfileObservationStatusLabel(observation: ObservationEntity): String {
+    return when {
+        observation.isPublished -> "Publicada"
+        observation.syncStatus == ObservationSyncStatus.SYNCED.name -> "Sincronizada"
+        observation.syncStatus == ObservationSyncStatus.FAILED.name -> "Falha de sincronizacao"
+        else -> "Pendente de sincronizacao"
+    }
 }
 
 @Composable

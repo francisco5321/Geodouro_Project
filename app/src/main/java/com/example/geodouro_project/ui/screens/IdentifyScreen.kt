@@ -72,11 +72,16 @@ import com.example.geodouro_project.domain.model.LocalPredictionCandidate
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.example.geodouro_project.ui.theme.GeodouroGreen
+import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroGrey
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
+import com.example.geodouro_project.ui.theme.geodouroLoadingIndicatorColor
+import com.example.geodouro_project.ui.theme.geodouroOutlinedBorderColor
+import com.example.geodouro_project.ui.theme.geodouroOutlinedButtonColors
+import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.coroutines.resume
@@ -269,7 +274,12 @@ fun IdentifyScreen(
                 OutlinedButton(
                     onClick = { refreshLocation() },
                     enabled = !isProcessing,
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    modifier = Modifier.padding(bottom = 12.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        geodouroOutlinedBorderColor(!isProcessing)
+                    ),
+                    colors = geodouroOutlinedButtonColors()
                 ) {
                     Text("Atualizar localizacao")
                 }
@@ -324,13 +334,13 @@ fun IdentifyScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(88.dp),
-                        containerColor = GeodouroGreen,
+                        containerColor = GeodouroBrandGreen,
                         shape = CircleShape
                     ) {
                         if (isProcessing) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(42.dp),
-                                color = Color.White,
+                                color = geodouroLoadingIndicatorColor(),
                                 strokeWidth = 3.dp
                             )
                         } else {
@@ -353,7 +363,12 @@ fun IdentifyScreen(
                         },
                         modifier = Modifier
                             .weight(1f)
-                            .height(88.dp)
+                            .height(88.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            geodouroOutlinedBorderColor(!isProcessing)
+                        ),
+                        colors = geodouroOutlinedButtonColors()
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -450,7 +465,8 @@ fun IdentifyScreen(
                         }
                     },
                     enabled = !isProcessing && capturedImageUris.isNotEmpty(),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = geodouroPrimaryButtonColors()
                 ) {
                     val label = if (capturedImageUris.size >= 2) {
                         "Analisar ${capturedImageUris.size} imagens"
@@ -465,7 +481,12 @@ fun IdentifyScreen(
                 OutlinedButton(
                     onClick = { capturedImageUris.clear() },
                     enabled = !isProcessing && capturedImageUris.isNotEmpty(),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        geodouroOutlinedBorderColor(!isProcessing && capturedImageUris.isNotEmpty())
+                    ),
+                    colors = geodouroOutlinedButtonColors()
                 ) {
                     Text("Limpar capturas")
                 }

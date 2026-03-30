@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -68,6 +67,10 @@ import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
+import com.example.geodouro_project.ui.theme.geodouroOutlinedBorderColor
+import com.example.geodouro_project.ui.theme.geodouroOutlinedButtonColors
+import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
+import com.example.geodouro_project.ui.theme.geodouroSecondaryButtonColors
 
 data class IdentificationResult(
     val scientificName: String,
@@ -363,14 +366,11 @@ fun ResultCard(
             Button(
                 onClick = if (result.isPlantDetected) onConfirm else onRetakePhotos,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = GeodouroGreen
-                ),
+                colors = geodouroPrimaryButtonColors(),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
-                    text = if (result.isPlantDetected) "Confirmar e guardar" else "Tirar novas fotos",
-                    color = Color.White
+                    text = if (result.isPlantDetected) "Confirmar e guardar" else "Tirar novas fotos"
                 )
             }
         }
@@ -746,14 +746,11 @@ fun MultiImageResultCard(
             Button(
                 onClick = if (result.isPlantDetected) onConfirm else onRetakePhotos,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = GeodouroGreen
-                ),
+                colors = geodouroPrimaryButtonColors(),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
-                    text = if (result.isPlantDetected) "Confirmar e guardar" else "Tirar novas fotos",
-                    color = Color.White
+                    text = if (result.isPlantDetected) "Confirmar e guardar" else "Tirar novas fotos"
                 )
             }
         }
@@ -897,7 +894,12 @@ private fun MultiImagePhotosSection(
                     ) {
                         OutlinedButton(
                             onClick = { selectedImageIndex = (currentIndex - 1).coerceAtLeast(0) },
-                            enabled = currentIndex > 0
+                            enabled = currentIndex > 0,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                geodouroOutlinedBorderColor(currentIndex > 0)
+                            ),
+                            colors = geodouroOutlinedButtonColors()
                         ) {
                             Text("Anterior")
                         }
@@ -910,7 +912,12 @@ private fun MultiImagePhotosSection(
 
                         OutlinedButton(
                             onClick = { selectedImageIndex = (currentIndex + 1).coerceAtMost(capturedImageUris.lastIndex) },
-                            enabled = currentIndex < capturedImageUris.lastIndex
+                            enabled = currentIndex < capturedImageUris.lastIndex,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                geodouroOutlinedBorderColor(currentIndex < capturedImageUris.lastIndex)
+                            ),
+                            colors = geodouroOutlinedButtonColors()
                         ) {
                             Text("Seguinte")
                         }
@@ -921,9 +928,9 @@ private fun MultiImagePhotosSection(
                     Button(
                         onClick = { selectedImageIndex = null },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = GeodouroGreen)
+                        colors = geodouroSecondaryButtonColors()
                     ) {
-                        Text("Fechar", color = Color.White)
+                        Text("Fechar")
                     }
                 }
             }

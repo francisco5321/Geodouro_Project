@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
 
 @Composable
 fun CaptureScreen() {
@@ -39,7 +40,8 @@ fun CaptureScreen() {
 
         Button(
             onClick = { /* guardar e georreferenciar*/ },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = geodouroPrimaryButtonColors()
         ) {
             Text("Confirmar e enviar")
         }

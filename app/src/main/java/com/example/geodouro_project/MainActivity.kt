@@ -23,6 +23,7 @@ import com.example.geodouro_project.ui.screens.CaptureScreen
 import com.example.geodouro_project.ui.screens.CommunityScreen
 import com.example.geodouro_project.ui.screens.HomeScreen
 import com.example.geodouro_project.ui.screens.IdentifyScreen
+import com.example.geodouro_project.ui.screens.ObservationDetailScreen
 import com.example.geodouro_project.ui.screens.ProfileScreen
 import com.example.geodouro_project.ui.screens.ResultsScreen
 import com.example.geodouro_project.ui.screens.SpeciesDetailScreen
@@ -78,11 +79,22 @@ fun AppNavigation() {
             modifier = Modifier.padding(paddingValues)
         ) {
             composable("home") {
-                HomeScreen()
+                HomeScreen(
+                    onSpeciesClick = { speciesId ->
+                        navController.navigate("speciesDetail/${Uri.encode(speciesId)}")
+                    },
+                    onOpenSpeciesList = {
+                        navController.navigate("list")
+                    }
+                )
             }
 
             composable("community") {
-                CommunityScreen()
+                CommunityScreen(
+                    onSpeciesClick = { speciesId ->
+                        navController.navigate("speciesDetail/${Uri.encode(speciesId)}")
+                    }
+                )
             }
 
             composable("identify") {
@@ -113,7 +125,11 @@ fun AppNavigation() {
             }
 
             composable("profile") {
-                ProfileScreen()
+                ProfileScreen(
+                    onObservationClick = { observationId ->
+                        navController.navigate("observationDetail/${Uri.encode(observationId)}")
+                    }
+                )
             }
 
             composable("results") {
@@ -147,7 +163,23 @@ fun AppNavigation() {
             ) { backStackEntry ->
                 SpeciesDetailScreen(
                     speciesId = backStackEntry.arguments?.getString("speciesId").orEmpty(),
-                    onBackClick = { navController.popBackStack() }
+                    onBackClick = { navController.popBackStack() },
+                    onObservationClick = { observationId ->
+                        navController.navigate("observationDetail/${Uri.encode(observationId)}")
+                    }
+                )
+            }
+
+            composable(
+                route = "observationDetail/{observationId}",
+                arguments = listOf(navArgument("observationId") { defaultValue = "" })
+            ) { backStackEntry ->
+                ObservationDetailScreen(
+                    observationId = backStackEntry.arguments?.getString("observationId").orEmpty(),
+                    onBackClick = { navController.popBackStack() },
+                    onOpenSpecies = { speciesId ->
+                        navController.navigate("speciesDetail/${Uri.encode(speciesId)}")
+                    }
                 )
             }
         }

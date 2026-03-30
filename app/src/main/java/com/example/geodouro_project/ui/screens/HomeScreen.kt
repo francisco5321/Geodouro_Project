@@ -57,7 +57,8 @@ import kotlinx.coroutines.launch
 
 data class HomeUiState(
     val speciesCount: Int = 0,
-    val observationsCount: Int = 0
+    val observationsCount: Int = 0,
+    val recentSpecies: List<SpeciesListItem> = emptyList()
 )
 
 class HomeViewModel(
@@ -69,10 +70,19 @@ class HomeViewModel(
 
     init {
         viewModelScope.launch {
+            repository.observeObservations().collect { observations ->
+                _uiState.value = _uiState.value.copy(
+                    recentSpecies = observations.toRecentSpeciesItems()
+                )
+            }
+        }
+
+        viewModelScope.launch {
             repository.observeObservationStats().collect { stats ->
                 _uiState.value = HomeUiState(
                     speciesCount = stats.speciesCount,
-                    observationsCount = stats.observationsCount
+                    observationsCount = stats.observationsCount,
+                    recentSpecies = _uiState.value.recentSpecies
                 )
             }
         }
@@ -93,18 +103,15 @@ class HomeViewModel(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    onSpeciesClick: (String) -> Unit = {},
+    onOpenSpeciesList: () -> Unit = {}
+) {
     val context = LocalContext.current
     val viewModel: HomeViewModel = viewModel(
         factory = HomeViewModel.factory(context.applicationContext)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    val recentSpecies = listOf(
-        SpeciesListItem("home_1", "Nome cientifico 1", "Nome comum 1", "Familia 1", "Genus 1", 89, null),
-        SpeciesListItem("home_2", "Nome cientifico 2", "Nome comum 2", "Familia 2", "Genus 2", 164, null),
-        SpeciesListItem("home_3", "Nome cientifico 3", "Nome comum 3", "Familia 3", "Genus 3", 124, null)
-    )
 
     Scaffold(
         topBar = {
@@ -117,7 +124,7 @@ fun HomeScreen() {
                     )
                 },
                 actions = {
-                    IconButton(onClick = { }) {
+                    IconButton(onClick = onOpenSpeciesList) {
                         Icon(Icons.Default.Search, "Pesquisar", tint = GeodouroGrey)
                     }
                 },
@@ -189,11 +196,29 @@ fun HomeScreen() {
                 )
             }
 
-            items(recentSpecies) { species ->
-                SpeciesCard(
-                    species = species,
-                    onClick = { }
-                )
+            if (uiState.recentSpecies.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
+                        elevation = CardDefaults.cardElevation(2.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = "As especies recentes vao aparecer aqui depois das primeiras identificacoes confirmadas.",
+                            modifier = Modifier.padding(16.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GeodouroTextSecondary
+                        )
+                    }
+                }
+            } else {
+                items(uiState.recentSpecies) { species ->
+                    SpeciesCard(
+                        species = species,
+                        onClick = { onSpeciesClick(species.id) }
+                    )
+                }
             }
         }
     }
@@ -236,4 +261,25 @@ fun StatCard(
             )
         }
     }
+}
+
+private fun List<com.example.geodouro_project.data.local.entity.ObservationEntity>.toRecentSpeciesItems(): List<SpeciesListItem> {
+    return groupBy { observation ->
+        observation.enrichedScientificName
+            ?.takeIf { it.isNotBlank() }
+            ?: observation.predictedSpecies
+    }.mapNotNull { (scientificName, observations) ->
+        val newestObservation = observations.maxByOrNull { it.capturedAt } ?: return@mapNotNull null
+        SpeciesListItem(
+            id = scientificName.toSpeciesId(),
+            scientificName = scientificName,
+            commonName = newestObservation.enrichedCommonName?.takeIf { it.isNotBlank() } ?: "Sem nome comum",
+            family = newestObservation.enrichedFamily?.takeIf { it.isNotBlank() } ?: "Familia desconhecida",
+            genus = scientificName.substringBefore(" ").ifBlank { "Genero desconhecido" },
+            imageCount = observations.sumOf { it.allImageUris().size },
+            thumbnailUri = newestObservation.allImageUris().firstOrNull()
+        ) to newestObservation.capturedAt
+    }.sortedByDescending { it.second }
+        .take(3)
+        .map { it.first }
 }
