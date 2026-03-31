@@ -13,6 +13,7 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.FileInputStream
 
 class RemoteObservationSyncService(
     private val appContext: Context,
@@ -111,7 +112,7 @@ class RemoteObservationSyncService(
         val contentResolver = appContext.contentResolver
         val mimeType = contentResolver.getType(imageUri)?.takeIf { it.isNotBlank() } ?: "image/jpeg"
         val imageBytes = runCatching {
-            contentResolver.openInputStream(imageUri)?.use { it.readBytes() }
+            openImageInputStream(imageUri)?.use { it.readBytes() }
         }.onFailure { error ->
             Log.e(TAG, "Failed to read observation image uri=$imageUriString", error)
         }.getOrNull()
@@ -135,6 +136,11 @@ class RemoteObservationSyncService(
 
     private fun buildObservationUrl(): String {
         return config.baseUrl.trimEnd('/') + "/api/observations"
+    }
+
+    private fun openImageInputStream(uri: Uri) = when (uri.scheme) {
+        "file" -> uri.path?.let { FileInputStream(it) }
+        else -> appContext.contentResolver.openInputStream(uri)
     }
 
     companion object {

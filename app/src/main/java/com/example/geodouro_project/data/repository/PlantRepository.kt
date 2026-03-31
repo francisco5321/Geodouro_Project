@@ -30,6 +30,7 @@ import com.example.geodouro_project.domain.model.ImageInferenceResult
 import com.example.geodouro_project.domain.model.LocalInferenceResult
 import com.example.geodouro_project.domain.model.LocalPredictionCandidate
 import com.example.geodouro_project.domain.model.MultiImageAggregationConfig
+import com.example.geodouro_project.domain.model.MultiImageAggregator
 import com.example.geodouro_project.domain.model.MultiImageAggregationResult
 import com.example.geodouro_project.domain.model.ObservationSaveResult
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
@@ -38,6 +39,7 @@ import com.google.android.gms.location.Priority
 import java.util.Locale
 import java.util.UUID
 import java.time.Instant
+import java.io.FileInputStream
 import kotlin.coroutines.resume
 import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +63,9 @@ class PlantRepository(
 
     private val classifier by lazy { MobileNetV3Classifier(appContext) }
     private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(appContext) }
+    private val multiImageAggregator by lazy {
+        MultiImageAggregator(nonPlantLabel = MobileNetV3Classifier.NON_PLANT_LABEL)
+    }
 
     suspend fun rerankLowConfidenceInference(localResult: LocalInferenceResult): LocalInferenceResult {
         if (isNonPlantPrediction(localResult.predictedSpecies) || localResult.confidence >= LOW_CONFIDENCE_THRESHOLD) {
@@ -504,7 +509,7 @@ class PlantRepository(
     private fun decodeLocalBitmap(imageUri: String): Bitmap? {
         val parsedUri = Uri.parse(imageUri)
         return runCatching {
-            appContext.contentResolver.openInputStream(parsedUri)?.use { inputStream ->
+            openImageInputStream(parsedUri)?.use { inputStream ->
                 BitmapFactory.decodeStream(inputStream)
             }
         }.getOrNull()
@@ -690,102 +695,16 @@ class PlantRepository(
         config: MultiImageAggregationConfig = MultiImageAggregationConfig(),
         processingTimeMs: Long = 0
     ): MultiImageAggregationResult = withContext(Dispatchers.Default) {
-        if (imageResults.isEmpty()) {
-            throw IllegalArgumentException("Lista de imagens nao pode estar vazia")
-        }
-
-        val successfulResults = imageResults.filter { it.predictedSpecies != "ERROR" && it.predictedSpecies != "UNKNOWN" }
-        val validResults = successfulResults.filterNot { isNonPlantPrediction(it.predictedSpecies) }
-        if (successfulResults.isEmpty()) {
-            throw IllegalArgumentException("Nenhuma imagem foi classificada com sucesso")
-        }
-
-        if (validResults.isEmpty()) {
-            val nonPlantConfidence = successfulResults
-                .filter { isNonPlantPrediction(it.predictedSpecies) }
-                .map { it.confidence }
-                .average()
-                .takeIf { !it.isNaN() }
-                ?.toFloat()
-                ?: 0.6f
-
-            return@withContext MultiImageAggregationResult(
-                finalPredictedSpecies = MobileNetV3Classifier.NON_PLANT_LABEL,
-                aggregatedConfidence = nonPlantConfidence,
-                confidenceState = ConfidenceState.ABSTAIN,
-                speciesVotes = emptyMap(),
-                confidencePerSpecies = emptyMap(),
-                processedImages = successfulResults,
-                totalImagesAnalyzed = imageResults.size,
-                processingTimeMs = processingTimeMs
-            )
-        }
-
-        val speciesVotes = mutableMapOf<String, Int>()
-        val confidencePerSpecies = mutableMapOf<String, MutableList<Float>>()
-
-        validResults.forEach { result ->
-            val species = result.predictedSpecies
-            speciesVotes[species] = (speciesVotes[species] ?: 0) + 1
-            confidencePerSpecies.getOrPut(species) { mutableListOf() }.add(result.confidence)
-        }
-
-        val sortedSpecies = speciesVotes.entries
-            .sortedWith(compareBy<Map.Entry<String, Int>> { -it.value }
-                .thenBy { -(confidencePerSpecies[it.key]?.average() ?: 0.0) })
-
-        val finalSpecies = sortedSpecies.firstOrNull()?.key ?: "UNKNOWN"
-        val finalConfidences = confidencePerSpecies[finalSpecies] ?: emptyList()
-        val aggregatedConfidence = if (finalConfidences.isNotEmpty()) {
-            finalConfidences.average().toFloat()
-        } else {
-            0f
-        }
-
-        val topAlternative = sortedSpecies.getOrNull(1)?.key
-        val topAlternativeConfidences = topAlternative?.let { confidencePerSpecies[it] } ?: emptyList()
-        val topAlternativeConfidence = if (topAlternativeConfidences.isNotEmpty()) {
-            topAlternativeConfidences.average().toFloat()
-        } else {
-            null
-        }
-
-        val policy = ConfidencePolicy()
-        val confidenceState = policy.evaluate(aggregatedConfidence, topAlternativeConfidence)
-
-        val consensusScore = if (speciesVotes.isNotEmpty()) {
-            (speciesVotes[finalSpecies] ?: 0).toFloat() / validResults.size
-        } else {
-            0f
-        }
-
-        if (config.requireConsensus && consensusScore < config.minConsensusScore) {
-            return@withContext MultiImageAggregationResult(
-                finalPredictedSpecies = finalSpecies,
-                aggregatedConfidence = aggregatedConfidence,
-                confidenceState = ConfidenceState.AMBIGUOUS,
-                speciesVotes = speciesVotes,
-                confidencePerSpecies = confidencePerSpecies.mapValues { it.value.average().toFloat() },
-                processedImages = validResults,
-                totalImagesAnalyzed = imageResults.size,
-                topAlternative = topAlternative,
-                topAlternativeConfidence = topAlternativeConfidence,
-                processingTimeMs = processingTimeMs
-            )
-        }
-
-        return@withContext MultiImageAggregationResult(
-            finalPredictedSpecies = finalSpecies,
-            aggregatedConfidence = aggregatedConfidence,
-            confidenceState = confidenceState,
-            speciesVotes = speciesVotes,
-            confidencePerSpecies = confidencePerSpecies.mapValues { it.value.average().toFloat() },
-            processedImages = validResults,
-            totalImagesAnalyzed = imageResults.size,
-            topAlternative = topAlternative,
-            topAlternativeConfidence = topAlternativeConfidence,
+        return@withContext multiImageAggregator.aggregate(
+            imageResults = imageResults,
+            config = config,
             processingTimeMs = processingTimeMs
         )
+    }
+
+    private fun openImageInputStream(uri: Uri) = when (uri.scheme) {
+        "file" -> uri.path?.let { FileInputStream(it) }
+        else -> appContext.contentResolver.openInputStream(uri)
     }
 
     companion object {

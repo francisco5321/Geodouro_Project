@@ -50,8 +50,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -263,6 +265,7 @@ fun ResultCard(
     onConfirm: () -> Unit,
     onRetakePhotos: () -> Unit
 ) {
+    val uriHandler = LocalUriHandler.current
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
@@ -340,10 +343,9 @@ fun ResultCard(
 
             if (!result.wikipediaUrl.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Wikipedia: ${result.wikipediaUrl}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GeodouroTextSecondary
+                WikipediaLink(
+                    url = result.wikipediaUrl,
+                    onOpen = { uriHandler.openUri(result.wikipediaUrl) }
                 )
             }
 
@@ -576,6 +578,7 @@ fun MultiImageResultCard(
     onConfirm: () -> Unit,
     onRetakePhotos: () -> Unit
 ) {
+    val uriHandler = LocalUriHandler.current
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
@@ -690,10 +693,9 @@ fun MultiImageResultCard(
 
             if (!result.wikipediaUrl.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Wikipedia: ${result.wikipediaUrl}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GeodouroTextSecondary
+                WikipediaLink(
+                    url = result.wikipediaUrl,
+                    onOpen = { uriHandler.openUri(result.wikipediaUrl) }
                 )
             }
 
@@ -977,6 +979,37 @@ private fun MultiImageResultUiModel.toIdentificationResult(sourceLabel: String):
         wikipediaUrl = wikipediaUrl,
         photoUrl = photoUrl
     )
+}
+
+@Composable
+private fun WikipediaLink(
+    url: String,
+    onOpen: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = GeodouroLightBg,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = "Wikipedia",
+                style = MaterialTheme.typography.labelLarge,
+                color = GeodouroTextPrimary,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = url,
+                style = MaterialTheme.typography.bodySmall,
+                color = GeodouroBrandGreen,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier.clickable(onClick = onOpen)
+            )
+        }
+    }
 }
 
 

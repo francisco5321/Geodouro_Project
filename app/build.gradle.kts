@@ -9,7 +9,12 @@ fun stringBuildConfigField(value: String): String {
     return "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 }
 
-val backendBaseUrl = providers.gradleProperty("BACKEND_BASE_URL").orNull ?: "http://192.168.1.67:8080"
+val debugBackendBaseUrl = providers.gradleProperty("DEBUG_BACKEND_BASE_URL").orNull
+    ?: providers.gradleProperty("BACKEND_BASE_URL").orNull
+    ?: "http://192.168.1.67:8080"
+val releaseBackendBaseUrl = providers.gradleProperty("RELEASE_BACKEND_BASE_URL").orNull
+    ?: providers.gradleProperty("BACKEND_BASE_URL").orNull
+    ?: ""
 val backendGuestLabel = providers.gradleProperty("BACKEND_GUEST_LABEL").orNull ?: "android-emulator"
 val backendDefaultUserId = providers.gradleProperty("BACKEND_DEFAULT_USER_ID").orNull ?: "0"
 
@@ -25,13 +30,18 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "BACKEND_BASE_URL", stringBuildConfigField(backendBaseUrl))
         buildConfigField("String", "BACKEND_GUEST_LABEL", stringBuildConfigField(backendGuestLabel))
         buildConfigField("int", "BACKEND_DEFAULT_USER_ID", backendDefaultUserId)
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "BACKEND_BASE_URL", stringBuildConfigField(debugBackendBaseUrl))
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
+        }
         release {
+            buildConfigField("String", "BACKEND_BASE_URL", stringBuildConfigField(releaseBackendBaseUrl))
+            manifestPlaceholders["usesCleartextTraffic"] = "false"
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
