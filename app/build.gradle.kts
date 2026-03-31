@@ -10,8 +10,7 @@ fun stringBuildConfigField(value: String): String {
 }
 
 val debugBackendBaseUrl = providers.gradleProperty("DEBUG_BACKEND_BASE_URL").orNull
-    ?: providers.gradleProperty("BACKEND_BASE_URL").orNull
-    ?: "http://192.168.1.67:8080"
+    ?: "http://192.168.0.39:8080"
 val releaseBackendBaseUrl = providers.gradleProperty("RELEASE_BACKEND_BASE_URL").orNull
     ?: providers.gradleProperty("BACKEND_BASE_URL").orNull
     ?: ""
@@ -100,4 +99,3 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 
 }
-

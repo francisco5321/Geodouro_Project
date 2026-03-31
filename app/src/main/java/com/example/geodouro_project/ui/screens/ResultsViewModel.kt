@@ -271,8 +271,12 @@ class ResultsViewModel(
                 Log.d(TAG, "saveObservation result observationId=${saveResult.observationId} syncStatus=${saveResult.syncStatus}")
                 val message = when (saveResult.syncStatus) {
                     ObservationSyncStatus.SYNCED -> "Observacao guardada e sincronizada."
-                    ObservationSyncStatus.PENDING -> "Observacao guardada localmente. Sync pendente."
-                    ObservationSyncStatus.FAILED -> "Observacao guardada. Sync falhou, sera tentado novamente."
+                    ObservationSyncStatus.PENDING -> {
+                        "Observacao guardada localmente. A sincronizacao fica pendente ate haver ligacao ao backend."
+                    }
+                    ObservationSyncStatus.FAILED -> {
+                        "Observacao guardada localmente. Nao foi possivel contactar o backend, por isso tentaremos sincronizar novamente mais tarde."
+                    }
                 }
 
                 _uiState.value = when (current) {

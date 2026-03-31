@@ -142,7 +142,7 @@ fun ResultsScreen(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "Identificacao - Resultados",
+                            text = "Identificacao de resultados",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = GeodouroBrandGreen

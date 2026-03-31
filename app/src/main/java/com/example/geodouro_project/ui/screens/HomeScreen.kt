@@ -1,7 +1,9 @@
 package com.example.geodouro_project.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -11,8 +13,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -26,16 +30,23 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -44,8 +55,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.geodouro_project.R
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.di.AppContainer
+import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroGrey
+import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroLightGreen
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
@@ -117,106 +130,199 @@ fun HomeScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    androidx.compose.foundation.Image(
+                    Image(
                         painter = painterResource(id = R.drawable.logo_s_fundo),
                         contentDescription = "Geodouro",
                         modifier = Modifier.height(80.dp)
                     )
                 },
                 actions = {
-                    IconButton(onClick = onOpenSpeciesList) {
-                        Icon(Icons.Default.Search, "Pesquisar", tint = GeodouroGrey)
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(GeodouroLightBg),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        IconButton(onClick = onOpenSpeciesList) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Pesquisar",
+                                tint = GeodouroBrandGreen,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = GeodouroWhite
                 )
             )
-        }
+        },
+        containerColor = GeodouroWhite
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .background(GeodouroWhite),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
+
+            // ── Hero banner ───────────────────────────────────────────────────
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = GeodouroLightGreen.copy(alpha = 0.2f)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text(
-                            "Identificacao de Flora",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = GeodouroTextPrimary
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 20.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    GeodouroBrandGreen,
+                                    GeodouroBrandGreen.copy(alpha = 0.75f)
+                                )
+                            )
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        .padding(horizontal = 24.dp, vertical = 28.dp)
+                ) {
+                    Column {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color.White.copy(alpha = 0.18f),
+                            modifier = Modifier.padding(bottom = 14.dp)
+                        ) {
+                            Text(
+                                text = "Flora Portuguesa",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.8.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                            )
+                        }
                         Text(
-                            "Capture e identifique especies da flora portuguesa com inteligencia artificial",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = GeodouroTextSecondary
+                            text = "Identificação\nde Flora",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                            lineHeight = 32.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Capture e identifique espécies da flora portuguesa com inteligência artificial.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.85f),
+                            lineHeight = 18.sp
                         )
                     }
                 }
             }
 
+            // ── Stats row ─────────────────────────────────────────────────────
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     StatCard(
                         icon = Icons.Default.Eco,
                         value = uiState.speciesCount.toString(),
-                        label = "Especies encontradas",
+                        label = "Espécies\nencontradas",
                         modifier = Modifier.weight(1f)
                     )
                     StatCard(
                         icon = Icons.Default.Check,
                         value = uiState.observationsCount.toString(),
-                        label = "Observacoes realizadas",
+                        label = "Observações\nrealizadas",
                         modifier = Modifier.weight(1f)
                     )
                 }
             }
 
+            // ── Section header ────────────────────────────────────────────────
             item {
-                Text(
-                    "Especies Recentes",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = GeodouroTextPrimary
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .padding(top = 28.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(3.dp)
+                            .height(18.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(GeodouroBrandGreen)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Espécies Recentes",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = GeodouroTextPrimary
+                    )
+                }
             }
 
+            // ── Empty state ───────────────────────────────────────────────────
             if (uiState.recentSpecies.isEmpty()) {
                 item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
-                        elevation = CardDefaults.cardElevation(2.dp),
-                        shape = RoundedCornerShape(8.dp)
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        color = GeodouroLightBg
                     ) {
-                        Text(
-                            text = "As especies recentes vao aparecer aqui depois das primeiras identificacoes confirmadas.",
-                            modifier = Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = GeodouroTextSecondary
-                        )
+                        Column(
+                            modifier = Modifier.padding(28.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(GeodouroBrandGreen.copy(alpha = 0.10f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Eco,
+                                    contentDescription = null,
+                                    tint = GeodouroBrandGreen,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "Ainda sem espécies",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = GeodouroTextPrimary,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "As espécies recentes vão aparecer aqui depois das primeiras identificações confirmadas.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = GeodouroTextSecondary,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 18.sp
+                            )
+                        }
                     }
                 }
             } else {
                 items(uiState.recentSpecies) { species ->
                     SpeciesCard(
                         species = species,
-                        onClick = { onSpeciesClick(species.id) }
+                        onClick = { onSpeciesClick(species.id) },
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 5.dp)
                     )
                 }
             }
@@ -226,38 +332,48 @@ fun HomeScreen(
 
 @Composable
 fun StatCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     value: String,
     label: String,
     modifier: Modifier = Modifier
 ) {
-    Card(
+    Surface(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
-        elevation = CardDefaults.cardElevation(2.dp),
-        shape = RoundedCornerShape(8.dp)
+        shape = RoundedCornerShape(18.dp),
+        color = GeodouroLightBg,
+        tonalElevation = 0.dp
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.Start
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = GeodouroGreen,
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(GeodouroBrandGreen.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = GeodouroBrandGreen,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(14.dp))
             Text(
-                value,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
+                text = value,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold,
                 color = GeodouroTextPrimary
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
-                label,
+                text = label,
                 style = MaterialTheme.typography.bodySmall,
-                color = GeodouroTextSecondary
+                color = GeodouroTextSecondary,
+                lineHeight = 16.sp
             )
         }
     }
@@ -274,8 +390,8 @@ private fun List<com.example.geodouro_project.data.local.entity.ObservationEntit
             id = scientificName.toSpeciesId(),
             scientificName = scientificName,
             commonName = newestObservation.enrichedCommonName?.takeIf { it.isNotBlank() } ?: "Sem nome comum",
-            family = newestObservation.enrichedFamily?.takeIf { it.isNotBlank() } ?: "Familia desconhecida",
-            genus = scientificName.substringBefore(" ").ifBlank { "Genero desconhecido" },
+            family = newestObservation.enrichedFamily?.takeIf { it.isNotBlank() } ?: "Família desconhecida",
+            genus = scientificName.substringBefore(" ").ifBlank { "Género desconhecido" },
             imageCount = observations.sumOf { it.allImageUris().size },
             thumbnailUri = newestObservation.allImageUris().firstOrNull()
         ) to newestObservation.capturedAt

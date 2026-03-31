@@ -20,10 +20,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.navArgument
 import com.example.geodouro_project.core.network.ConnectivityChecker
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.LocalInferenceResult
+import com.example.geodouro_project.domain.model.ObservationSyncStatus
 import com.example.geodouro_project.ui.components.BottomNavigationBar
 import com.example.geodouro_project.ui.screens.CaptureScreen
 import com.example.geodouro_project.ui.screens.CommunityScreen
@@ -57,6 +59,7 @@ fun AppNavigation() {
     val hasInternet by connectivityChecker.observeInternetAvailability().collectAsStateWithLifecycle(
         initialValue = connectivityChecker.hasInternetConnection()
     )
+    val observations by repository.observeObservations().collectAsStateWithLifecycle(initialValue = emptyList())
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "home"
     val snackbarHostState = remember { SnackbarHostState() }
@@ -66,6 +69,7 @@ fun AppNavigation() {
     var latestCaptureLongitude by remember { mutableStateOf<Double?>(null) }
     var networkRefreshVersion by remember { mutableStateOf(0) }
     var previousInternetState by remember { mutableStateOf<Boolean?>(null) }
+    var previousFailedObservationIds by remember { mutableStateOf<Set<String>?>(null) }
 
     val bottomNavRoutes = listOf("home", "community", "identify", "list", "profile")
     val showBottomBar = currentRoute in bottomNavRoutes
@@ -81,6 +85,22 @@ fun AppNavigation() {
         }
     }
 
+    LaunchedEffect(observations) {
+        val failedObservationIds = observations
+            .filter { it.syncStatus == ObservationSyncStatus.FAILED.name }
+            .map { it.id }
+            .toSet()
+
+        val previous = previousFailedObservationIds
+        previousFailedObservationIds = failedObservationIds
+
+        if (previous != null && (failedObservationIds - previous).isNotEmpty()) {
+            snackbarHostState.showSnackbar(
+                "Backend indisponivel. As observacoes foram guardadas localmente e serao sincronizadas mais tarde."
+            )
+        }
+    }
+
     Scaffold(
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState)
@@ -90,12 +110,22 @@ fun AppNavigation() {
                 BottomNavigationBar(
                     currentRoute = currentRoute,
                     onNavigate = { route ->
-                        navController.navigate(route) {
-                            popUpTo("home") {
-                                saveState = true
+                        if (route == "home") {
+                            navController.navigate("home") {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = false
+                                }
+                                launchSingleTop = true
+                                restoreState = false
                             }
-                            launchSingleTop = true
-                            restoreState = true
+                        } else {
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
                     }
                 )

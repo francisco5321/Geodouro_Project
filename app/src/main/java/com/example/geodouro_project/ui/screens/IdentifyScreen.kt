@@ -455,6 +455,7 @@ fun IdentifyScreen(
             ) {
                 val label = when {
                     uiState.isProcessing -> "A analisar..."
+                    uiState.capturedImageUris.isEmpty() -> "Analisar imagem"
                     uiState.capturedImageUris.size >= 2 -> "Analisar ${uiState.capturedImageUris.size} imagens"
                     else -> "Analisar 1 imagem"
                 }

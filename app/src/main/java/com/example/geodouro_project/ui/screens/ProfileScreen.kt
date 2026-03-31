@@ -539,7 +539,7 @@ private fun buildProfileObservationStatusLabel(observation: ObservationEntity): 
     return when {
         observation.isPublished -> "Publicada"
         observation.syncStatus == ObservationSyncStatus.SYNCED.name -> "Sincronizada"
-        observation.syncStatus == ObservationSyncStatus.FAILED.name -> "Falha de sincronizacao"
+        observation.syncStatus == ObservationSyncStatus.FAILED.name -> "Guardada localmente - backend indisponivel"
         else -> "Pendente de sincronizacao"
     }
 }

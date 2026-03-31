@@ -286,10 +286,11 @@ fun FilterTabRow(
 @Composable
 fun SpeciesCard(
     species: SpeciesListItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = GeodouroWhite),

@@ -32,7 +32,10 @@ fun CaptureScreen() {
                 .height(300.dp),
             color = MaterialTheme.colorScheme.surfaceVariant
         ) {
-            Text("Aqui vai aparecer a imagem capturada.", modifier = Modifier.padding(16.dp))
+            Text(
+                "Aqui vai aparecer a imagem capturada.",
+                modifier = Modifier.padding(16.dp)
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -41,7 +44,10 @@ fun CaptureScreen() {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Sugestao da IA:", style = MaterialTheme.typography.labelLarge)
                 Text("Lavandula stoechas (Rosmaninho)", style = MaterialTheme.typography.bodyLarge)
-                LinearProgressIndicator(progress = { 0.85f }, modifier = Modifier.fillMaxWidth())
+                LinearProgressIndicator(
+                    progress = { 0.85f },
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Text("90% de confianca", style = MaterialTheme.typography.labelSmall)
             }
         }

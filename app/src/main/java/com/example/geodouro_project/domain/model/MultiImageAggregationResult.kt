@@ -1,8 +1,6 @@
 package com.example.geodouro_project.domain.model
 
-/**
- * Resultado de uma única imagem no contexto de análise multi-imagem
- */
+/** Resultado de uma unica imagem no contexto de analise multi-imagem. */
 data class ImageInferenceResult(
     val imageUri: String,
     val predictedSpecies: String,
@@ -42,28 +40,19 @@ data class ImageInferenceResult(
 }
 
 /**
- * Resultado agregado de múltiplas imagens
- * Combina votação por espécie + média de confiança
+ * Resultado agregado de multiplas imagens.
+ * Combina votacao por especie e media de confianca.
  */
 data class MultiImageAggregationResult(
-    // Resultado agregado
     val finalPredictedSpecies: String,
-    val aggregatedConfidence: Float,  // Média ponderada
+    val aggregatedConfidence: Float,
     val confidenceState: ConfidenceState,
-    
-    // Votos
-    val speciesVotes: Map<String, Int>,  // Espécie -> número de imagens que votaram
-    val confidencePerSpecies: Map<String, Float>,  // Espécie -> confiança média
-    
-    // Imagens processadas
+    val speciesVotes: Map<String, Int>,
+    val confidencePerSpecies: Map<String, Float>,
     val processedImages: List<ImageInferenceResult>,
     val totalImagesAnalyzed: Int,
-    
-    // Confiança individual
     val topAlternative: String? = null,
     val topAlternativeConfidence: Float? = null,
-    
-    // Metadados
     val aggregatedAt: Long = System.currentTimeMillis(),
     val processingTimeMs: Long = 0
 ) {
@@ -76,20 +65,16 @@ data class MultiImageAggregationResult(
             return if (totalImagesAnalyzed > 0) maxVotes.toFloat() / totalImagesAnalyzed else 0f
         }
 
-    /**
-     * Unanimidade: todas as imagens predizem a mesma espécie?
-     */
+    /** Unanimidade: todas as imagens predizem a mesma especie. */
     val isUnanimous: Boolean
         get() = speciesVotes.size == 1 && speciesVotes.values.first() == totalImagesAnalyzed
 }
 
-/**
- * Configuração para agregação multi-imagem
- */
+/** Configuracao para agregacao multi-imagem. */
 data class MultiImageAggregationConfig(
     val minImagesRequired: Int = 1,
     val maxImagesRequired: Int = 5,
-    val confidenceWeightedVoting: Boolean = true,  // Votação ponderada por confiança
-    val requireConsensus: Boolean = false,         // Exigir unanimidade
-    val minConsensusScore: Float = 0.6f            // Mínimo 60% de votos
+    val confidenceWeightedVoting: Boolean = true,
+    val requireConsensus: Boolean = false,
+    val minConsensusScore: Float = 0.6f
 )
