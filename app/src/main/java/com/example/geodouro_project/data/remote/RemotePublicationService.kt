@@ -18,12 +18,16 @@ class RemotePublicationService(
     fun isConfigured(): Boolean = config.isConfigured()
 
     fun publishObservation(observation: ObservationEntity): Boolean {
+        return publishObservationId(observation.id)
+    }
+
+    fun publishObservationId(deviceObservationId: String): Boolean {
         if (!isConfigured()) {
             return false
         }
 
         val payload = RemotePublishObservationPayload(
-            deviceObservationId = observation.id
+            deviceObservationId = deviceObservationId
         )
 
         val request = Request.Builder()
@@ -38,7 +42,7 @@ class RemotePublicationService(
                 response.isSuccessful
             }
         }.onFailure { error ->
-            Log.e(TAG, "Failed to publish observation ${observation.id}", error)
+            Log.e(TAG, "Failed to publish observation $deviceObservationId", error)
         }.getOrDefault(false)
     }
 

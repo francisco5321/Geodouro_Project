@@ -70,6 +70,7 @@ import com.example.geodouro_project.ui.theme.GeodouroLightGreen
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
+import com.example.geodouro_project.ui.theme.geodouroOutlinedTextFieldColors
 import com.example.geodouro_project.ui.theme.geodouroLoadingIndicatorColor
 import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
 import java.text.SimpleDateFormat
@@ -104,20 +105,19 @@ class ProfileViewModel(
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            repository.observeObservations().collect { observations ->
-                _uiState.value = _uiState.value.copy(observations = observations)
-            }
-        }
+        refreshRemoteProfile()
+    }
 
+    private fun refreshRemoteProfile() {
         viewModelScope.launch {
-            repository.observeObservationStats().collect { stats ->
-                _uiState.value = _uiState.value.copy(
-                    observationsCount = stats.observationsCount,
-                    publishedCount = stats.publishedCount,
-                    speciesCount = stats.speciesCount
-                )
-            }
+            val observations = repository.fetchObservationsRemoteFirst()
+            val stats = repository.fetchObservationStatsRemoteFirst()
+            _uiState.value = _uiState.value.copy(
+                observations = observations,
+                observationsCount = stats.observationsCount,
+                publishedCount = stats.publishedCount,
+                speciesCount = stats.speciesCount
+            )
         }
     }
 
@@ -142,6 +142,9 @@ class ProfileViewModel(
                     "Nao foi possivel publicar. Confirma que a observacao ja foi sincronizada."
                 }
             )
+            if (published) {
+                refreshRemoteProfile()
+            }
         }
     }
 
@@ -287,6 +290,7 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
+                    colors = geodouroOutlinedTextFieldColors(),
                     leadingIcon = {
                         Icon(Icons.Default.Search, contentDescription = null)
                     },

@@ -56,8 +56,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.geodouro_project.R
-import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.repository.PlantRepository
+import com.example.geodouro_project.data.repository.PlantRepository.PlantSpeciesCatalogItem
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroGrey
@@ -65,6 +65,7 @@ import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
+import com.example.geodouro_project.ui.theme.geodouroOutlinedTextFieldColors
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -98,13 +99,16 @@ class SpeciesListViewModel(
     val uiState: StateFlow<SpeciesListUiState> = _uiState.asStateFlow()
 
     init {
+        refresh()
+    }
+
+    fun refresh() {
         viewModelScope.launch {
-            repository.observeObservations().collect { observations ->
-                _uiState.value = SpeciesListUiState(
-                    species = observations.toSpeciesListItems(),
-                    isLoading = false
-                )
-            }
+            _uiState.value = SpeciesListUiState(isLoading = true)
+            _uiState.value = SpeciesListUiState(
+                species = repository.fetchSpeciesCatalogRemoteFirst().toRemoteSpeciesListItems(),
+                isLoading = false
+            )
         }
     }
 
@@ -182,6 +186,7 @@ fun SpeciesListScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
+                colors = geodouroOutlinedTextFieldColors(),
                 leadingIcon = {
                     Icon(Icons.Default.Search, contentDescription = null, tint = GeodouroGrey)
                 },
@@ -420,23 +425,16 @@ private fun EmptySpeciesState(
     }
 }
 
-private fun List<ObservationEntity>.toSpeciesListItems(): List<SpeciesListItem> {
-    return groupBy { observation ->
-        observation.enrichedScientificName
-            ?.takeIf { it.isNotBlank() }
-            ?: observation.predictedSpecies
-    }.map { (scientificName, observations) ->
-        val first = observations.first()
+private fun List<PlantSpeciesCatalogItem>.toRemoteSpeciesListItems(): List<SpeciesListItem> {
+    return map { species ->
         SpeciesListItem(
-            id = scientificName.toSpeciesId(),
-            scientificName = scientificName,
-            commonName = first.enrichedCommonName?.takeIf { it.isNotBlank() } ?: "Sem nome comum",
-            family = first.enrichedFamily?.takeIf { it.isNotBlank() } ?: "Familia desconhecida",
-            genus = scientificName.substringBefore(" ").ifBlank { "Genero desconhecido" },
-            imageCount = observations.sumOf { it.allImageUris().size },
-            thumbnailUri = observations.firstNotNullOfOrNull { observation ->
-                observation.allImageUris().firstOrNull()
-            }
+            id = species.id,
+            scientificName = species.scientificName,
+            commonName = species.commonName?.takeIf { it.isNotBlank() } ?: "Sem nome comum",
+            family = species.family.ifBlank { "Familia desconhecida" },
+            genus = species.genus.ifBlank { "Genero desconhecido" },
+            imageCount = species.imageCount,
+            thumbnailUri = species.thumbnailUri
         )
     }
 }

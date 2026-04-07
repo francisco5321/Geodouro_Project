@@ -48,6 +48,9 @@ interface ObservationDao {
     @Query("SELECT * FROM observation ORDER BY capturedAt DESC")
     fun observeAll(): Flow<List<ObservationEntity>>
 
+    @Query("SELECT * FROM observation ORDER BY capturedAt DESC")
+    suspend fun getAll(): List<ObservationEntity>
+
     @Query("SELECT * FROM observation WHERE isPublished = 1 ORDER BY capturedAt DESC")
     fun observePublished(): Flow<List<ObservationEntity>>
 

@@ -53,7 +53,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.geodouro_project.R
+import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.repository.PlantRepository
+import com.example.geodouro_project.data.repository.PlantRepository.PlantSpeciesCatalogItem
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
@@ -83,21 +85,13 @@ class HomeViewModel(
 
     init {
         viewModelScope.launch {
-            repository.observeObservations().collect { observations ->
-                _uiState.value = _uiState.value.copy(
-                    recentSpecies = observations.toRecentSpeciesItems()
-                )
-            }
-        }
-
-        viewModelScope.launch {
-            repository.observeObservationStats().collect { stats ->
-                _uiState.value = HomeUiState(
-                    speciesCount = stats.speciesCount,
-                    observationsCount = stats.observationsCount,
-                    recentSpecies = _uiState.value.recentSpecies
-                )
-            }
+            val speciesCatalog = repository.fetchSpeciesCatalogRemoteFirst()
+            val stats = repository.fetchObservationStatsRemoteFirst()
+            _uiState.value = HomeUiState(
+                speciesCount = stats.speciesCount,
+                observationsCount = stats.observationsCount,
+                recentSpecies = speciesCatalog.toRemoteRecentSpeciesItems()
+            )
         }
     }
 
@@ -379,7 +373,7 @@ fun StatCard(
     }
 }
 
-private fun List<com.example.geodouro_project.data.local.entity.ObservationEntity>.toRecentSpeciesItems(): List<SpeciesListItem> {
+private fun List<ObservationEntity>.toRecentSpeciesItems(): List<SpeciesListItem> {
     return groupBy { observation ->
         observation.enrichedScientificName
             ?.takeIf { it.isNotBlank() }
@@ -398,4 +392,20 @@ private fun List<com.example.geodouro_project.data.local.entity.ObservationEntit
     }.sortedByDescending { it.second }
         .take(3)
         .map { it.first }
+}
+
+private fun List<PlantSpeciesCatalogItem>.toRemoteRecentSpeciesItems(): List<SpeciesListItem> {
+    return sortedByDescending { it.updatedAtEpochMs }
+        .take(3)
+        .map { species ->
+            SpeciesListItem(
+                id = species.id,
+                scientificName = species.scientificName,
+                commonName = species.commonName?.takeIf { it.isNotBlank() } ?: "Sem nome comum",
+                family = species.family.ifBlank { "Familia desconhecida" },
+                genus = species.genus.ifBlank { "Genero desconhecido" },
+                imageCount = species.imageCount,
+                thumbnailUri = species.thumbnailUri
+            )
+        }
 }

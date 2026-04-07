@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
@@ -67,6 +67,7 @@ import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
+import com.example.geodouro_project.ui.theme.geodouroOutlinedTextFieldColors
 import com.example.geodouro_project.ui.theme.geodouroLoadingIndicatorColor
 import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
 import com.example.geodouro_project.ui.theme.geodouroSecondaryButtonColors
@@ -94,13 +95,17 @@ class ObservationDetailViewModel(
     val uiState: StateFlow<ObservationDetailUiState> = _uiState.asStateFlow()
 
     init {
+        refresh()
+    }
+
+    private fun refresh() {
         viewModelScope.launch {
-            repository.observeObservations().collect { observations ->
-                _uiState.value = _uiState.value.copy(
-                    observation = observations.firstOrNull { it.id == observationId },
-                    isLoading = false
-                )
-            }
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(
+                observation = repository.fetchRemoteObservationDetail(observationId)
+                    ?: repository.fetchLocalObservations().firstOrNull { it.id == observationId },
+                isLoading = false
+            )
         }
     }
 
@@ -122,6 +127,8 @@ class ObservationDetailViewModel(
                     family = family
                 )
             }.getOrDefault(false)
+
+            if (updated) refresh()
 
             _uiState.value = _uiState.value.copy(
                 isSaving = false,
@@ -214,7 +221,7 @@ fun ObservationDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Voltar",
                             tint = GeodouroBrandGreen
                         )
@@ -278,21 +285,24 @@ fun ObservationDetailScreen(
                                         onValueChange = { scientificNameInput = it },
                                         modifier = Modifier.fillMaxWidth(),
                                         label = { Text("Nome cientifico") },
-                                        singleLine = true
+                                        singleLine = true,
+                                        colors = geodouroOutlinedTextFieldColors()
                                     )
                                     OutlinedTextField(
                                         value = commonNameInput,
                                         onValueChange = { commonNameInput = it },
                                         modifier = Modifier.fillMaxWidth(),
                                         label = { Text("Nome comum") },
-                                        singleLine = true
+                                        singleLine = true,
+                                        colors = geodouroOutlinedTextFieldColors()
                                     )
                                     OutlinedTextField(
                                         value = familyInput,
                                         onValueChange = { familyInput = it },
                                         modifier = Modifier.fillMaxWidth(),
                                         label = { Text("Familia") },
-                                        singleLine = true
+                                        singleLine = true,
+                                        colors = geodouroOutlinedTextFieldColors()
                                     )
                                 } else {
                                     Text(

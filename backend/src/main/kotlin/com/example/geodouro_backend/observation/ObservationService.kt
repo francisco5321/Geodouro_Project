@@ -46,6 +46,54 @@ class ObservationService(
         )
     }
 
+    fun listObservations(userId: Int?, guestLabel: String?): List<ObservationDetailResponse> {
+        val resolvedUserId = resolveLookupUserId(userId, guestLabel)
+        return jdbcTemplate.query(
+            LIST_OBSERVATIONS_SQL,
+            MapSqlParameterSource("userId", resolvedUserId),
+            observationDetailSummaryRowMapper
+        ).map(::withObservationImages)
+    }
+
+    fun getObservationDetail(deviceObservationId: UUID): ObservationDetailResponse {
+        return jdbcTemplate.query(
+            OBSERVATION_DETAIL_SQL,
+            MapSqlParameterSource("deviceObservationId", deviceObservationId),
+            observationDetailSummaryRowMapper
+        ).firstOrNull()?.let(::withObservationImages)
+            ?: throw ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Observation not found for deviceObservationId=$deviceObservationId"
+            )
+    }
+
+    fun updateObservationMetadata(
+        deviceObservationId: UUID,
+        request: UpdateObservationMetadataRequest
+    ): ObservationDetailResponse {
+        val current = getObservationDetail(deviceObservationId)
+        if (current.isPublished) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot update a published observation")
+        }
+
+        val scientificName = request.scientificName?.trim().orEmpty().ifBlank { current.scientificName }
+        val commonName = request.commonName?.trim()?.takeIf { it.isNotBlank() }
+        val family = request.family?.trim()?.takeIf { it.isNotBlank() } ?: current.family ?: "Unknown"
+        val plantSpeciesId = upsertPlantSpecies(scientificName, commonName, family)
+
+        jdbcTemplate.update(
+            UPDATE_OBSERVATION_METADATA_SQL,
+            MapSqlParameterSource()
+                .addValue("deviceObservationId", deviceObservationId)
+                .addValue("plantSpeciesId", plantSpeciesId)
+                .addValue("scientificName", scientificName)
+                .addValue("commonName", commonName)
+                .addValue("family", family)
+        )
+
+        return getObservationDetail(deviceObservationId)
+    }
+
     private fun upsertObservationInternal(
         request: UpsertObservationRequest,
         storedImagePaths: List<String>,
@@ -60,19 +108,6 @@ class ObservationService(
         val observedAt = request.observedAt ?: java.time.Instant.now()
         val observedAtTimestamp = Timestamp.from(observedAt)
         val primaryImagePath = storedImagePaths.firstOrNull()
-
-        logger.debug(
-            "Preparing upsert deviceObservationId={} userId={} plantSpeciesId={} capturedAt={} confidence={} lat={} lon={} imageCount={} primaryImagePath={}",
-            deviceObservationId,
-            userId,
-            plantSpeciesId,
-            request.capturedAt,
-            request.confidence,
-            request.latitude,
-            request.longitude,
-            storedImagePaths.size,
-            primaryImagePath
-        )
 
         val parameters = MapSqlParameterSource()
             .addValue("deviceObservationId", deviceObservationId)
@@ -96,45 +131,22 @@ class ObservationService(
             .addValue("lastSyncAttemptAt", request.lastSyncAttemptAt)
             .addValue("notes", request.notes)
 
-        val response = jdbcTemplate.query(UPSERT_OBSERVATION_SQL, parameters, observationRowMapper).first()
+        val response = jdbcTemplate.query(UPSERT_OBSERVATION_SQL, parameters, observationResponseRowMapper).first()
         replaceObservationImages(response.observationId, storedImagePaths)
         refreshPlantSpeciesImageCount(plantSpeciesId)
-
-        logger.info(
-            "Upsert finished observationId={} deviceObservationId={} userId={} plantSpeciesId={} syncStatus={} imageCount={} primaryImagePath={}",
-            response.observationId,
-            response.deviceObservationId,
-            response.userId,
-            plantSpeciesId,
-            response.syncStatus,
-            storedImagePaths.size,
-            response.storedImagePath
-        )
-
         return response
     }
 
-    fun getByDeviceObservationId(deviceObservationId: UUID): ObservationResponse {
-        return jdbcTemplate.query(
-            """
-            SELECT observation_id,
-                   device_observation_id,
-                   user_id,
-                   predicted_scientific_name,
-                   confidence,
-                   sync_status,
-                   is_published,
-                   observed_at,
-                   image_uri
-            FROM observation
-            WHERE device_observation_id = :deviceObservationId
-            """.trimIndent(),
-            MapSqlParameterSource("deviceObservationId", deviceObservationId),
-            observationRowMapper
-        ).firstOrNull() ?: throw ResponseStatusException(
-            HttpStatus.NOT_FOUND,
-            "Observation not found for deviceObservationId=$deviceObservationId"
-        )
+    private fun resolveLookupUserId(userId: Int?, guestLabel: String?): Int {
+        userId?.let { return it }
+        guestLabel?.trim()?.takeIf { it.isNotBlank() }?.let { label ->
+            return jdbcTemplate.query(
+                "SELECT user_id FROM app_user WHERE guest_label = :guestLabel",
+                MapSqlParameterSource("guestLabel", label)
+            ) { rs, _ -> rs.getInt("user_id") }.firstOrNull()
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found for guestLabel=$label")
+        }
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Either userId or guestLabel must be provided")
     }
 
     private fun resolveUserId(request: UpsertObservationRequest): Int {
@@ -143,31 +155,17 @@ class ObservationService(
                 "SELECT user_id FROM app_user WHERE user_id = :userId",
                 MapSqlParameterSource("userId", providedUserId)
             ) { rs, _ -> rs.getInt("user_id") }.firstOrNull()
-
-            logger.debug("Requested explicit userId={} exists={}", providedUserId, existing != null)
-
-            return existing ?: throw ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "User with id=$providedUserId does not exist"
-            )
+            return existing ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "User with id=$providedUserId does not exist")
         }
 
-        val guestLabel = request.guestLabel
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?: "guest-${UUID.randomUUID()}"
-
+        val guestLabel = request.guestLabel?.trim()?.takeIf { it.isNotBlank() } ?: "guest-${UUID.randomUUID()}"
         val existingGuestId = jdbcTemplate.query(
             "SELECT user_id FROM app_user WHERE guest_label = :guestLabel",
             MapSqlParameterSource("guestLabel", guestLabel)
         ) { rs, _ -> rs.getInt("user_id") }.firstOrNull()
+        if (existingGuestId != null) return existingGuestId
 
-        if (existingGuestId != null) {
-            logger.info("Reusing guest user guestLabel={} userId={}", guestLabel, existingGuestId)
-            return existingGuestId
-        }
-
-        val createdUserId = jdbcTemplate.queryForObject(
+        return jdbcTemplate.queryForObject(
             """
             INSERT INTO app_user (is_authenticated, guest_label)
             VALUES (FALSE, :guestLabel)
@@ -176,49 +174,39 @@ class ObservationService(
             MapSqlParameterSource("guestLabel", guestLabel),
             Int::class.java
         ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not create guest user")
-
-        logger.info("Created guest user guestLabel={} userId={}", guestLabel, createdUserId)
-        return createdUserId
     }
 
     private fun resolvePlantSpeciesId(request: UpsertObservationRequest): Int {
-        val scientificName = request.enrichedScientificName
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
+        val scientificName = request.enrichedScientificName?.trim()?.takeIf { it.isNotBlank() }
             ?: request.predictedScientificName.trim()
+        val commonName = request.enrichedCommonName?.trim()?.takeIf { it.isNotBlank() }
+        val family = request.enrichedFamily?.trim()?.takeIf { it.isNotBlank() } ?: "Unknown"
+        return upsertPlantSpecies(scientificName, commonName, family)
+    }
 
-        val commonName = request.enrichedCommonName
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-        val family = request.enrichedFamily
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?: "Unknown"
+    private fun upsertPlantSpecies(scientificName: String, commonName: String?, family: String): Int {
         val (genus, species) = splitScientificName(scientificName)
-
-        val parameters = MapSqlParameterSource()
-            .addValue("scientificName", scientificName)
-            .addValue("commonName", commonName)
-            .addValue("family", family)
-            .addValue("genus", genus)
-            .addValue("species", species)
-
-        val plantSpeciesId = jdbcTemplate.queryForObject(
+        return jdbcTemplate.queryForObject(
             UPSERT_PLANT_SPECIES_SQL,
-            parameters,
+            MapSqlParameterSource()
+                .addValue("scientificName", scientificName)
+                .addValue("commonName", commonName)
+                .addValue("family", family)
+                .addValue("genus", genus)
+                .addValue("species", species),
             Int::class.java
         ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not upsert plant species")
+    }
 
-        logger.debug(
-            "Resolved plant species scientificName={} plantSpeciesId={} family={} genus={} species={}",
-            scientificName,
-            plantSpeciesId,
-            family,
-            genus,
-            species
+    private fun withObservationImages(summary: ObservationDetailResponse): ObservationDetailResponse {
+        val imagePaths = jdbcTemplate.query(
+            OBSERVATION_IMAGE_PATHS_SQL,
+            MapSqlParameterSource("observationId", summary.observationId)
+        ) { rs, _ -> rs.getString("image_path") }.filterNotNull()
+
+        return summary.copy(
+            imagePaths = if (imagePaths.isNotEmpty()) imagePaths else summary.imagePaths
         )
-
-        return plantSpeciesId
     }
 
     private fun replaceObservationImages(observationId: Int, storedImagePaths: List<String>) {
@@ -226,7 +214,6 @@ class ObservationService(
             "DELETE FROM observation_image WHERE observation_id = :observationId",
             MapSqlParameterSource("observationId", observationId)
         )
-
         storedImagePaths.forEach { imagePath ->
             jdbcTemplate.update(
                 INSERT_OBSERVATION_IMAGE_SQL,
@@ -245,11 +232,7 @@ class ObservationService(
     }
 
     private fun sanitizeImagePaths(imageUris: List<String>?): List<String> {
-        return imageUris.orEmpty()
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .filterNot { it.startsWith("content://") }
-            .distinct()
+        return imageUris.orEmpty().map { it.trim() }.filter { it.isNotBlank() }.filterNot { it.startsWith("content://") }.distinct()
     }
 
     private fun splitScientificName(scientificName: String): Pair<String, String> {
@@ -263,10 +246,7 @@ class ObservationService(
     private fun normalizeSyncStatus(syncStatus: String?): String {
         val normalized = syncStatus?.trim()?.uppercase() ?: "PENDING"
         if (normalized !in allowedSyncStatuses) {
-            throw ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "syncStatus must be one of $allowedSyncStatuses"
-            )
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "syncStatus must be one of $allowedSyncStatuses")
         }
         return normalized
     }
@@ -280,7 +260,7 @@ class ObservationService(
         }
     }
 
-    private val observationRowMapper = RowMapper { rs, _ ->
+    private val observationResponseRowMapper = RowMapper { rs, _ ->
         ObservationResponse(
             observationId = rs.getInt("observation_id"),
             deviceObservationId = rs.getObject("device_observation_id", UUID::class.java),
@@ -294,24 +274,78 @@ class ObservationService(
         )
     }
 
+    private val observationDetailSummaryRowMapper = RowMapper { rs, _ ->
+        ObservationDetailResponse(
+            observationId = rs.getInt("observation_id"),
+            deviceObservationId = rs.getObject("device_observation_id", UUID::class.java),
+            userId = rs.getInt("user_id"),
+            scientificName = rs.getString("scientific_name"),
+            commonName = rs.getString("common_name"),
+            family = rs.getString("family"),
+            wikipediaUrl = rs.getString("wikipedia_url"),
+            photoUrl = rs.getString("photo_url"),
+            imagePaths = listOfNotNull(rs.getString("primary_image_path")),
+            capturedAt = rs.getObject("captured_at") as? Long,
+            confidence = rs.getObject("confidence")?.toString()?.toFloat(),
+            latitude = rs.getBigDecimal("latitude")?.toDouble(),
+            longitude = rs.getBigDecimal("longitude")?.toDouble(),
+            syncStatus = rs.getString("sync_status"),
+            isPublished = rs.getBoolean("is_published"),
+            observedAt = rs.getTimestamp("observed_at").toInstant()
+        )
+    }
+
     companion object {
         private val logger = LoggerFactory.getLogger(ObservationService::class.java)
         private val allowedSyncStatuses = setOf("PENDING", "SYNCED", "FAILED")
 
+        private const val OBSERVATION_DETAIL_SELECT = """
+            SELECT o.observation_id,
+                   o.device_observation_id,
+                   o.user_id,
+                   COALESCE(o.enriched_scientific_name, o.predicted_scientific_name, ps.scientific_name) AS scientific_name,
+                   COALESCE(o.enriched_common_name, ps.common_name) AS common_name,
+                   COALESCE(o.enriched_family, ps.family) AS family,
+                   o.enriched_wikipedia_url AS wikipedia_url,
+                   o.enriched_photo_url AS photo_url,
+                   COALESCE(oi.image_path, o.image_uri, o.enriched_photo_url) AS primary_image_path,
+                   o.captured_at,
+                   o.confidence,
+                   o.latitude,
+                   o.longitude,
+                   o.sync_status,
+                   o.is_published,
+                   o.observed_at
+            FROM observation o
+            LEFT JOIN plant_species ps ON ps.plant_species_id = o.plant_species_id
+            LEFT JOIN LATERAL (
+                SELECT image_path
+                FROM observation_image
+                WHERE observation_id = o.observation_id
+                ORDER BY observation_image_id ASC
+                LIMIT 1
+            ) oi ON TRUE
+        """
+
+        private const val LIST_OBSERVATIONS_SQL = OBSERVATION_DETAIL_SELECT + """
+            WHERE o.user_id = :userId
+            ORDER BY o.captured_at DESC NULLS LAST, o.observation_id DESC
+        """
+
+        private const val OBSERVATION_DETAIL_SQL = OBSERVATION_DETAIL_SELECT + """
+            WHERE o.device_observation_id = :deviceObservationId
+        """
+
+        private const val OBSERVATION_IMAGE_PATHS_SQL = """
+            SELECT image_path
+            FROM observation_image
+            WHERE observation_id = :observationId
+            ORDER BY observation_image_id ASC
+        """
+
         private val UPSERT_PLANT_SPECIES_SQL = """
-            INSERT INTO plant_species (
-                scientific_name,
-                common_name,
-                family,
-                genus,
-                species
-            ) VALUES (
-                :scientificName,
-                :commonName,
-                :family,
-                :genus,
-                :species
-            )
+            INSERT INTO plant_species (scientific_name, common_name, family, genus, species)
+            VALUES (:scientificName, :commonName, :family, :genus, :species)
             ON CONFLICT (scientific_name)
             DO UPDATE SET
                 common_name = COALESCE(EXCLUDED.common_name, plant_species.common_name),
@@ -322,14 +356,19 @@ class ObservationService(
             RETURNING plant_species_id
         """.trimIndent()
 
+        private val UPDATE_OBSERVATION_METADATA_SQL = """
+            UPDATE observation
+            SET plant_species_id = :plantSpeciesId,
+                enriched_scientific_name = :scientificName,
+                enriched_common_name = :commonName,
+                enriched_family = :family,
+                updated_at = NOW()
+            WHERE device_observation_id = :deviceObservationId
+        """.trimIndent()
+
         private val INSERT_OBSERVATION_IMAGE_SQL = """
-            INSERT INTO observation_image (
-                observation_id,
-                image_path
-            ) VALUES (
-                :observationId,
-                :imagePath
-            )
+            INSERT INTO observation_image (observation_id, image_path)
+            VALUES (:observationId, :imagePath)
         """.trimIndent()
 
         private val REFRESH_PLANT_SPECIES_IMAGE_COUNT_SQL = """
@@ -346,47 +385,15 @@ class ObservationService(
 
         private val UPSERT_OBSERVATION_SQL = """
             INSERT INTO observation (
-                device_observation_id,
-                user_id,
-                plant_species_id,
-                image_uri,
-                captured_at,
-                predicted_scientific_name,
-                confidence,
-                enriched_scientific_name,
-                enriched_common_name,
-                enriched_family,
-                enriched_wikipedia_url,
-                enriched_photo_url,
-                latitude,
-                longitude,
-                observed_at,
-                is_published,
-                is_synced,
-                sync_status,
-                last_sync_attempt_at,
-                notes
+                device_observation_id, user_id, plant_species_id, image_uri, captured_at,
+                predicted_scientific_name, confidence, enriched_scientific_name, enriched_common_name,
+                enriched_family, enriched_wikipedia_url, enriched_photo_url, latitude, longitude,
+                observed_at, is_published, is_synced, sync_status, last_sync_attempt_at, notes
             ) VALUES (
-                :deviceObservationId,
-                :userId,
-                :plantSpeciesId,
-                :imageUri,
-                :capturedAt,
-                :predictedScientificName,
-                :confidence,
-                :enrichedScientificName,
-                :enrichedCommonName,
-                :enrichedFamily,
-                :enrichedWikipediaUrl,
-                :enrichedPhotoUrl,
-                :latitude,
-                :longitude,
-                :observedAt,
-                :isPublished,
-                :isSynced,
-                :syncStatus,
-                :lastSyncAttemptAt,
-                :notes
+                :deviceObservationId, :userId, :plantSpeciesId, :imageUri, :capturedAt,
+                :predictedScientificName, :confidence, :enrichedScientificName, :enrichedCommonName,
+                :enrichedFamily, :enrichedWikipediaUrl, :enrichedPhotoUrl, :latitude, :longitude,
+                :observedAt, :isPublished, :isSynced, :syncStatus, :lastSyncAttemptAt, :notes
             )
             ON CONFLICT (device_observation_id)
             DO UPDATE SET
@@ -410,15 +417,8 @@ class ObservationService(
                 last_sync_attempt_at = EXCLUDED.last_sync_attempt_at,
                 notes = EXCLUDED.notes,
                 updated_at = NOW()
-            RETURNING observation_id,
-                      device_observation_id,
-                      user_id,
-                      predicted_scientific_name,
-                      confidence,
-                      sync_status,
-                      is_published,
-                      observed_at,
-                      image_uri
+            RETURNING observation_id, device_observation_id, user_id, predicted_scientific_name,
+                      confidence, sync_status, is_published, observed_at, image_uri
         """.trimIndent()
     }
 }

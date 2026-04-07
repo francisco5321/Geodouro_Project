@@ -9,9 +9,7 @@ fun stringBuildConfigField(value: String): String {
     return "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 }
 
-val debugBackendBaseUrl = providers.gradleProperty("DEBUG_BACKEND_BASE_URL").orNull
-    ?: providers.gradleProperty("BACKEND_BASE_URL").orNull
-    ?: "http://10.0.2.2:8080"
+val debugBackendBaseUrl = "http://192.168.1.67:8080"
 val releaseBackendBaseUrl = providers.gradleProperty("RELEASE_BACKEND_BASE_URL").orNull
     ?: providers.gradleProperty("BACKEND_BASE_URL").orNull
     ?: ""

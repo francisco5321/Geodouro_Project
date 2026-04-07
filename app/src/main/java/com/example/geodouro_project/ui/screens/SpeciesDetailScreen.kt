@@ -1,6 +1,7 @@
 package com.example.geodouro_project.ui.screens
 
 import android.content.Context
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,15 +15,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -30,20 +35,32 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -69,12 +86,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+private val GeodouroGreenSoft = Color(0xFFC0DD97)
+private val GeodouroGreenLight = Color(0xFFEAF3DE)
+private val GeodouroGreenDark = Color(0xFF27500A)
+private val GeodouroGreenMid = Color(0xFF639922)
+
 data class SpeciesDetailUiState(
     val detail: SpeciesDetail? = null,
     val isLoading: Boolean = true
 )
 
 data class SpeciesDetail(
+    val id: String,
     val scientificName: String,
     val commonName: String,
     val family: String,
@@ -99,20 +122,16 @@ class SpeciesDetailViewModel(
     val uiState: StateFlow<SpeciesDetailUiState> = _uiState.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            repository.observeObservations().collect { observations ->
-                val matchingObservations = observations.filter { observation ->
-                    val scientificName = observation.enrichedScientificName
-                        ?.takeIf { it.isNotBlank() }
-                        ?: observation.predictedSpecies
-                    scientificName.toSpeciesId() == speciesId
-                }
+        refresh()
+    }
 
-                _uiState.value = SpeciesDetailUiState(
-                    detail = matchingObservations.toSpeciesDetail(),
-                    isLoading = false
-                )
-            }
+    private fun refresh() {
+        viewModelScope.launch {
+            _uiState.value = SpeciesDetailUiState(isLoading = true)
+            _uiState.value = SpeciesDetailUiState(
+                detail = repository.fetchSpeciesDetailRemoteFirst(speciesId)?.toUiModel(),
+                isLoading = false
+            )
         }
     }
 
@@ -120,12 +139,11 @@ class SpeciesDetailViewModel(
         fun factory(context: Context, speciesId: String): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return SpeciesDetailViewModel(
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    SpeciesDetailViewModel(
                         repository = AppContainer.providePlantRepository(context),
                         speciesId = speciesId
                     ) as T
-                }
             }
     }
 }
@@ -139,8 +157,10 @@ fun SpeciesDetailScreen(
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+    val decodedId = remember(speciesId) { Uri.decode(speciesId) }
+    var fullscreenImageUri by rememberSaveable { mutableStateOf<String?>(null) }
     val viewModel: SpeciesDetailViewModel = viewModel(
-        factory = SpeciesDetailViewModel.factory(context.applicationContext, speciesId)
+        factory = SpeciesDetailViewModel.factory(context.applicationContext, decodedId)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -157,7 +177,7 @@ fun SpeciesDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Voltar",
                             tint = GeodouroBrandGreen
                         )
@@ -167,223 +187,359 @@ fun SpeciesDetailScreen(
                     containerColor = GeodouroWhite
                 )
             )
-        }
+        },
+        containerColor = GeodouroLightBg
     ) { padding ->
         when {
-            uiState.isLoading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .background(GeodouroWhite),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("A carregar detalhe da especie...", color = GeodouroTextSecondary)
-                }
-            }
-
-            uiState.detail == null -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .background(GeodouroWhite),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Nao foi possivel encontrar esta especie.", color = GeodouroTextSecondary)
-                }
-            }
-
+            uiState.isLoading -> CenteredMessage(padding, "A carregar detalhe da especie...")
+            uiState.detail == null -> CenteredMessage(padding, "Nao foi possivel encontrar esta especie.")
             else -> {
                 val detail = uiState.detail ?: return@Scaffold
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(padding)
-                        .background(GeodouroWhite),
+                        .padding(padding),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
-                            elevation = CardDefaults.cardElevation(2.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Column {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(220.dp)
-                                        .background(GeodouroLightBg),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (!detail.heroImageUri.isNullOrBlank()) {
-                                        AsyncImage(
-                                            model = detail.heroImageUri,
-                                            contentDescription = detail.scientificName,
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.Image,
-                                            contentDescription = null,
-                                            tint = GeodouroGreen,
-                                            modifier = Modifier.size(56.dp)
-                                        )
-                                    }
-                                }
+                        HeroImage(
+                            detail = detail,
+                            onImageClick = { imageUri -> fullscreenImageUri = imageUri }
+                        )
+                    }
+                    item {
+                        IdentityCard(
+                            detail = detail,
+                            onImageClick = { imageUri -> fullscreenImageUri = imageUri }
+                        )
+                    }
+                    item { LocationCard(detail.locationSummary) }
 
-                                Column(
-                                    modifier = Modifier.padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Text(
-                                        text = detail.scientificName,
-                                        style = MaterialTheme.typography.headlineSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = GeodouroTextPrimary
-                                    )
-                                    Text(
-                                        text = detail.commonName,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = GeodouroTextSecondary
-                                    )
-
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        SpeciesMetaChip(detail.family)
-                                        SpeciesMetaChip(detail.genus)
-                                    }
-
-                                    if (detail.galleryImageUris.isNotEmpty()) {
-                                        LazyRow(
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                        ) {
-                                            items(detail.galleryImageUris) { imageUri ->
-                                                AsyncImage(
-                                                    model = imageUri,
-                                                    contentDescription = detail.scientificName,
-                                                    modifier = Modifier
-                                                        .size(96.dp)
-                                                        .background(GeodouroLightBg, RoundedCornerShape(10.dp)),
-                                                    contentScale = ContentScale.Crop
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        DetailStatCard(
-                                            modifier = Modifier.weight(1f),
-                                            value = detail.observationCount.toString(),
-                                            label = "Observacoes"
-                                        )
-                                        DetailStatCard(
-                                            modifier = Modifier.weight(1f),
-                                            value = detail.imageCount.toString(),
-                                            label = "Imagens"
-                                        )
-                                    }
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        DetailStatCard(
-                                            modifier = Modifier.weight(1f),
-                                            value = detail.syncedCount.toString(),
-                                            label = "Sincronizadas"
-                                        )
-                                        DetailStatCard(
-                                            modifier = Modifier.weight(1f),
-                                            value = detail.publishedCount.toString(),
-                                            label = "Publicadas"
-                                        )
-                                    }
-
-                                    Surface(
-                                        color = GeodouroLightBg,
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        Text(
-                                            text = detail.locationSummary,
-                                            modifier = Modifier.padding(12.dp),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = GeodouroTextPrimary
-                                        )
-                                    }
-
-                                    if (!detail.wikipediaUrl.isNullOrBlank()) {
-                                        Button(
-                                            onClick = { uriHandler.openUri(detail.wikipediaUrl) },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Link,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.size(8.dp))
-                                            Text("Abrir Wikipedia")
-                                        }
-                                    }
-                                }
+                    if (!detail.wikipediaUrl.isNullOrBlank()) {
+                        item {
+                            OutlinedButton(
+                                onClick = { uriHandler.openUri(detail.wikipediaUrl) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = GeodouroBrandGreen
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Link,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Abrir Wikipedia", fontWeight = FontWeight.Medium)
                             }
                         }
                     }
 
-                    item {
-                        Text(
-                            text = "Observacoes recentes",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = GeodouroTextPrimary
-                        )
+                    if (detail.observations.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = "OBSERVACOES RECENTES",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    letterSpacing = 1.2.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                color = GeodouroTextSecondary,
+                                modifier = Modifier.padding(top = 4.dp, start = 2.dp)
+                            )
+                        }
+                        items(detail.observations) { obs ->
+                            ObservationPreviewCard(
+                                observation = obs,
+                                onClick = { onObservationClick(obs.id) }
+                            )
+                        }
                     }
+                }
+            }
+        }
+    }
 
-                    items(detail.observations) { observation ->
-                        ObservationPreviewCard(
-                            observation = observation,
-                            onClick = { onObservationClick(observation.id) }
+    fullscreenImageUri?.let { imageUri ->
+        FullscreenImageDialog(
+            imageUri = imageUri,
+            contentDescription = uiState.detail?.scientificName ?: "Imagem da especie",
+            onDismiss = { fullscreenImageUri = null }
+        )
+    }
+}
+
+@Composable
+private fun CenteredMessage(padding: PaddingValues, text: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)
+            .background(GeodouroWhite),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text, color = GeodouroTextSecondary)
+    }
+}
+
+@Composable
+private fun HeroImage(
+    detail: SpeciesDetail,
+    onImageClick: (String) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(240.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(GeodouroLightBg),
+        contentAlignment = Alignment.Center
+    ) {
+        if (!detail.heroImageUri.isNullOrBlank()) {
+            AsyncImage(
+                model = detail.heroImageUri,
+                contentDescription = detail.scientificName,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { onImageClick(detail.heroImageUri) },
+                contentScale = ContentScale.Crop
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color(0x55000000))
+                        )
+                    )
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.Image,
+                contentDescription = null,
+                tint = GeodouroGreen,
+                modifier = Modifier.size(56.dp)
+            )
+        }
+
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(12.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = GeodouroWhite.copy(alpha = 0.92f),
+            tonalElevation = 0.dp
+        ) {
+            Text(
+                text = "${detail.imageCount} imagens",
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium,
+                color = GeodouroGreenDark
+            )
+        }
+    }
+}
+
+@Composable
+private fun IdentityCard(
+    detail: SpeciesDetail,
+    onImageClick: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
+        elevation = CardDefaults.cardElevation(0.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = detail.scientificName,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = GeodouroTextPrimary
+            )
+
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                text = "${detail.commonName} · ${detail.family}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = GeodouroTextSecondary
+            )
+
+            Spacer(Modifier.height(14.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TaxonChip(detail.family)
+                TaxonChip(detail.genus)
+            }
+
+            if (detail.galleryImageUris.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(detail.galleryImageUris) { uri ->
+                        AsyncImage(
+                            model = uri,
+                            contentDescription = detail.scientificName,
+                            modifier = Modifier
+                                .size(84.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(GeodouroLightBg)
+                                .clickable { onImageClick(uri) },
+                            contentScale = ContentScale.Crop
                         )
                     }
                 }
+            }
+
+            Spacer(Modifier.height(18.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatCell(Modifier.weight(1f), detail.observationCount.toString(), "Observ.")
+                StatCell(Modifier.weight(1f), detail.imageCount.toString(), "Imagens")
+                StatCell(Modifier.weight(1f), detail.syncedCount.toString(), "Sincron.")
+                StatCell(Modifier.weight(1f), detail.publishedCount.toString(), "Publicas")
             }
         }
     }
 }
 
 @Composable
-private fun DetailStatCard(
-    value: String,
-    label: String,
-    modifier: Modifier = Modifier
-) {
-    Card(
+private fun TaxonChip(label: String) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = GeodouroGreenLight
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            color = GeodouroGreenDark
+        )
+    }
+}
+
+@Composable
+private fun StatCell(modifier: Modifier, value: String, label: String) {
+    Surface(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = GeodouroLightBg),
-        shape = RoundedCornerShape(10.dp)
+        shape = RoundedCornerShape(10.dp),
+        color = GeodouroGreenSoft.copy(alpha = 0.45f)
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 14.dp, horizontal = 12.dp),
+            modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = value,
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
                 fontWeight = FontWeight.Bold,
-                color = GeodouroBrandGreen
+                color = GeodouroGreenMid
             )
+            Spacer(Modifier.height(2.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = GeodouroTextSecondary
+                style = MaterialTheme.typography.labelSmall,
+                color = GeodouroGreenDark,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
+        }
+    }
+}
+
+@Composable
+private fun FullscreenImageDialog(
+    imageUri: String,
+    contentDescription: String,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            AsyncImage(
+                model = imageUri,
+                contentDescription = contentDescription,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Fechar imagem",
+                    tint = Color.White
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationCard(summary: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
+        elevation = CardDefaults.cardElevation(0.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(36.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = GeodouroGreenLight
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = GeodouroBrandGreen,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "LOCALIZACAO",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        letterSpacing = 1.sp,
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = GeodouroTextSecondary
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = GeodouroTextPrimary,
+                    lineHeight = 21.sp
+                )
+            }
         }
     }
 }
@@ -394,22 +550,27 @@ private fun ObservationPreviewCard(
     onClick: () -> Unit
 ) {
     val dateFormatter = rememberDateFormatter()
+    val status = buildObservationStatusLabel(observation)
+    val isPublished = observation.isPublished
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
-        elevation = CardDefaults.cardElevation(1.dp),
-        shape = RoundedCornerShape(10.dp)
+        elevation = CardDefaults.cardElevation(0.dp),
+        shape = RoundedCornerShape(14.dp)
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(84.dp)
-                    .background(GeodouroLightBg, RoundedCornerShape(10.dp)),
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(GeodouroLightBg),
                 contentAlignment = Alignment.Center
             ) {
                 val imageUri = observation.allImageUris().firstOrNull()
@@ -424,96 +585,106 @@ private fun ObservationPreviewCard(
                     Icon(
                         imageVector = Icons.Default.Image,
                         contentDescription = null,
-                        tint = GeodouroGreen
+                        tint = GeodouroGreen,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = observation.enrichedCommonName?.takeIf { it.isNotBlank() }
                         ?: observation.predictedSpecies,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = GeodouroTextPrimary
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = GeodouroTextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = dateFormatter.format(Date(observation.capturedAt)),
                     style = MaterialTheme.typography.bodySmall,
                     color = GeodouroTextSecondary
                 )
-                Text(
-                    text = "Confianca ${(observation.confidence * 100).toInt()}%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GeodouroTextSecondary
-                )
-                Text(
-                    text = buildObservationStatusLabel(observation),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GeodouroBrandGreen
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ConfidenceBadge("${(observation.confidence * 100).toInt()}%")
+                    StatusBadge(status, isPublished)
+                }
             }
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = GeodouroTextSecondary,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
 
 @Composable
-private fun rememberDateFormatter(): SimpleDateFormat {
-    return SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+private fun ConfidenceBadge(text: String) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = GeodouroLightBg
+    ) {
+        Text(
+            text = "Conf. $text",
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = GeodouroTextSecondary
+        )
+    }
 }
 
-private fun List<ObservationEntity>.toSpeciesDetail(): SpeciesDetail? {
-    val first = firstOrNull() ?: return null
-    val scientificName = first.enrichedScientificName?.takeIf { it.isNotBlank() }
-        ?: first.predictedSpecies
-    return SpeciesDetail(
+@Composable
+private fun StatusBadge(status: String, isPublished: Boolean) {
+    val bgColor = if (isPublished) GeodouroGreenLight else GeodouroLightBg
+    val textColor = if (isPublished) GeodouroGreenDark else GeodouroTextSecondary
+
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = bgColor
+    ) {
+        Text(
+            text = status,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (isPublished) FontWeight.Medium else FontWeight.Normal,
+            color = textColor
+        )
+    }
+}
+
+@Composable
+private fun rememberDateFormatter(): SimpleDateFormat =
+    SimpleDateFormat("dd/MM/yyyy · HH:mm", Locale.getDefault())
+
+private fun PlantRepository.PlantSpeciesDetailData.toUiModel(): SpeciesDetail =
+    SpeciesDetail(
+        id = id,
         scientificName = scientificName,
-        commonName = first.enrichedCommonName?.takeIf { it.isNotBlank() } ?: "Sem nome comum",
-        family = first.enrichedFamily?.takeIf { it.isNotBlank() } ?: "Familia desconhecida",
-        genus = scientificName.substringBefore(" ").ifBlank { "Genero desconhecido" },
-        imageCount = sumOf { it.allImageUris().size },
-        observationCount = size,
-        wikipediaUrl = first.enrichedWikipediaUrl,
-        heroImageUri = first.allImageUris().firstOrNull() ?: first.enrichedPhotoUrl,
-        galleryImageUris = flatMap { it.allImageUris() }.distinct().take(8),
-        locationSummary = buildSpeciesLocationSummary(this),
-        syncedCount = count { it.syncStatus == ObservationSyncStatus.SYNCED.name },
-        publishedCount = count { it.isPublished },
-        observations = this
+        commonName = commonName?.takeIf { it.isNotBlank() } ?: "Sem nome comum",
+        family = family.ifBlank { "Familia desconhecida" },
+        genus = genus.ifBlank { "Genero desconhecido" },
+        imageCount = imageCount,
+        observationCount = observationCount,
+        wikipediaUrl = wikipediaUrl,
+        heroImageUri = heroImageUri,
+        galleryImageUris = galleryImageUris,
+        locationSummary = locationSummary,
+        syncedCount = syncedCount,
+        publishedCount = publishedCount,
+        observations = observations
     )
-}
 
-private fun buildSpeciesLocationSummary(observations: List<ObservationEntity>): String {
-    val withLocation = observations.filter { it.latitude != null && it.longitude != null }
-    if (withLocation.isEmpty()) {
-        return "Sem localizacoes registadas para esta especie."
-    }
-
-    val first = withLocation.first()
-    val last = withLocation.last()
-    return if (withLocation.size == 1) {
-        "1 observacao com localizacao registada em GPS %.5f, %.5f".format(
-            first.latitude,
-            first.longitude
-        )
-    } else {
-        "Localizacoes registadas em ${withLocation.size} observacoes. Intervalo aproximado: %.5f, %.5f ate %.5f, %.5f".format(
-            first.latitude,
-            first.longitude,
-            last.latitude,
-            last.longitude
-        )
-    }
-}
-
-private fun buildObservationStatusLabel(observation: ObservationEntity): String {
-    return when {
+private fun buildObservationStatusLabel(observation: ObservationEntity): String =
+    when {
         observation.isPublished -> "Publicada"
         observation.syncStatus == ObservationSyncStatus.SYNCED.name -> "Sincronizada"
         observation.syncStatus == ObservationSyncStatus.FAILED.name -> "Falha de sincronizacao"
-        else -> "Pendente de sincronizacao"
+        else -> "Pendente"
     }
-}

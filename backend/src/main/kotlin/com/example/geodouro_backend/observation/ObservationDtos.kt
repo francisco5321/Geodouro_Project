@@ -34,6 +34,12 @@ data class UpsertObservationRequest(
     val notes: String? = null
 )
 
+data class UpdateObservationMetadataRequest(
+    val scientificName: String?,
+    val commonName: String?,
+    val family: String?
+)
+
 data class ObservationResponse(
     val observationId: Int,
     val deviceObservationId: UUID?,
@@ -44,4 +50,23 @@ data class ObservationResponse(
     val isPublished: Boolean,
     val observedAt: Instant,
     val storedImagePath: String?
+)
+
+data class ObservationDetailResponse(
+    val observationId: Int,
+    val deviceObservationId: UUID,
+    val userId: Int,
+    val scientificName: String,
+    val commonName: String?,
+    val family: String?,
+    val wikipediaUrl: String?,
+    val photoUrl: String?,
+    val imagePaths: List<String>,
+    val capturedAt: Long?,
+    val confidence: Float?,
+    val latitude: Double?,
+    val longitude: Double?,
+    val syncStatus: String,
+    val isPublished: Boolean,
+    val observedAt: Instant
 )

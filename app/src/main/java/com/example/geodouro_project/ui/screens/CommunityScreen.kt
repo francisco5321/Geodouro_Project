@@ -82,6 +82,7 @@ import com.example.geodouro_project.ui.theme.GeodouroLightGreen
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
+import com.example.geodouro_project.ui.theme.geodouroOutlinedTextFieldColors
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -246,12 +247,7 @@ fun CommunityScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 shape = RoundedCornerShape(24.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    unfocusedBorderColor = Color(0xFFDDE8DC),
-                                    focusedBorderColor = GeodouroBrandGreen,
-                                    unfocusedContainerColor = GeodouroLightBg,
-                                    focusedContainerColor = GeodouroWhite
-                                ),
+                                colors = geodouroOutlinedTextFieldColors(),
                                 leadingIcon = {
                                     Icon(
                                         Icons.Default.Search,
