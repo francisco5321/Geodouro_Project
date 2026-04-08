@@ -10,7 +10,8 @@ import org.springframework.web.server.ResponseStatusException
 
 @Service
 class AuthService(
-    private val jdbcTemplate: NamedParameterJdbcTemplate
+    private val jdbcTemplate: NamedParameterJdbcTemplate,
+    private val authTokenService: AuthTokenService
 ) {
     private val passwordEncoder = BCryptPasswordEncoder()
 
@@ -30,17 +31,17 @@ class AuthService(
             throw invalidCredentials()
         }
 
-        return LoginResponse(
-            userId = user.userId,
-            username = user.username,
-            email = user.email,
-            firstName = user.firstName,
-            lastName = user.lastName,
-            displayName = listOf(user.firstName, user.lastName)
-                .joinToString(" ")
-                .trim()
-                .ifBlank { user.username }
-        )
+        return user.toLoginResponse(authTokenService.createToken(user.userId))
+    }
+
+    fun getCurrentUser(userId: Int): CurrentUserResponse {
+        val user = jdbcTemplate.query(
+            FIND_AUTHENTICATED_USER_BY_ID_SQL,
+            MapSqlParameterSource("userId", userId),
+            userRowMapper
+        ).firstOrNull() ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessao invalida")
+
+        return user.toCurrentUserResponse()
     }
 
     private fun matchesPassword(rawPassword: String, storedHash: String): Boolean {
@@ -65,7 +66,36 @@ class AuthService(
         val firstName: String,
         val lastName: String,
         val passwordHash: String?
-    )
+    ) {
+        fun toLoginResponse(authToken: String): LoginResponse {
+            return LoginResponse(
+                userId = userId,
+                username = username,
+                email = email,
+                firstName = firstName,
+                lastName = lastName,
+                displayName = listOf(firstName, lastName)
+                    .joinToString(" ")
+                    .trim()
+                    .ifBlank { username },
+                authToken = authToken
+            )
+        }
+
+        fun toCurrentUserResponse(): CurrentUserResponse {
+            return CurrentUserResponse(
+                userId = userId,
+                username = username,
+                email = email,
+                firstName = firstName,
+                lastName = lastName,
+                displayName = listOf(firstName, lastName)
+                    .joinToString(" ")
+                    .trim()
+                    .ifBlank { username }
+            )
+        }
+    }
 
     private val userRowMapper = RowMapper { rs, _ ->
         AuthenticatedUserRecord(
@@ -79,14 +109,22 @@ class AuthService(
     }
 
     companion object {
-        private const val FIND_AUTHENTICATED_USER_SQL = """
+        private const val USER_SELECT = """
             SELECT user_id, username, email, first_name, last_name, password_hash
             FROM app_user
             WHERE is_authenticated = TRUE
+        """
+
+        private const val FIND_AUTHENTICATED_USER_SQL = USER_SELECT + """
               AND (
                 LOWER(username) = :identifier
                 OR LOWER(email) = :identifier
               )
+            LIMIT 1
+        """
+
+        private const val FIND_AUTHENTICATED_USER_BY_ID_SQL = USER_SELECT + """
+              AND user_id = :userId
             LIMIT 1
         """
     }

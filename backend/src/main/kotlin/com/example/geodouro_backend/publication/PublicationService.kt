@@ -14,7 +14,7 @@ class PublicationService(
     private val jdbcTemplate: NamedParameterJdbcTemplate
 ) {
 
-    fun publishObservation(request: PublishObservationRequest): PublicationResponse {
+    fun publishObservation(request: PublishObservationRequest, authenticatedUserId: Int? = null): PublicationResponse {
         val observation = jdbcTemplate.query(
             OBSERVATION_FOR_PUBLICATION_SQL,
             MapSqlParameterSource("deviceObservationId", request.deviceObservationId),
@@ -23,6 +23,10 @@ class PublicationService(
             HttpStatus.NOT_FOUND,
             "Observation not found for deviceObservationId=${request.deviceObservationId}"
         )
+
+        if (authenticatedUserId != null && authenticatedUserId != observation.userId) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para publicar esta observacao")
+        }
 
         val publicationId = jdbcTemplate.queryForObject(
             UPSERT_PUBLICATION_SQL,

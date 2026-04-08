@@ -9,7 +9,8 @@ sealed interface SessionState {
         val userId: Int?,
         val username: String,
         val email: String?,
-        val displayName: String
+        val displayName: String,
+        val authToken: String? = null
     ) : SessionState
 
     data class Guest(

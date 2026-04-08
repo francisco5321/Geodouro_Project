@@ -43,6 +43,8 @@ import com.example.geodouro_project.ui.screens.HomeScreen
 import com.example.geodouro_project.ui.screens.IdentifyScreen
 import com.example.geodouro_project.ui.screens.ObservationDetailScreen
 import com.example.geodouro_project.ui.screens.ProfileScreen
+import com.example.geodouro_project.ui.screens.RoutePlanDetailScreen
+import com.example.geodouro_project.ui.screens.RoutePlanListScreen
 import com.example.geodouro_project.ui.screens.ResultsScreen
 import com.example.geodouro_project.ui.screens.SpeciesDetailScreen
 import com.example.geodouro_project.ui.screens.SpeciesListScreen
@@ -171,6 +173,9 @@ fun AppNavigation() {
                     },
                     onOpenSpeciesList = {
                         navController.navigate("list")
+                    },
+                    onOpenRoutePlans = {
+                        navController.navigate("routePlans")
                     }
                 )
             }
@@ -225,6 +230,15 @@ fun AppNavigation() {
                 )
             }
 
+            composable("routePlans") {
+                RoutePlanListScreen(
+                    onRoutePlanClick = { routePlanId ->
+                        navController.navigate("routePlanDetail/$routePlanId")
+                    },
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
             composable("results") {
                 ResultsScreen(
                     refreshTrigger = networkRefreshVersion,
@@ -249,6 +263,16 @@ fun AppNavigation() {
 
             composable("capture") {
                 CaptureScreen()
+            }
+
+            composable(
+                route = "routePlanDetail/{routePlanId}",
+                arguments = listOf(navArgument("routePlanId") { defaultValue = -1 })
+            ) { backStackEntry ->
+                RoutePlanDetailScreen(
+                    routePlanId = backStackEntry.arguments?.getInt("routePlanId") ?: -1,
+                    onBackClick = { navController.popBackStack() }
+                )
             }
 
             composable(

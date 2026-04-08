@@ -12,7 +12,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class RemotePublicationService(
     private val httpClient: OkHttpClient,
     private val gson: Gson,
-    private val config: RemoteDbConfig
+    private val config: RemoteDbConfig,
+    private val currentIdentityProvider: () -> RemoteUserIdentity?
 ) {
 
     fun isConfigured(): Boolean = config.isConfigured()
@@ -30,10 +31,16 @@ class RemotePublicationService(
             deviceObservationId = deviceObservationId
         )
 
-        val request = Request.Builder()
+        val identity = currentIdentityProvider()
+        val requestBuilder = Request.Builder()
             .url(config.baseUrl.trimEnd('/') + "/api/publications")
             .post(gson.toJson(payload).toRequestBody(JSON_MEDIA_TYPE))
-            .build()
+
+        identity?.authToken?.takeIf { it.isNotBlank() }?.let { token ->
+            requestBuilder.header("Authorization", "Bearer $token")
+        }
+
+        val request = requestBuilder.build()
 
         return runCatching {
             httpClient.newCall(request).execute().use { response ->

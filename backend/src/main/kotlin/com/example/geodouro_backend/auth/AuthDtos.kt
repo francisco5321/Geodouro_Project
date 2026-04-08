@@ -15,5 +15,16 @@ data class LoginResponse(
     val email: String,
     val firstName: String,
     val lastName: String,
+    val displayName: String,
+    val authToken: String,
+    val tokenType: String = "Bearer"
+)
+
+data class CurrentUserResponse(
+    val userId: Int,
+    val username: String,
+    val email: String,
+    val firstName: String,
+    val lastName: String,
     val displayName: String
 )

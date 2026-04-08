@@ -21,20 +21,15 @@ class RemoteObservationCatalogService(
         if (!isConfigured()) return emptyList()
         val identity = currentIdentityProvider() ?: fallbackIdentity() ?: return emptyList()
 
-        val url = buildString {
-            append(config.baseUrl.trimEnd('/'))
-            append("/api/observations?")
-            if (identity.userId != null) {
-                append("userId=${identity.userId}")
-            } else {
-                if (identity.guestLabel.isNullOrBlank()) {
-                    return emptyList()
-                }
-                append("guestLabel=${identity.guestLabel}")
-            }
+        val requestBuilder = Request.Builder()
+            .url(buildObservationListUrl(identity))
+            .get()
+
+        identity.authToken?.takeIf { it.isNotBlank() }?.let { token ->
+            requestBuilder.header("Authorization", "Bearer $token")
         }
 
-        val request = Request.Builder().url(url).get().build()
+        val request = requestBuilder.build()
         return runCatching {
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use emptyList()
@@ -50,10 +45,16 @@ class RemoteObservationCatalogService(
 
     fun fetchObservationDetail(deviceObservationId: String): RemoteObservationDetail? {
         if (!isConfigured()) return null
-        val request = Request.Builder()
+        val identity = currentIdentityProvider() ?: fallbackIdentity()
+        val requestBuilder = Request.Builder()
             .url(config.baseUrl.trimEnd('/') + "/api/observations/" + deviceObservationId)
             .get()
-            .build()
+
+        identity?.authToken?.takeIf { it.isNotBlank() }?.let { token ->
+            requestBuilder.header("Authorization", "Bearer $token")
+        }
+
+        val request = requestBuilder.build()
         return runCatching {
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use null
@@ -72,6 +73,7 @@ class RemoteObservationCatalogService(
         family: String
     ): Boolean {
         if (!isConfigured()) return false
+        val identity = currentIdentityProvider() ?: fallbackIdentity()
         val body = gson.toJson(
             mapOf(
                 "scientificName" to scientificName,
@@ -79,15 +81,30 @@ class RemoteObservationCatalogService(
                 "family" to family
             )
         ).toRequestBody(JSON_MEDIA_TYPE)
-        val request = Request.Builder()
+        val requestBuilder = Request.Builder()
             .url(config.baseUrl.trimEnd('/') + "/api/observations/" + deviceObservationId)
             .patch(body)
-            .build()
+
+        identity?.authToken?.takeIf { it.isNotBlank() }?.let { token ->
+            requestBuilder.header("Authorization", "Bearer $token")
+        }
+
+        val request = requestBuilder.build()
         return runCatching {
             httpClient.newCall(request).execute().use { response -> response.isSuccessful }
         }.onFailure { error ->
             Log.e(TAG, "Failed to update observation metadata $deviceObservationId", error)
         }.getOrDefault(false)
+    }
+
+    private fun buildObservationListUrl(identity: RemoteUserIdentity): String {
+        val base = config.baseUrl.trimEnd('/') + "/api/observations"
+        return when {
+            !identity.authToken.isNullOrBlank() -> base
+            identity.userId != null -> "$base?userId=${identity.userId}"
+            !identity.guestLabel.isNullOrBlank() -> "$base?guestLabel=${identity.guestLabel}"
+            else -> base
+        }
     }
 
     private fun RemoteObservationDetailResponse.toDomain(): RemoteObservationDetail {
@@ -119,8 +136,8 @@ class RemoteObservationCatalogService(
 
     private fun fallbackIdentity(): RemoteUserIdentity? {
         return when {
-            config.defaultUserId > 0 -> RemoteUserIdentity(userId = config.defaultUserId, guestLabel = null)
-            config.guestLabel.isNotBlank() -> RemoteUserIdentity(userId = null, guestLabel = config.guestLabel)
+            config.defaultUserId > 0 -> RemoteUserIdentity(userId = config.defaultUserId, guestLabel = null, authToken = null)
+            config.guestLabel.isNotBlank() -> RemoteUserIdentity(userId = null, guestLabel = config.guestLabel, authToken = null)
             else -> null
         }
     }

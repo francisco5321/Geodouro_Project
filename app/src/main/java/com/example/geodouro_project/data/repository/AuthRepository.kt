@@ -23,12 +23,13 @@ class AuthRepository(
 ) {
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _sessionState = MutableStateFlow<SessionState>(SessionState.Loading)
+    private var lastValidatedToken: String? = null
     val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
 
     init {
         repositoryScope.launch {
             sessionStorage.sessionState.collect { persistedState ->
-                _sessionState.value = persistedState
+                _sessionState.value = validatePersistedState(persistedState)
             }
         }
     }
@@ -45,8 +46,10 @@ class AuthRepository(
                 userId = remoteUser.userId.takeIf { it > 0 } ?: fallbackAuthenticatedUserId.takeIf { it > 0 },
                 username = remoteUser.username,
                 email = remoteUser.email,
-                displayName = remoteUser.displayName
+                displayName = remoteUser.displayName,
+                authToken = remoteUser.authToken.takeIf { it.isNotBlank() }
             )
+            lastValidatedToken = session.authToken
             sessionStorage.saveAuthenticatedSession(session)
         }
     }
@@ -57,19 +60,65 @@ class AuthRepository(
             guestLabel = buildGuestLabel(),
             displayName = DEFAULT_GUEST_DISPLAY_NAME
         )
+        lastValidatedToken = null
         sessionStorage.saveGuestSession(session)
     }
 
     suspend fun logout() {
+        lastValidatedToken = null
         sessionStorage.clearSession()
     }
 
     fun currentRemoteIdentity(): RemoteUserIdentity? {
         return when (val state = _sessionState.value) {
-            is SessionState.Authenticated -> RemoteUserIdentity(userId = state.userId, guestLabel = null)
-            is SessionState.Guest -> RemoteUserIdentity(userId = null, guestLabel = state.guestLabel)
+            is SessionState.Authenticated -> RemoteUserIdentity(
+                userId = state.userId,
+                guestLabel = null,
+                authToken = state.authToken
+            )
+            is SessionState.Guest -> RemoteUserIdentity(userId = null, guestLabel = state.guestLabel, authToken = null)
             SessionState.Loading,
             SessionState.LoggedOut -> null
+        }
+    }
+
+    fun currentSessionState(): SessionState = _sessionState.value
+
+    fun currentAuthToken(): String? {
+        return (_sessionState.value as? SessionState.Authenticated)?.authToken
+    }
+
+    private suspend fun validatePersistedState(state: SessionState): SessionState {
+        val authenticatedState = state as? SessionState.Authenticated ?: run {
+            lastValidatedToken = null
+            return state
+        }
+        val authToken = authenticatedState.authToken?.takeIf { it.isNotBlank() } ?: run {
+            lastValidatedToken = null
+            return authenticatedState
+        }
+        if (authToken == lastValidatedToken) {
+            return authenticatedState
+        }
+
+        return runCatching {
+            val currentUser = withContext(Dispatchers.IO) {
+                remoteAuthService.fetchCurrentUser(authToken)
+            }
+            val validatedState = authenticatedState.copy(
+                userId = currentUser.userId,
+                username = currentUser.username,
+                email = currentUser.email,
+                displayName = currentUser.displayName,
+                authToken = authToken
+            )
+            lastValidatedToken = authToken
+            sessionStorage.saveAuthenticatedSession(validatedState)
+            validatedState
+        }.getOrElse {
+            lastValidatedToken = null
+            sessionStorage.clearSession()
+            SessionState.LoggedOut
         }
     }
 

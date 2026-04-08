@@ -1,4 +1,4 @@
-﻿package com.example.geodouro_project.data.remote
+package com.example.geodouro_project.data.remote
 
 data class RemoteDbConfig(
     val baseUrl: String,
@@ -12,5 +12,6 @@ data class RemoteDbConfig(
 
 data class RemoteUserIdentity(
     val userId: Int?,
-    val guestLabel: String?
+    val guestLabel: String?,
+    val authToken: String? = null
 )

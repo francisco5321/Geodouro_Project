@@ -35,6 +35,11 @@ class AuthSessionStorage(
             preferences[USERNAME_KEY] = session.username
             preferences[EMAIL_KEY] = session.email.orEmpty()
             preferences[DISPLAY_NAME_KEY] = session.displayName
+            if (session.authToken.isNullOrBlank()) {
+                preferences.remove(AUTH_TOKEN_KEY)
+            } else {
+                preferences[AUTH_TOKEN_KEY] = session.authToken
+            }
             preferences.remove(GUEST_LABEL_KEY)
         }
     }
@@ -47,6 +52,7 @@ class AuthSessionStorage(
             preferences.remove(USER_ID_KEY)
             preferences.remove(USERNAME_KEY)
             preferences.remove(EMAIL_KEY)
+            preferences.remove(AUTH_TOKEN_KEY)
         }
     }
 
@@ -68,7 +74,8 @@ class AuthSessionStorage(
                         userId = preferences[USER_ID_KEY]?.takeIf { it != NO_USER_ID },
                         username = username,
                         email = preferences[EMAIL_KEY]?.trim()?.takeIf { it.isNotBlank() },
-                        displayName = displayName
+                        displayName = displayName,
+                        authToken = preferences[AUTH_TOKEN_KEY]?.trim()?.takeIf { it.isNotBlank() }
                     )
                 }
             }
@@ -103,6 +110,7 @@ class AuthSessionStorage(
         val USERNAME_KEY = stringPreferencesKey("username")
         val EMAIL_KEY = stringPreferencesKey("email")
         val DISPLAY_NAME_KEY = stringPreferencesKey("display_name")
+        val AUTH_TOKEN_KEY = stringPreferencesKey("auth_token")
         val GUEST_LABEL_KEY = stringPreferencesKey("guest_label")
     }
 }

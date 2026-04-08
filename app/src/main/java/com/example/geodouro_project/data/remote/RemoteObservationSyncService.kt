@@ -8,12 +8,12 @@ import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.remote.model.RemoteObservationPayload
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
 import com.google.gson.Gson
+import java.io.FileInputStream
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.FileInputStream
 
 class RemoteObservationSyncService(
     private val appContext: Context,
@@ -37,7 +37,7 @@ class RemoteObservationSyncService(
             Log.w(TAG, "Skipping sync because there is no active session identity.")
             return false
         }
-        if (identity.userId == null && identity.guestLabel.isNullOrBlank()) {
+        if (identity.authToken.isNullOrBlank() && identity.userId == null && identity.guestLabel.isNullOrBlank()) {
             Log.w(TAG, "Skipping sync because the active session has no remote identity configured.")
             return false
         }
@@ -70,10 +70,15 @@ class RemoteObservationSyncService(
             TAG,
             "Uploading observation with ${imageUris.size} image(s) to $url deviceObservationId=${observation.id} lat=${observation.latitude} lon=${observation.longitude}"
         )
-        val request = Request.Builder()
+        val requestBuilder = Request.Builder()
             .url(url)
             .post(multipartBody)
-            .build()
+
+        identity.authToken?.takeIf { it.isNotBlank() }?.let { token ->
+            requestBuilder.header("Authorization", "Bearer $token")
+        }
+
+        val request = requestBuilder.build()
 
         return runCatching {
             httpClient.newCall(request).execute().use { response ->
@@ -150,8 +155,8 @@ class RemoteObservationSyncService(
 
     private fun fallbackIdentity(): RemoteUserIdentity? {
         return when {
-            config.defaultUserId > 0 -> RemoteUserIdentity(userId = config.defaultUserId, guestLabel = null)
-            config.guestLabel.isNotBlank() -> RemoteUserIdentity(userId = null, guestLabel = config.guestLabel)
+            config.defaultUserId > 0 -> RemoteUserIdentity(userId = config.defaultUserId, guestLabel = null, authToken = null)
+            config.guestLabel.isNotBlank() -> RemoteUserIdentity(userId = null, guestLabel = config.guestLabel, authToken = null)
             else -> null
         }
     }
@@ -166,4 +171,3 @@ class RemoteObservationSyncService(
         private val JSON_MEDIA_TYPE = "application/json".toMediaType()
     }
 }
-

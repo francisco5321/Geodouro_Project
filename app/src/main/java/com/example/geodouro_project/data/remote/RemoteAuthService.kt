@@ -51,8 +51,51 @@ class RemoteAuthService(
         }
     }
 
+    fun fetchCurrentUser(authToken: String): RemoteCurrentUserResult {
+        if (!isConfigured()) {
+            throw IllegalStateException("Backend de autenticacao indisponivel.")
+        }
+
+        val request = Request.Builder()
+            .url(config.baseUrl.trimEnd('/') + "/api/auth/me")
+            .header("Authorization", "Bearer $authToken")
+            .get()
+            .build()
+
+        return runCatching {
+            httpClient.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                when {
+                    response.isSuccessful -> gson.fromJson(body, RemoteCurrentUserResponse::class.java).toDomain()
+                    response.code == 401 -> throw IllegalArgumentException("Sessao expirada ou invalida.")
+                    else -> {
+                        Log.w(TAG, "Fetch current user failed code=${response.code} body=$body")
+                        throw IllegalStateException("Nao foi possivel validar a sessao.")
+                    }
+                }
+            }
+        }.onFailure { error ->
+            Log.e(TAG, "Failed to validate remote session", error)
+        }.getOrElse { error ->
+            throw error
+        }
+    }
+
     private fun RemoteLoginResponse.toDomain(): RemoteLoginResult {
         return RemoteLoginResult(
+            userId = userId,
+            username = username,
+            email = email,
+            firstName = firstName,
+            lastName = lastName,
+            displayName = displayName,
+            authToken = authToken,
+            tokenType = tokenType
+        )
+    }
+
+    private fun RemoteCurrentUserResponse.toDomain(): RemoteCurrentUserResult {
+        return RemoteCurrentUserResult(
             userId = userId,
             username = username,
             email = email,
@@ -74,6 +117,17 @@ data class RemoteLoginResult(
     val email: String,
     val firstName: String,
     val lastName: String,
+    val displayName: String,
+    val authToken: String,
+    val tokenType: String
+)
+
+data class RemoteCurrentUserResult(
+    val userId: Int,
+    val username: String,
+    val email: String,
+    val firstName: String,
+    val lastName: String,
     val displayName: String
 )
 
@@ -83,6 +137,25 @@ private data class RemoteLoginRequest(
 )
 
 private data class RemoteLoginResponse(
+    @SerializedName("userId")
+    val userId: Int,
+    @SerializedName("username")
+    val username: String,
+    @SerializedName("email")
+    val email: String,
+    @SerializedName("firstName")
+    val firstName: String,
+    @SerializedName("lastName")
+    val lastName: String,
+    @SerializedName("displayName")
+    val displayName: String,
+    @SerializedName("authToken")
+    val authToken: String,
+    @SerializedName("tokenType")
+    val tokenType: String
+)
+
+private data class RemoteCurrentUserResponse(
     @SerializedName("userId")
     val userId: Int,
     @SerializedName("username")

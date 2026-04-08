@@ -2,18 +2,20 @@ package com.example.geodouro_project.di
 
 import android.content.Context
 import com.example.geodouro_project.BuildConfig
-import com.example.geodouro_project.data.local.AuthSessionStorage
 import com.example.geodouro_project.core.network.ConnectivityChecker
+import com.example.geodouro_project.data.local.AuthSessionStorage
 import com.example.geodouro_project.data.local.GeodouroDatabase
 import com.example.geodouro_project.data.remote.RemoteAuthService
 import com.example.geodouro_project.data.remote.RemoteDbConfig
 import com.example.geodouro_project.data.remote.RemoteObservationCatalogService
 import com.example.geodouro_project.data.remote.RemoteObservationSyncService
 import com.example.geodouro_project.data.remote.RemotePublicationService
+import com.example.geodouro_project.data.remote.RemoteRoutePlanService
 import com.example.geodouro_project.data.remote.RemoteSpeciesService
 import com.example.geodouro_project.data.remote.api.INaturalistApiService
 import com.example.geodouro_project.data.repository.AuthRepository
 import com.example.geodouro_project.data.repository.PlantRepository
+import com.example.geodouro_project.data.repository.RoutePlanRepository
 import com.google.gson.Gson
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -26,6 +28,8 @@ object AppContainer {
     private var repositoryInstance: PlantRepository? = null
     @Volatile
     private var authRepositoryInstance: AuthRepository? = null
+    @Volatile
+    private var routePlanRepositoryInstance: RoutePlanRepository? = null
 
     fun provideAuthRepository(context: Context): AuthRepository {
         return authRepositoryInstance ?: synchronized(this) {
@@ -57,6 +61,29 @@ object AppContainer {
         return repositoryInstance ?: synchronized(this) {
             repositoryInstance ?: buildRepository(context.applicationContext)
                 .also { repositoryInstance = it }
+        }
+    }
+
+    fun provideRoutePlanRepository(context: Context): RoutePlanRepository {
+        return routePlanRepositoryInstance ?: synchronized(this) {
+            val loggingInterceptor = HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BASIC
+            }
+            val httpClient = OkHttpClient.Builder()
+                .addInterceptor(loggingInterceptor)
+                .build()
+
+            routePlanRepositoryInstance ?: RoutePlanRepository(
+                remoteRoutePlanService = RemoteRoutePlanService(
+                    httpClient = httpClient,
+                    gson = Gson(),
+                    config = RemoteDbConfig(
+                        baseUrl = BuildConfig.BACKEND_BASE_URL,
+                        guestLabel = BuildConfig.BACKEND_GUEST_LABEL,
+                        defaultUserId = BuildConfig.BACKEND_DEFAULT_USER_ID
+                    )
+                )
+            ).also { routePlanRepositoryInstance = it }
         }
     }
 
@@ -97,7 +124,8 @@ object AppContainer {
                 baseUrl = BuildConfig.BACKEND_BASE_URL,
                 guestLabel = BuildConfig.BACKEND_GUEST_LABEL,
                 defaultUserId = BuildConfig.BACKEND_DEFAULT_USER_ID
-            )
+            ),
+            currentIdentityProvider = authRepository::currentRemoteIdentity
         )
         val remoteSpeciesService = RemoteSpeciesService(
             httpClient = okHttpClient,

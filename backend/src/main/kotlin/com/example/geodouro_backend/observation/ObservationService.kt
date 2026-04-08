@@ -17,7 +17,7 @@ class ObservationService(
     private val observationStorageService: ObservationStorageService
 ) {
 
-    fun upsertObservation(request: UpsertObservationRequest): ObservationResponse {
+    fun upsertObservation(request: UpsertObservationRequest, authenticatedUserId: Int? = null): ObservationResponse {
         val sanitizedImagePaths = sanitizeImagePaths(request.imageUris)
             .ifEmpty {
                 request.imageUri
@@ -25,10 +25,14 @@ class ObservationService(
                     ?.let(::listOf)
                     .orEmpty()
             }
-        return upsertObservationInternal(request, sanitizedImagePaths)
+        return upsertObservationInternal(request, sanitizedImagePaths, authenticatedUserId = authenticatedUserId)
     }
 
-    fun upsertObservation(request: UpsertObservationRequest, images: List<MultipartFile>): ObservationResponse {
+    fun upsertObservation(
+        request: UpsertObservationRequest,
+        images: List<MultipartFile>,
+        authenticatedUserId: Int? = null
+    ): ObservationResponse {
         validateCoordinates(request.latitude, request.longitude)
 
         val deviceObservationId = request.deviceObservationId ?: UUID.randomUUID()
@@ -42,12 +46,17 @@ class ObservationService(
         return upsertObservationInternal(
             request = request.copy(deviceObservationId = deviceObservationId),
             storedImagePaths = storedImagePaths,
-            resolvedPlantSpeciesId = plantSpeciesId
+            resolvedPlantSpeciesId = plantSpeciesId,
+            authenticatedUserId = authenticatedUserId
         )
     }
 
-    fun listObservations(userId: Int?, guestLabel: String?): List<ObservationDetailResponse> {
-        val resolvedUserId = resolveLookupUserId(userId, guestLabel)
+    fun listObservations(
+        userId: Int?,
+        guestLabel: String?,
+        authenticatedUserId: Int? = null
+    ): List<ObservationDetailResponse> {
+        val resolvedUserId = authenticatedUserId ?: resolveLookupUserId(userId, guestLabel)
         return jdbcTemplate.query(
             LIST_OBSERVATIONS_SQL,
             MapSqlParameterSource("userId", resolvedUserId),
@@ -69,9 +78,13 @@ class ObservationService(
 
     fun updateObservationMetadata(
         deviceObservationId: UUID,
-        request: UpdateObservationMetadataRequest
+        request: UpdateObservationMetadataRequest,
+        authenticatedUserId: Int? = null
     ): ObservationDetailResponse {
         val current = getObservationDetail(deviceObservationId)
+        if (authenticatedUserId != null && current.userId != authenticatedUserId) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para editar esta observacao")
+        }
         if (current.isPublished) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot update a published observation")
         }
@@ -97,12 +110,13 @@ class ObservationService(
     private fun upsertObservationInternal(
         request: UpsertObservationRequest,
         storedImagePaths: List<String>,
-        resolvedPlantSpeciesId: Int? = null
+        resolvedPlantSpeciesId: Int? = null,
+        authenticatedUserId: Int? = null
     ): ObservationResponse {
         validateCoordinates(request.latitude, request.longitude)
 
         val deviceObservationId = request.deviceObservationId ?: UUID.randomUUID()
-        val userId = resolveUserId(request)
+        val userId = authenticatedUserId ?: resolveUserId(request)
         val plantSpeciesId = resolvedPlantSpeciesId ?: resolvePlantSpeciesId(request)
         val syncStatus = normalizeSyncStatus(request.syncStatus)
         val observedAt = request.observedAt ?: java.time.Instant.now()

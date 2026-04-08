@@ -2,6 +2,7 @@ package com.example.geodouro_project.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Eco
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -58,10 +60,8 @@ import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.data.repository.PlantRepository.PlantSpeciesCatalogItem
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
-import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroGrey
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
-import com.example.geodouro_project.ui.theme.GeodouroLightGreen
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
@@ -112,7 +112,8 @@ class HomeViewModel(
 @Composable
 fun HomeScreen(
     onSpeciesClick: (String) -> Unit = {},
-    onOpenSpeciesList: () -> Unit = {}
+    onOpenSpeciesList: () -> Unit = {},
+    onOpenRoutePlans: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: HomeViewModel = viewModel(
@@ -164,8 +165,6 @@ fun HomeScreen(
             contentPadding = PaddingValues(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-
-            // ── Hero banner ───────────────────────────────────────────────────
             item {
                 Box(
                     modifier = Modifier
@@ -198,7 +197,7 @@ fun HomeScreen(
                             )
                         }
                         Text(
-                            text = "Identificação\nde Flora",
+                            text = "Identificacao\nde Flora",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color.White,
@@ -206,7 +205,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "Capture e identifique espécies da flora portuguesa com inteligência artificial.",
+                            text = "Capture e identifique especies da flora portuguesa com inteligencia artificial.",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.85f),
                             lineHeight = 18.sp
@@ -215,7 +214,6 @@ fun HomeScreen(
                 }
             }
 
-            // ── Stats row ─────────────────────────────────────────────────────
             item {
                 Row(
                     modifier = Modifier
@@ -226,25 +224,68 @@ fun HomeScreen(
                     StatCard(
                         icon = Icons.Default.Eco,
                         value = uiState.speciesCount.toString(),
-                        label = "Espécies\nencontradas",
+                        label = "Especies\nencontradas",
                         modifier = Modifier.weight(1f)
                     )
                     StatCard(
                         icon = Icons.Default.Check,
                         value = uiState.observationsCount.toString(),
-                        label = "Observações\nrealizadas",
+                        label = "Observacoes\nrealizadas",
                         modifier = Modifier.weight(1f)
                     )
                 }
             }
 
-            // ── Section header ────────────────────────────────────────────────
+            item {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 18.dp)
+                        .clickable(onClick = onOpenRoutePlans),
+                    shape = RoundedCornerShape(18.dp),
+                    color = GeodouroLightBg
+                ) {
+                    Row(
+                        modifier = Modifier.padding(18.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(GeodouroBrandGreen.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Map,
+                                contentDescription = null,
+                                tint = GeodouroBrandGreen
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Percursos Planeados",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = GeodouroTextPrimary
+                            )
+                            Text(
+                                text = "Abre os percursos criados na web e consulta a ordem das paragens.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = GeodouroTextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+
             item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp)
-                        .padding(top = 28.dp, bottom = 12.dp),
+                        .padding(top = 10.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
@@ -256,7 +297,7 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Espécies Recentes",
+                        text = "Especies Recentes",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = GeodouroTextPrimary
@@ -264,7 +305,6 @@ fun HomeScreen(
                 }
             }
 
-            // ── Empty state ───────────────────────────────────────────────────
             if (uiState.recentSpecies.isEmpty()) {
                 item {
                     Surface(
@@ -294,7 +334,7 @@ fun HomeScreen(
                             }
                             Spacer(modifier = Modifier.height(14.dp))
                             Text(
-                                text = "Ainda sem espécies",
+                                text = "Ainda sem especies",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = GeodouroTextPrimary,
@@ -302,7 +342,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "As espécies recentes vão aparecer aqui depois das primeiras identificações confirmadas.",
+                                text = "As especies recentes vao aparecer aqui depois das primeiras identificacoes confirmadas.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = GeodouroTextSecondary,
                                 textAlign = TextAlign.Center,
@@ -384,8 +424,8 @@ private fun List<ObservationEntity>.toRecentSpeciesItems(): List<SpeciesListItem
             id = scientificName.toSpeciesId(),
             scientificName = scientificName,
             commonName = newestObservation.enrichedCommonName?.takeIf { it.isNotBlank() } ?: "Sem nome comum",
-            family = newestObservation.enrichedFamily?.takeIf { it.isNotBlank() } ?: "Família desconhecida",
-            genus = scientificName.substringBefore(" ").ifBlank { "Género desconhecido" },
+            family = newestObservation.enrichedFamily?.takeIf { it.isNotBlank() } ?: "Familia desconhecida",
+            genus = scientificName.substringBefore(" ").ifBlank { "Genero desconhecido" },
             imageCount = observations.sumOf { it.allImageUris().size },
             thumbnailUri = newestObservation.allImageUris().firstOrNull()
         ) to newestObservation.capturedAt

@@ -19,6 +19,10 @@ server:
 app:
   storage:
     images-dir: ${OBSERVATION_IMAGES_DIR:backend-uploads}
+  cors:
+    allowed-origin-patterns: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:*}
+  auth:
+    token-secret: ${APP_AUTH_TOKEN_SECRET:geodouro-dev-token-secret}
 logging:
   level:
     com.example.geodouro_backend: DEBUG
