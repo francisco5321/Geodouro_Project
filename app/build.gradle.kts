@@ -69,6 +69,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation(platform(libs.androidx.compose.bom))
     implementation("androidx.compose.material:material")
     implementation(libs.androidx.ui)

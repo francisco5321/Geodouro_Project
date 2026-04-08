@@ -2,14 +2,17 @@ package com.example.geodouro_project.di
 
 import android.content.Context
 import com.example.geodouro_project.BuildConfig
+import com.example.geodouro_project.data.local.AuthSessionStorage
 import com.example.geodouro_project.core.network.ConnectivityChecker
 import com.example.geodouro_project.data.local.GeodouroDatabase
+import com.example.geodouro_project.data.remote.RemoteAuthService
 import com.example.geodouro_project.data.remote.RemoteDbConfig
 import com.example.geodouro_project.data.remote.RemoteObservationCatalogService
 import com.example.geodouro_project.data.remote.RemoteObservationSyncService
 import com.example.geodouro_project.data.remote.RemotePublicationService
 import com.example.geodouro_project.data.remote.RemoteSpeciesService
 import com.example.geodouro_project.data.remote.api.INaturalistApiService
+import com.example.geodouro_project.data.repository.AuthRepository
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.google.gson.Gson
 import okhttp3.OkHttpClient
@@ -21,6 +24,34 @@ object AppContainer {
 
     @Volatile
     private var repositoryInstance: PlantRepository? = null
+    @Volatile
+    private var authRepositoryInstance: AuthRepository? = null
+
+    fun provideAuthRepository(context: Context): AuthRepository {
+        return authRepositoryInstance ?: synchronized(this) {
+            val loggingInterceptor = HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BASIC
+            }
+            val authHttpClient = OkHttpClient.Builder()
+                .addInterceptor(loggingInterceptor)
+                .build()
+
+            authRepositoryInstance ?: AuthRepository(
+                sessionStorage = AuthSessionStorage(context.applicationContext),
+                remoteAuthService = RemoteAuthService(
+                    httpClient = authHttpClient,
+                    gson = Gson(),
+                    config = RemoteDbConfig(
+                        baseUrl = BuildConfig.BACKEND_BASE_URL,
+                        guestLabel = BuildConfig.BACKEND_GUEST_LABEL,
+                        defaultUserId = BuildConfig.BACKEND_DEFAULT_USER_ID
+                    )
+                ),
+                fallbackAuthenticatedUserId = BuildConfig.BACKEND_DEFAULT_USER_ID,
+                guestLabelPrefix = BuildConfig.BACKEND_GUEST_LABEL
+            ).also { authRepositoryInstance = it }
+        }
+    }
 
     fun providePlantRepository(context: Context): PlantRepository {
         return repositoryInstance ?: synchronized(this) {
@@ -31,6 +62,7 @@ object AppContainer {
 
     private fun buildRepository(appContext: Context): PlantRepository {
         val database = GeodouroDatabase.getInstance(appContext)
+        val authRepository = provideAuthRepository(appContext)
 
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
@@ -55,7 +87,8 @@ object AppContainer {
                 baseUrl = BuildConfig.BACKEND_BASE_URL,
                 guestLabel = BuildConfig.BACKEND_GUEST_LABEL,
                 defaultUserId = BuildConfig.BACKEND_DEFAULT_USER_ID
-            )
+            ),
+            currentIdentityProvider = authRepository::currentRemoteIdentity
         )
         val remotePublicationService = RemotePublicationService(
             httpClient = okHttpClient,
@@ -82,7 +115,8 @@ object AppContainer {
                 baseUrl = BuildConfig.BACKEND_BASE_URL,
                 guestLabel = BuildConfig.BACKEND_GUEST_LABEL,
                 defaultUserId = BuildConfig.BACKEND_DEFAULT_USER_ID
-            )
+            ),
+            currentIdentityProvider = authRepository::currentRemoteIdentity
         )
 
         return PlantRepository(

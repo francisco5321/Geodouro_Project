@@ -11,21 +11,26 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class RemoteObservationCatalogService(
     private val httpClient: OkHttpClient,
     private val gson: Gson,
-    private val config: RemoteDbConfig
+    private val config: RemoteDbConfig,
+    private val currentIdentityProvider: () -> RemoteUserIdentity?
 ) {
 
     fun isConfigured(): Boolean = config.isConfigured()
 
     fun fetchObservations(): List<RemoteObservationDetail> {
         if (!isConfigured()) return emptyList()
+        val identity = currentIdentityProvider() ?: fallbackIdentity() ?: return emptyList()
 
         val url = buildString {
             append(config.baseUrl.trimEnd('/'))
             append("/api/observations?")
-            if (config.defaultUserId > 0) {
-                append("userId=${config.defaultUserId}")
+            if (identity.userId != null) {
+                append("userId=${identity.userId}")
             } else {
-                append("guestLabel=${config.guestLabel}")
+                if (identity.guestLabel.isNullOrBlank()) {
+                    return emptyList()
+                }
+                append("guestLabel=${identity.guestLabel}")
             }
         }
 
@@ -109,6 +114,14 @@ class RemoteObservationCatalogService(
             normalizedPath
         } else {
             config.baseUrl.trimEnd('/') + "/uploads/" + normalizedPath.trimStart('/')
+        }
+    }
+
+    private fun fallbackIdentity(): RemoteUserIdentity? {
+        return when {
+            config.defaultUserId > 0 -> RemoteUserIdentity(userId = config.defaultUserId, guestLabel = null)
+            config.guestLabel.isNotBlank() -> RemoteUserIdentity(userId = null, guestLabel = config.guestLabel)
+            else -> null
         }
     }
 

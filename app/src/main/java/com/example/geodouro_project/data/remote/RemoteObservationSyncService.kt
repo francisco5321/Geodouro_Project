@@ -19,7 +19,8 @@ class RemoteObservationSyncService(
     private val appContext: Context,
     private val httpClient: OkHttpClient,
     private val gson: Gson,
-    private val config: RemoteDbConfig
+    private val config: RemoteDbConfig,
+    private val currentIdentityProvider: () -> RemoteUserIdentity?
 ) {
 
     fun isConfigured(): Boolean = config.isConfigured()
@@ -31,11 +32,20 @@ class RemoteObservationSyncService(
         }
 
         val imageUris = observation.allImageUris()
-        val configuredUserId = config.defaultUserId.takeIf { it > 0 }
+        val identity = currentIdentityProvider() ?: fallbackIdentity()
+        if (identity == null) {
+            Log.w(TAG, "Skipping sync because there is no active session identity.")
+            return false
+        }
+        if (identity.userId == null && identity.guestLabel.isNullOrBlank()) {
+            Log.w(TAG, "Skipping sync because the active session has no remote identity configured.")
+            return false
+        }
+
         val payload = RemoteObservationPayload(
             deviceObservationId = observation.id,
-            userId = configuredUserId,
-            guestLabel = if (configuredUserId == null) config.guestLabel else null,
+            userId = identity.userId,
+            guestLabel = identity.guestLabel,
             imageUri = imageUris.firstOrNull() ?: observation.imageUri,
             imageUris = imageUris,
             capturedAt = observation.capturedAt,
@@ -136,6 +146,14 @@ class RemoteObservationSyncService(
 
     private fun buildObservationUrl(): String {
         return config.baseUrl.trimEnd('/') + "/api/observations"
+    }
+
+    private fun fallbackIdentity(): RemoteUserIdentity? {
+        return when {
+            config.defaultUserId > 0 -> RemoteUserIdentity(userId = config.defaultUserId, guestLabel = null)
+            config.guestLabel.isNotBlank() -> RemoteUserIdentity(userId = null, guestLabel = config.guestLabel)
+            else -> null
+        }
     }
 
     private fun openImageInputStream(uri: Uri) = when (uri.scheme) {

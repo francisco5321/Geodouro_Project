@@ -19,11 +19,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -35,6 +36,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -62,6 +64,7 @@ import coil.compose.AsyncImage
 import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.di.AppContainer
+import com.example.geodouro_project.domain.model.SessionState
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
@@ -72,6 +75,8 @@ import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
 import com.example.geodouro_project.ui.theme.geodouroOutlinedTextFieldColors
 import com.example.geodouro_project.ui.theme.geodouroLoadingIndicatorColor
+import com.example.geodouro_project.ui.theme.geodouroOutlinedBorderColor
+import com.example.geodouro_project.ui.theme.geodouroOutlinedButtonColors
 import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -164,6 +169,8 @@ class ProfileViewModel(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
+    sessionState: SessionState,
+    onLogout: () -> Unit,
     onObservationClick: (String) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -254,11 +261,25 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         Text(
-                            "Utilizador",
+                            profileDisplayName(sessionState),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = GeodouroTextPrimary
                         )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Surface(
+                            color = GeodouroLightBg,
+                            shape = RoundedCornerShape(999.dp)
+                        ) {
+                            Text(
+                                text = profileSessionLabel(sessionState),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = GeodouroBrandGreen
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(16.dp))
 
@@ -269,6 +290,25 @@ fun ProfileScreen(
                             StatItem(uiState.observationsCount.toString(), "Observacoes")
                             StatItem(uiState.publishedCount.toString(), "Publicacoes")
                             StatItem(uiState.speciesCount.toString(), "Especies")
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedButton(
+                            onClick = onLogout,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = geodouroOutlinedButtonColors(),
+                            border = androidx.compose.foundation.BorderStroke(
+                                width = 1.dp,
+                                color = geodouroOutlinedBorderColor(enabled = true)
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Logout,
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text("Terminar sessao")
                         }
                     }
                 }
@@ -562,5 +602,23 @@ fun StatItem(value: String, label: String) {
             style = MaterialTheme.typography.bodySmall,
             color = GeodouroTextSecondary
         )
+    }
+}
+
+private fun profileDisplayName(sessionState: SessionState): String {
+    return when (sessionState) {
+        is SessionState.Authenticated -> sessionState.displayName
+        is SessionState.Guest -> sessionState.displayName
+        SessionState.Loading,
+        SessionState.LoggedOut -> "Utilizador"
+    }
+}
+
+private fun profileSessionLabel(sessionState: SessionState): String {
+    return when (sessionState) {
+        is SessionState.Authenticated -> "Sessao autenticada"
+        is SessionState.Guest -> "Modo convidado"
+        SessionState.Loading,
+        SessionState.LoggedOut -> "Sem sessao"
     }
 }

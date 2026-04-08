@@ -9,3 +9,8 @@ data class RemoteDbConfig(
         return baseUrl.isNotBlank()
     }
 }
+
+data class RemoteUserIdentity(
+    val userId: Int?,
+    val guestLabel: String?
+)

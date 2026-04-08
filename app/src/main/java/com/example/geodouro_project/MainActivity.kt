@@ -9,24 +9,34 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.example.geodouro_project.core.network.ConnectivityChecker
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.LocalInferenceResult
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
+import com.example.geodouro_project.domain.model.SessionState
 import com.example.geodouro_project.ui.components.BottomNavigationBar
+import com.example.geodouro_project.ui.screens.AuthScreen
 import com.example.geodouro_project.ui.screens.CaptureScreen
 import com.example.geodouro_project.ui.screens.CommunityScreen
 import com.example.geodouro_project.ui.screens.HomeScreen
@@ -36,6 +46,10 @@ import com.example.geodouro_project.ui.screens.ProfileScreen
 import com.example.geodouro_project.ui.screens.ResultsScreen
 import com.example.geodouro_project.ui.screens.SpeciesDetailScreen
 import com.example.geodouro_project.ui.screens.SpeciesListScreen
+import com.example.geodouro_project.ui.theme.GeodouroLightBg
+import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
+import com.example.geodouro_project.ui.theme.GeodouroWhite
+import kotlinx.coroutines.launch
 import com.example.geodouro_project.ui.theme.Geodouro_ProjectTheme
 
 class MainActivity : ComponentActivity() {
@@ -54,8 +68,11 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation() {
     val navController = rememberNavController()
     val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val authRepository = remember(appContext) { AppContainer.provideAuthRepository(appContext) }
+    val coroutineScope = rememberCoroutineScope()
     val connectivityChecker = remember(appContext) { ConnectivityChecker(appContext) }
     val repository = remember(appContext) { AppContainer.providePlantRepository(appContext) }
+    val sessionState by authRepository.sessionState.collectAsStateWithLifecycle()
     val hasInternet by connectivityChecker.observeInternetAvailability().collectAsStateWithLifecycle(
         initialValue = connectivityChecker.hasInternetConnection()
     )
@@ -70,6 +87,16 @@ fun AppNavigation() {
     var networkRefreshVersion by remember { mutableStateOf(0) }
     var previousInternetState by remember { mutableStateOf<Boolean?>(null) }
     var previousFailedObservationIds by remember { mutableStateOf<Set<String>?>(null) }
+
+    if (sessionState == SessionState.Loading) {
+        SessionLoadingScreen()
+        return
+    }
+
+    if (sessionState == SessionState.LoggedOut) {
+        AuthScreen()
+        return
+    }
 
     val bottomNavRoutes = listOf("home", "community", "identify", "list", "profile")
     val showBottomBar = currentRoute in bottomNavRoutes
@@ -186,6 +213,12 @@ fun AppNavigation() {
 
             composable("profile") {
                 ProfileScreen(
+                    sessionState = sessionState,
+                    onLogout = {
+                        coroutineScope.launch {
+                            authRepository.logout()
+                        }
+                    },
                     onObservationClick = { observationId ->
                         navController.navigate("observationDetail/${Uri.encode(observationId)}")
                     }
@@ -242,6 +275,40 @@ fun AppNavigation() {
                         navController.navigate("speciesDetail/${Uri.encode(speciesId)}")
                     }
                 )
+            }
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun SessionLoadingScreen() {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = GeodouroWhite
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                color = GeodouroLightBg,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)
+            ) {
+                Box(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.foundation.layout.Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator()
+                        Text(
+                            text = "A restaurar sessao...",
+                            modifier = Modifier.padding(top = 12.dp),
+                            color = GeodouroTextSecondary
+                        )
+                    }
+                }
             }
         }
     }
