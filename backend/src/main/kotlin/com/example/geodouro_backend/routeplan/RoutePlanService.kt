@@ -1,10 +1,12 @@
 package com.example.geodouro_backend.routeplan
 
 import org.springframework.http.HttpStatus
+import org.springframework.dao.EmptyResultDataAccessException
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 
 @Service
@@ -46,6 +48,294 @@ class RoutePlanService(
         )
     }
 
+
+    @Transactional
+    fun createRoutePlan(userId: Int, request: SaveRoutePlanRequest): RoutePlanMutationResponse {
+        validateRoutePlanRequest(request)
+        val routePlanId = jdbcTemplate.queryForObject(
+            """
+                INSERT INTO route_plan (user_id, name, description, start_label, start_latitude, start_longitude)
+                VALUES (:userId, :name, :description, :startLabel, :startLatitude, :startLongitude)
+                RETURNING route_plan_id
+            """.trimIndent(),
+            routePlanParams(userId, request),
+            Int::class.java
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Nao foi possivel criar o percurso")
+
+        return RoutePlanMutationResponse(true, "Percurso criado com sucesso.", routePlanId)
+    }
+
+    @Transactional
+    fun updateRoutePlan(routePlanId: Int, userId: Int, request: SaveRoutePlanRequest): RoutePlanMutationResponse {
+        validateRoutePlanRequest(request)
+        ensureOwnedRoutePlan(routePlanId, userId)
+        jdbcTemplate.update(
+            """
+                UPDATE route_plan
+                SET name = :name,
+                    description = :description,
+                    start_label = :startLabel,
+                    start_latitude = :startLatitude,
+                    start_longitude = :startLongitude,
+                    updated_at = NOW()
+                WHERE route_plan_id = :routePlanId
+                  AND user_id = :userId
+            """.trimIndent(),
+            routePlanParams(userId, request).addValue("routePlanId", routePlanId)
+        )
+        return RoutePlanMutationResponse(true, "Percurso atualizado com sucesso.", routePlanId)
+    }
+
+    @Transactional
+    fun deleteRoutePlan(routePlanId: Int, userId: Int) {
+        val affected = jdbcTemplate.update(
+            """
+                DELETE FROM route_plan
+                WHERE route_plan_id = :routePlanId
+                  AND user_id = :userId
+            """.trimIndent(),
+            MapSqlParameterSource()
+                .addValue("routePlanId", routePlanId)
+                .addValue("userId", userId)
+        )
+        if (affected == 0) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Percurso nao encontrado")
+        }
+    }
+
+    @Transactional
+    fun addSavedTargetToRoutePlan(routePlanId: Int, userId: Int, savedVisitTargetId: Int): RoutePlanStopMutationResponse {
+        ensureOwnedRoutePlan(routePlanId, userId)
+        ensureOwnedVisitTarget(savedVisitTargetId, userId)
+        val existingPointId = findRoutePlanPointId(routePlanId, savedVisitTargetId)
+        if (existingPointId != null) {
+            return RoutePlanStopMutationResponse(true, true, "Esse alvo ja esta neste percurso.", existingPointId, savedVisitTargetId)
+        }
+        val pointId = insertRoutePlanPoint(routePlanId, savedVisitTargetId)
+        return RoutePlanStopMutationResponse(true, true, "Alvo adicionado ao percurso.", pointId, savedVisitTargetId)
+    }
+
+    @Transactional
+    fun addSpeciesToRoutePlan(routePlanId: Int, userId: Int, plantSpeciesId: Int): RoutePlanStopMutationResponse {
+        ensureOwnedRoutePlan(routePlanId, userId)
+        ensureSpeciesExists(plantSpeciesId)
+        val savedVisitTargetId = findOrCreateVisitTarget(userId, "plant_species_id", plantSpeciesId)
+        return addSavedTargetToRoutePlan(routePlanId, userId, savedVisitTargetId)
+    }
+
+    @Transactional
+    fun toggleObservationPoint(routePlanId: Int, userId: Int, observationId: Int): RoutePlanStopMutationResponse {
+        ensureOwnedRoutePlan(routePlanId, userId)
+        ensureObservationWithCoordinatesExists(observationId)
+        val savedVisitTargetId = findOrCreateVisitTarget(userId, "observation_id", observationId)
+        val existingPointId = findRoutePlanPointId(routePlanId, savedVisitTargetId)
+        if (existingPointId != null) {
+            deleteRoutePlanPoint(existingPointId, userId)
+            resequenceRoutePlan(routePlanId)
+            return RoutePlanStopMutationResponse(true, false, "Observacao removida do percurso.", null, savedVisitTargetId)
+        }
+        val pointId = insertRoutePlanPoint(routePlanId, savedVisitTargetId)
+        return RoutePlanStopMutationResponse(true, true, "Observacao adicionada ao percurso.", pointId, savedVisitTargetId)
+    }
+
+    @Transactional
+    fun removeRoutePlanPoint(routePlanPointId: Int, userId: Int): Int {
+        val routePlanId = findRoutePlanIdForPoint(routePlanPointId, userId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Ponto do percurso nao encontrado")
+        deleteRoutePlanPoint(routePlanPointId, userId)
+        resequenceRoutePlan(routePlanId)
+        return routePlanId
+    }
+
+    private fun validateRoutePlanRequest(request: SaveRoutePlanRequest) {
+        if (request.name.trim().isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Nome do percurso e obrigatorio")
+        }
+        validateCoordinate("startLatitude", request.startLatitude, -90.0, 90.0)
+        validateCoordinate("startLongitude", request.startLongitude, -180.0, 180.0)
+        if ((request.startLatitude == null) xor (request.startLongitude == null)) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Define latitude e longitude para o ponto de partida")
+        }
+    }
+
+    private fun validateCoordinate(name: String, value: Double?, min: Double, max: Double) {
+        if (value != null && (value < min || value > max)) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "$name invalida")
+        }
+    }
+
+    private fun routePlanParams(userId: Int, request: SaveRoutePlanRequest): MapSqlParameterSource {
+        return MapSqlParameterSource()
+            .addValue("userId", userId)
+            .addValue("name", request.name.trim())
+            .addValue("description", request.description?.trim()?.takeIf { it.isNotBlank() })
+            .addValue("startLabel", request.startLabel?.trim()?.takeIf { it.isNotBlank() })
+            .addValue("startLatitude", request.startLatitude)
+            .addValue("startLongitude", request.startLongitude)
+    }
+
+    private fun ensureOwnedRoutePlan(routePlanId: Int, userId: Int) {
+        val count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM route_plan WHERE route_plan_id = :routePlanId AND user_id = :userId",
+            MapSqlParameterSource().addValue("routePlanId", routePlanId).addValue("userId", userId),
+            Int::class.java
+        ) ?: 0
+        if (count == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Percurso nao encontrado")
+    }
+
+    private fun ensureOwnedVisitTarget(savedVisitTargetId: Int, userId: Int) {
+        val count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM saved_visit_target WHERE saved_visit_target_id = :savedVisitTargetId AND user_id = :userId",
+            MapSqlParameterSource().addValue("savedVisitTargetId", savedVisitTargetId).addValue("userId", userId),
+            Int::class.java
+        ) ?: 0
+        if (count == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nao encontrado")
+    }
+
+    private fun ensureSpeciesExists(plantSpeciesId: Int) {
+        val count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM plant_species WHERE plant_species_id = :plantSpeciesId",
+            MapSqlParameterSource("plantSpeciesId", plantSpeciesId),
+            Int::class.java
+        ) ?: 0
+        if (count == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Especie nao encontrada")
+    }
+
+    private fun ensureObservationWithCoordinatesExists(observationId: Int) {
+        val count = jdbcTemplate.queryForObject(
+            """
+                SELECT COUNT(*)
+                FROM observation
+                WHERE observation_id = :observationId
+                  AND latitude IS NOT NULL
+                  AND longitude IS NOT NULL
+            """.trimIndent(),
+            MapSqlParameterSource("observationId", observationId),
+            Int::class.java
+        ) ?: 0
+        if (count == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Observacao nao encontrada")
+    }
+
+    private fun findOrCreateVisitTarget(userId: Int, columnName: String, targetId: Int): Int {
+        val existing = try {
+            jdbcTemplate.queryForObject(
+                """
+                    SELECT saved_visit_target_id
+                    FROM saved_visit_target
+                    WHERE user_id = :userId
+                      AND $columnName = :targetId
+                    LIMIT 1
+                """.trimIndent(),
+                MapSqlParameterSource().addValue("userId", userId).addValue("targetId", targetId),
+                Int::class.java
+            )
+        } catch (_: EmptyResultDataAccessException) {
+            null
+        }
+        if (existing != null) return existing
+
+        return jdbcTemplate.queryForObject(
+            """
+                INSERT INTO saved_visit_target (user_id, $columnName)
+                VALUES (:userId, :targetId)
+                RETURNING saved_visit_target_id
+            """.trimIndent(),
+            MapSqlParameterSource().addValue("userId", userId).addValue("targetId", targetId),
+            Int::class.java
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Nao foi possivel guardar o alvo")
+    }
+
+    private fun findRoutePlanPointId(routePlanId: Int, savedVisitTargetId: Int): Int? {
+        return try {
+            jdbcTemplate.queryForObject(
+                """
+                    SELECT route_plan_point_id
+                    FROM route_plan_point
+                    WHERE route_plan_id = :routePlanId
+                      AND saved_visit_target_id = :savedVisitTargetId
+                    LIMIT 1
+                """.trimIndent(),
+                MapSqlParameterSource().addValue("routePlanId", routePlanId).addValue("savedVisitTargetId", savedVisitTargetId),
+                Int::class.java
+            )
+        } catch (_: EmptyResultDataAccessException) {
+            null
+        }
+    }
+
+    private fun insertRoutePlanPoint(routePlanId: Int, savedVisitTargetId: Int): Int {
+        return jdbcTemplate.queryForObject(
+            """
+                INSERT INTO route_plan_point (route_plan_id, saved_visit_target_id, visit_order)
+                VALUES (:routePlanId, :savedVisitTargetId, :visitOrder)
+                RETURNING route_plan_point_id
+            """.trimIndent(),
+            MapSqlParameterSource()
+                .addValue("routePlanId", routePlanId)
+                .addValue("savedVisitTargetId", savedVisitTargetId)
+                .addValue("visitOrder", nextVisitOrder(routePlanId)),
+            Int::class.java
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Nao foi possivel adicionar o ponto")
+    }
+
+    private fun nextVisitOrder(routePlanId: Int): Int {
+        return (jdbcTemplate.queryForObject(
+            "SELECT COALESCE(MAX(visit_order), 0) + 1 FROM route_plan_point WHERE route_plan_id = :routePlanId",
+            MapSqlParameterSource("routePlanId", routePlanId),
+            Int::class.java
+        ) ?: 1)
+    }
+
+    private fun findRoutePlanIdForPoint(routePlanPointId: Int, userId: Int): Int? {
+        return try {
+            jdbcTemplate.queryForObject(
+                """
+                    SELECT rpp.route_plan_id
+                    FROM route_plan_point rpp
+                    JOIN route_plan rp ON rp.route_plan_id = rpp.route_plan_id
+                    WHERE rpp.route_plan_point_id = :routePlanPointId
+                      AND rp.user_id = :userId
+                """.trimIndent(),
+                MapSqlParameterSource().addValue("routePlanPointId", routePlanPointId).addValue("userId", userId),
+                Int::class.java
+            )
+        } catch (_: EmptyResultDataAccessException) {
+            null
+        }
+    }
+
+    private fun deleteRoutePlanPoint(routePlanPointId: Int, userId: Int) {
+        val affected = jdbcTemplate.update(
+            """
+                DELETE FROM route_plan_point rpp
+                USING route_plan rp
+                WHERE rp.route_plan_id = rpp.route_plan_id
+                  AND rp.user_id = :userId
+                  AND rpp.route_plan_point_id = :routePlanPointId
+            """.trimIndent(),
+            MapSqlParameterSource().addValue("routePlanPointId", routePlanPointId).addValue("userId", userId)
+        )
+        if (affected == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Ponto do percurso nao encontrado")
+    }
+
+    private fun resequenceRoutePlan(routePlanId: Int) {
+        val ids = jdbcTemplate.queryForList(
+            """
+                SELECT route_plan_point_id
+                FROM route_plan_point
+                WHERE route_plan_id = :routePlanId
+                ORDER BY visit_order ASC, route_plan_point_id ASC
+            """.trimIndent(),
+            MapSqlParameterSource("routePlanId", routePlanId),
+            Int::class.java
+        )
+        ids.forEachIndexed { index, pointId ->
+            jdbcTemplate.update(
+                "UPDATE route_plan_point SET visit_order = :visitOrder WHERE route_plan_point_id = :pointId",
+                MapSqlParameterSource().addValue("visitOrder", index + 1).addValue("pointId", pointId)
+            )
+        }
+    }
     private fun buildRouteGeometry(
         summary: RoutePlanDetailResponse,
         stops: List<RoutePlanStopResponse>
@@ -260,4 +550,5 @@ class RoutePlanService(
         """
     }
 }
+
 

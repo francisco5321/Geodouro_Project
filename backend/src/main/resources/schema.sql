@@ -144,4 +144,14 @@ CREATE INDEX IF NOT EXISTS idx_publication_image_publication_id ON publication_i
 CREATE INDEX IF NOT EXISTS idx_plant_species_family ON plant_species(family);
 CREATE INDEX IF NOT EXISTS idx_plant_species_genus ON plant_species(genus);
 CREATE INDEX IF NOT EXISTS idx_plant_species_species ON plant_species(species);
-
+CREATE OR REPLACE FUNCTION synthetic_device_observation_id(observation_id INTEGER)
+RETURNS UUID
+LANGUAGE SQL
+IMMUTABLE
+RETURN (
+    substring(md5('geodouro-observation:' || observation_id::text), 1, 8) || '-' ||
+    substring(md5('geodouro-observation:' || observation_id::text), 9, 4) || '-' ||
+    substring(md5('geodouro-observation:' || observation_id::text), 13, 4) || '-' ||
+    substring(md5('geodouro-observation:' || observation_id::text), 17, 4) || '-' ||
+    substring(md5('geodouro-observation:' || observation_id::text), 21, 12)
+)::uuid;

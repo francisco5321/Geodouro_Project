@@ -40,3 +40,24 @@ data class RoutePlanCoordinateResponse(
     val latitude: Double,
     val longitude: Double
 )
+data class SaveRoutePlanRequest(
+    val name: String,
+    val description: String? = null,
+    val startLabel: String? = null,
+    val startLatitude: Double? = null,
+    val startLongitude: Double? = null
+)
+
+data class RoutePlanMutationResponse(
+    val success: Boolean,
+    val message: String,
+    val routePlanId: Int
+)
+
+data class RoutePlanStopMutationResponse(
+    val success: Boolean,
+    val inRoute: Boolean,
+    val message: String,
+    val routePlanPointId: Int? = null,
+    val savedVisitTargetId: Int? = null
+)

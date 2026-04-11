@@ -1,14 +1,17 @@
 package com.example.geodouro_project.ui.screens
 
+import android.Manifest
 import android.content.Context
-import androidx.compose.foundation.Canvas
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,9 +22,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -36,14 +43,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,6 +55,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.geodouro_project.core.location.LocationResolver
 import com.example.geodouro_project.data.repository.RoutePlanRepository
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.SessionState
@@ -61,7 +65,6 @@ import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
-import kotlin.math.max
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -254,19 +257,13 @@ private fun RoutePlanDetailContent(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         RoutePlanMetaChip("${routePlan.stopCount} paragens")
-                        RoutePlanMetaChip(
-                            if (routePlan.startLabel.isNullOrBlank()) {
-                                "Inicio e fim na primeira paragem"
-                            } else {
-                                routePlan.startLabel
-                            }
-                        )
+                        RoutePlanMetaChip("Partida: localizacao atual")
                     }
                 }
             }
         }
 
-        item { RouteStartCard(routePlan) }
+        item { RouteStartCard() }
         item { RouteMapCard(routePlan) }
 
         item {
@@ -285,8 +282,7 @@ private fun RoutePlanDetailContent(
 }
 
 @Composable
-private fun RouteStartCard(routePlan: RoutePlanRepository.RoutePlanDetail) {
-    val hasCustomStart = routePlan.startLatitude != null && routePlan.startLongitude != null
+private fun RouteStartCard() {
     Card(
         colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
         elevation = CardDefaults.cardElevation(2.dp),
@@ -311,17 +307,13 @@ private fun RouteStartCard(routePlan: RoutePlanRepository.RoutePlanDetail) {
             }
             Column {
                 Text(
-                    text = if (hasCustomStart) "Ponto de partida" else "Inicio e fim do circuito",
+                    text = "Ponto de partida",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = GeodouroTextPrimary
                 )
                 Text(
-                    text = when {
-                        !routePlan.startLabel.isNullOrBlank() -> routePlan.startLabel
-                        routePlan.stops.isNotEmpty() -> routePlan.stops.first().title
-                        else -> "Sem ponto de partida registado"
-                    },
+                    text = "A tua localizacao atual, ao abrir o percurso no Google Maps.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = GeodouroTextSecondary
                 )
@@ -332,7 +324,23 @@ private fun RouteStartCard(routePlan: RoutePlanRepository.RoutePlanDetail) {
 
 @Composable
 private fun RouteMapCard(routePlan: RoutePlanRepository.RoutePlanDetail) {
-    val points = buildVisualPoints(routePlan)
+    val points = buildGoogleMapsPoints(routePlan)
+    val context = LocalContext.current
+    val appContext = context.applicationContext
+    val locationResolver = remember(appContext) { LocationResolver(appContext) }
+    val coroutineScope = rememberCoroutineScope()
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        coroutineScope.launch {
+            val originCoordinates = if (granted) {
+                locationResolver.getCurrentCoordinates()
+            } else {
+                null
+            }
+            openDriveToRouteStartInGoogleMaps(context, points, originCoordinates)
+        }
+    }
     Card(
         colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
         elevation = CardDefaults.cardElevation(2.dp),
@@ -358,87 +366,60 @@ private fun RouteMapCard(routePlan: RoutePlanRepository.RoutePlanDetail) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1.25f),
+                    .padding(top = 4.dp),
                 color = GeodouroLightBg,
                 shape = RoundedCornerShape(16.dp)
             ) {
-                if (points.size < 2) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "Sem coordenadas suficientes para desenhar o circuito.",
-                            color = GeodouroTextSecondary,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                } else {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val padding = 28f
-                        val width = size.width
-                        val height = size.height
-
-                        drawRect(
-                            color = Color.White.copy(alpha = 0.4f),
-                            size = Size(width, height)
-                        )
-
-                        repeat(4) { index ->
-                            val ratio = (index + 1) / 5f
-                            drawLine(
-                                color = GeodouroBrandGreen.copy(alpha = 0.08f),
-                                start = Offset(width * ratio, padding),
-                                end = Offset(width * ratio, height - padding),
-                                strokeWidth = 2f
-                            )
-                            drawLine(
-                                color = GeodouroBrandGreen.copy(alpha = 0.08f),
-                                start = Offset(padding, height * ratio),
-                                end = Offset(width - padding, height * ratio),
-                                strokeWidth = 2f
-                            )
-                        }
-
-                        val latitudes = points.map { it.latitude }
-                        val longitudes = points.map { it.longitude }
-                        val minLat = latitudes.minOrNull() ?: 0.0
-                        val maxLat = latitudes.maxOrNull() ?: 0.0
-                        val minLon = longitudes.minOrNull() ?: 0.0
-                        val maxLon = longitudes.maxOrNull() ?: 0.0
-                        val latRange = max(0.0001, maxLat - minLat)
-                        val lonRange = max(0.0001, maxLon - minLon)
-
-                        fun project(latitude: Double, longitude: Double): Offset {
-                            val x = padding + (((longitude - minLon) / lonRange).toFloat() * (width - (padding * 2)))
-                            val y = (height - padding) - (((latitude - minLat) / latRange).toFloat() * (height - (padding * 2)))
-                            return Offset(x, y)
-                        }
-
-                        val projectedPoints = points.map { project(it.latitude, it.longitude) }
-                        val path = Path().apply {
-                            projectedPoints.firstOrNull()?.let { moveTo(it.x, it.y) }
-                            projectedPoints.drop(1).forEach { point ->
-                                lineTo(point.x, point.y)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = if (points.isEmpty()) {
+                            "Adiciona pelo menos uma paragem com coordenadas para abrir no Google Maps."
+                        } else {
+                            "Primeiro navega de carro ate ao inicio. Depois abre o circuito a pe, passando pelas paragens e regressando ao primeiro ponto."
+                        },
+                        color = GeodouroTextSecondary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Button(
+                        onClick = {
+                            if (locationResolver.hasLocationPermission()) {
+                                coroutineScope.launch {
+                                    openDriveToRouteStartInGoogleMaps(
+                                        context = context,
+                                        points = points,
+                                        originCoordinates = locationResolver.getCurrentCoordinates()
+                                    )
+                                }
+                            } else {
+                                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                             }
-                        }
-
-                        drawPath(
-                            path = path,
-                            color = GeodouroBrandGreen,
-                            style = Stroke(width = 8f, cap = StrokeCap.Round)
+                        },
+                        enabled = points.isNotEmpty(),
+                        colors = ButtonDefaults.buttonColors(containerColor = GeodouroBrandGreen),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DirectionsCar,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 8.dp)
                         )
-
-                        projectedPoints.forEachIndexed { index, point ->
-                            val isStart = index == 0
-                            drawCircle(
-                                color = if (isStart) GeodouroBrandGreen else GeodouroGreen,
-                                radius = if (isStart) 14f else 11f,
-                                center = point
-                            )
-                            drawCircle(
-                                color = Color.White,
-                                radius = if (isStart) 6f else 4f,
-                                center = point
-                            )
-                        }
+                        Text("Ir ate ao inicio de carro")
+                    }
+                    Button(
+                        onClick = { openWalkingRouteInGoogleMaps(context, points) },
+                        enabled = points.size >= 2,
+                        colors = ButtonDefaults.buttonColors(containerColor = GeodouroGreen),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Directions,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text("Percurso a pe")
                     }
                 }
             }
@@ -451,35 +432,73 @@ private data class VisualRoutePoint(
     val longitude: Double
 )
 
-private fun buildVisualPoints(routePlan: RoutePlanRepository.RoutePlanDetail): List<VisualRoutePoint> {
-    val backendGeometry = routePlan.routeGeometry.map { point ->
-        VisualRoutePoint(point.latitude, point.longitude)
-    }
-    if (backendGeometry.size >= 2) {
-        return backendGeometry
+private fun openDriveToRouteStartInGoogleMaps(
+    context: Context,
+    points: List<VisualRoutePoint>,
+    originCoordinates: Pair<Double, Double>?
+) {
+    if (points.isEmpty()) return
+
+    val origin = originCoordinates?.let { (latitude, longitude) ->
+        "$latitude,$longitude"
+    } ?: "Current Location"
+    val destination = points.first().asMapsCoordinate()
+
+    val uriBuilder = Uri.parse("https://www.google.com/maps/dir/").buildUpon()
+        .appendQueryParameter("api", "1")
+        .appendQueryParameter("origin", origin)
+        .appendQueryParameter("destination", destination)
+        .appendQueryParameter("travelmode", "driving")
+
+    openMapsIntent(context, uriBuilder.build())
+}
+
+private fun openWalkingRouteInGoogleMaps(context: Context, points: List<VisualRoutePoint>) {
+    if (points.size < 2) return
+
+    val origin = points.first().asMapsCoordinate()
+    val destination = points.first().asMapsCoordinate()
+    val waypoints = points
+        .drop(1)
+        .take(23)
+        .joinToString("|") { it.asMapsCoordinate() }
+
+    val uriBuilder = Uri.parse("https://www.google.com/maps/dir/").buildUpon()
+        .appendQueryParameter("api", "1")
+        .appendQueryParameter("origin", origin)
+        .appendQueryParameter("destination", destination)
+        .appendQueryParameter("travelmode", "walking")
+
+    if (waypoints.isNotBlank()) {
+        uriBuilder.appendQueryParameter("waypoints", waypoints)
     }
 
-    val stops = routePlan.stops.mapNotNull { stop ->
+    openMapsIntent(context, uriBuilder.build())
+}
+
+private fun openMapsIntent(context: Context, uri: Uri) {
+    val mapsIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+        setPackage("com.google.android.apps.maps")
+    }
+
+    val fallbackIntent = Intent(Intent.ACTION_VIEW, uri)
+    runCatching {
+        context.startActivity(mapsIntent)
+    }.getOrElse {
+        context.startActivity(fallbackIntent)
+    }
+}
+
+private fun VisualRoutePoint.asMapsCoordinate(): String = "$latitude,$longitude"
+
+private fun buildGoogleMapsPoints(routePlan: RoutePlanRepository.RoutePlanDetail): List<VisualRoutePoint> {
+    return routePlan.stops.mapNotNull { stop ->
         if (stop.latitude != null && stop.longitude != null) {
             VisualRoutePoint(stop.latitude, stop.longitude)
         } else {
             null
         }
     }
-
-    val startPoint = if (routePlan.startLatitude != null && routePlan.startLongitude != null) {
-        VisualRoutePoint(routePlan.startLatitude, routePlan.startLongitude)
-    } else {
-        stops.firstOrNull()
-    } ?: return emptyList()
-
-    val points = mutableListOf<VisualRoutePoint>()
-    points += startPoint
-    points += stops
-    if (points.lastOrNull() != startPoint) {
-        points += startPoint
-    }
-    return points
 }
 
 @Composable

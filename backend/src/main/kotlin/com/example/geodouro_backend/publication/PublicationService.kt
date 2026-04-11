@@ -151,7 +151,7 @@ class PublicationService(
         private const val PUBLICATION_SELECT_SQL = """
             SELECT p.publication_id,
                    p.observation_id,
-                   o.device_observation_id,
+                   COALESCE(o.device_observation_id, synthetic_device_observation_id(o.observation_id)) AS device_observation_id,
                    COALESCE(NULLIF(u.username, ''), NULLIF(u.first_name, ''), u.guest_label, 'Utilizador') AS user_display_name,
                    COALESCE(o.enriched_scientific_name, o.predicted_scientific_name) AS scientific_name,
                    COALESCE(o.enriched_common_name, ps.common_name) AS common_name,
@@ -178,7 +178,9 @@ class PublicationService(
 
         private const val PUBLICATION_BY_DEVICE_ID_SQL = PUBLICATION_SELECT_SQL + """
             WHERE o.device_observation_id = :deviceObservationId
+               OR synthetic_device_observation_id(o.observation_id) = :deviceObservationId
             ORDER BY p.published_at DESC
         """
     }
 }
+

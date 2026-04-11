@@ -48,6 +48,7 @@ import com.example.geodouro_project.ui.screens.RoutePlanListScreen
 import com.example.geodouro_project.ui.screens.ResultsScreen
 import com.example.geodouro_project.ui.screens.SpeciesDetailScreen
 import com.example.geodouro_project.ui.screens.SpeciesListScreen
+import com.example.geodouro_project.ui.screens.VisitTargetScreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
@@ -176,6 +177,9 @@ fun AppNavigation() {
                     },
                     onOpenRoutePlans = {
                         navController.navigate("routePlans")
+                    },
+                    onOpenVisitTargets = {
+                        navController.navigate("visitTargets")
                     }
                 )
             }
@@ -239,6 +243,12 @@ fun AppNavigation() {
                 )
             }
 
+
+            composable("visitTargets") {
+                VisitTargetScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
             composable("results") {
                 ResultsScreen(
                     refreshTrigger = networkRefreshVersion,
@@ -337,3 +347,9 @@ private fun SessionLoadingScreen() {
         }
     }
 }
+
+
+
+
+
+

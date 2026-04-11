@@ -299,7 +299,7 @@ class ObservationService(
             wikipediaUrl = rs.getString("wikipedia_url"),
             photoUrl = rs.getString("photo_url"),
             imagePaths = listOfNotNull(rs.getString("primary_image_path")),
-            capturedAt = rs.getObject("captured_at") as? Long,
+            capturedAt = (rs.getObject("captured_at") as? Number)?.toLong(),
             confidence = rs.getObject("confidence")?.toString()?.toFloat(),
             latitude = rs.getBigDecimal("latitude")?.toDouble(),
             longitude = rs.getBigDecimal("longitude")?.toDouble(),
@@ -315,7 +315,7 @@ class ObservationService(
 
         private const val OBSERVATION_DETAIL_SELECT = """
             SELECT o.observation_id,
-                   o.device_observation_id,
+                   COALESCE(o.device_observation_id, synthetic_device_observation_id(o.observation_id)) AS device_observation_id,
                    o.user_id,
                    COALESCE(o.enriched_scientific_name, o.predicted_scientific_name, ps.scientific_name) AS scientific_name,
                    COALESCE(o.enriched_common_name, ps.common_name) AS common_name,
@@ -348,6 +348,7 @@ class ObservationService(
 
         private const val OBSERVATION_DETAIL_SQL = OBSERVATION_DETAIL_SELECT + """
             WHERE o.device_observation_id = :deviceObservationId
+               OR synthetic_device_observation_id(o.observation_id) = :deviceObservationId
         """
 
         private const val OBSERVATION_IMAGE_PATHS_SQL = """
@@ -436,3 +437,5 @@ class ObservationService(
         """.trimIndent()
     }
 }
+
+

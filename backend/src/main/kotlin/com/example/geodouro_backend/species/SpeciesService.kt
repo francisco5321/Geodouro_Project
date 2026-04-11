@@ -237,7 +237,7 @@ class SpeciesService(
 
         private const val SPECIES_OBSERVATIONS_SQL = """
             SELECT o.observation_id,
-                   o.device_observation_id,
+                   COALESCE(o.device_observation_id, synthetic_device_observation_id(o.observation_id)) AS device_observation_id,
                    COALESCE(o.enriched_scientific_name, o.predicted_scientific_name, ps.scientific_name) AS scientific_name,
                    COALESCE(o.enriched_common_name, ps.common_name) AS common_name,
                    o.captured_at,
@@ -260,3 +260,4 @@ class SpeciesService(
         """
     }
 }
+
