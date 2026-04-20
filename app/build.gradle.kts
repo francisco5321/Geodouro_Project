@@ -9,10 +9,11 @@ fun stringBuildConfigField(value: String): String {
     return "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 }
 
-val debugBackendBaseUrl = "http://192.168.1.67:8080"
+val backendBaseUrl = providers.gradleProperty("BACKEND_BASE_URL").orNull ?: ""
+val debugBackendBaseUrl = providers.gradleProperty("DEBUG_BACKEND_BASE_URL").orNull
+    ?: backendBaseUrl
 val releaseBackendBaseUrl = providers.gradleProperty("RELEASE_BACKEND_BASE_URL").orNull
-    ?: providers.gradleProperty("BACKEND_BASE_URL").orNull
-    ?: ""
+    ?: backendBaseUrl
 val backendGuestLabel = providers.gradleProperty("BACKEND_GUEST_LABEL").orNull ?: "android-emulator"
 val backendDefaultUserId = providers.gradleProperty("BACKEND_DEFAULT_USER_ID").orNull ?: "0"
 
@@ -39,7 +40,7 @@ android {
         }
         release {
             buildConfigField("String", "BACKEND_BASE_URL", stringBuildConfigField(releaseBackendBaseUrl))
-            manifestPlaceholders["usesCleartextTraffic"] = "false"
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
