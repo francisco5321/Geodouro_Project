@@ -178,7 +178,8 @@ fun AuthScreen() {
             .verticalScroll(rememberScrollState())
             .imePadding()
             .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 20.dp),
+            .padding(horizontal = 24.dp)
+            .padding(top = 44.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         Box(
