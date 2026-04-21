@@ -101,16 +101,16 @@ fun IdentifyScreen(
     }
 
     val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        viewModel.onCameraCapture(bitmap)
+        contract = ActivityResultContracts.TakePicture()
+    ) { saved ->
+        viewModel.onCameraCaptureResult(saved)
     }
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            cameraLauncher.launch(null)
+            viewModel.prepareCameraCapture()?.let { cameraLauncher.launch(it) }
         } else {
             viewModel.onCameraPermissionDenied()
         }
@@ -315,7 +315,7 @@ fun IdentifyScreen(
                             ) == PackageManager.PERMISSION_GRANTED
 
                             if (granted) {
-                                cameraLauncher.launch(null)
+                                viewModel.prepareCameraCapture()?.let { cameraLauncher.launch(it) }
                             } else {
                                 cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                             }

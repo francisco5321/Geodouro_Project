@@ -1,7 +1,6 @@
 package com.example.geodouro_project.ui.screens
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -46,6 +45,7 @@ class IdentifyViewModel(
     private val locationResolver: LocationResolver,
     private val imageStorage: PersistentImageStorage
 ) : ViewModel() {
+    private var pendingCameraImageUri: Uri? = null
 
     private val _uiState = MutableStateFlow(
         IdentifyUiState(
@@ -127,17 +127,29 @@ class IdentifyViewModel(
         }
     }
 
-    fun onCameraCapture(bitmap: Bitmap?) {
-        if (bitmap == null) {
+    fun prepareCameraCapture(): Uri? {
+        return runCatching {
+            imageStorage.createCameraImageUri()
+        }.onSuccess { uri ->
+            pendingCameraImageUri = uri
+        }.onFailure {
+            emitMessage("Falha ao preparar captura: ${it.message ?: "erro desconhecido"}")
+        }.getOrNull()
+    }
+
+    fun onCameraCaptureResult(saved: Boolean) {
+        val imageUri = pendingCameraImageUri
+        pendingCameraImageUri = null
+
+        if (!saved || imageUri == null) {
             emitMessage("Captura cancelada.")
             return
         }
 
         viewModelScope.launch {
             runCatching {
-                val imageUri = imageStorage.saveBitmap(bitmap)
                 _uiState.update { state ->
-                    state.copy(capturedImageUris = state.capturedImageUris + imageUri)
+                    state.copy(capturedImageUris = state.capturedImageUris + imageUri.toString())
                 }
                 emitMessage("Imagem ${_uiState.value.capturedImageUris.size} capturada.")
                 refreshLocation()
