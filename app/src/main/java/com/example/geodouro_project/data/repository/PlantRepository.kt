@@ -874,7 +874,7 @@ class PlantRepository(
 
     private fun RemoteCommunityPublication.toDomain(): CommunityPublication {
         return CommunityPublication(
-            id = publicationId.toString(),
+            id = deviceObservationId,
             scientificName = scientificName,
             commonName = commonName,
             userDisplayName = userDisplayName,

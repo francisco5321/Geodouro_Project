@@ -151,7 +151,7 @@ enum class CommunityFilter(val label: String) {
 @Composable
 fun CommunityScreen(
     refreshTrigger: Int = 0,
-    onSpeciesClick: (String) -> Unit = {}
+    onPublicationClick: (String) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val viewModel: CommunityViewModel = viewModel(
@@ -376,7 +376,7 @@ fun CommunityScreen(
                             ) {
                                 CommunityPostCard(
                                     post = post,
-                                    onClick = { onSpeciesClick(post.scientificName.toSpeciesId()) }
+                                    onClick = { onPublicationClick(post.id) }
                                 )
                             }
                             Spacer(Modifier.height(12.dp))

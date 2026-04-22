@@ -88,6 +88,7 @@ fun AppNavigation() {
     var clearIdentifyCapturesVersion by remember { mutableStateOf(0) }
     var networkRefreshVersion by remember { mutableStateOf(0) }
     var previousInternetState by remember { mutableStateOf<Boolean?>(null) }
+    var detailAnchorRoute by remember { mutableStateOf<String?>(null) }
 
     if (sessionState == SessionState.Loading) {
         SessionLoadingScreen()
@@ -128,6 +129,46 @@ fun AppNavigation() {
         }
     }
 
+    fun speciesDetailRoute(speciesId: String): String =
+        "speciesDetail/${Uri.encode(speciesId)}"
+
+    fun observationDetailRoute(observationId: String): String =
+        "observationDetail/${Uri.encode(observationId)}"
+
+    fun routePlanDetailRoute(routePlanId: Int): String =
+        "routePlanDetail/$routePlanId"
+
+    fun navigateAboveAnchor(anchorRoute: String, route: String) {
+        detailAnchorRoute = anchorRoute
+        navController.popBackStack(anchorRoute, inclusive = false)
+        navController.navigate(route) {
+            launchSingleTop = true
+        }
+    }
+
+    fun navigateWithinDetailFlow(route: String) {
+        val anchorRoute = detailAnchorRoute
+        if (anchorRoute != null) {
+            navController.popBackStack(anchorRoute, inclusive = false)
+            navController.navigate(route) {
+                launchSingleTop = true
+            }
+        } else {
+            navController.navigate(route) {
+                launchSingleTop = true
+            }
+        }
+    }
+
+    fun popToDetailAnchorOrBack() {
+        val anchorRoute = detailAnchorRoute
+        detailAnchorRoute = null
+
+        if (anchorRoute == null || !navController.popBackStack(anchorRoute, inclusive = false)) {
+            navController.popBackStack()
+        }
+    }
+
     Scaffold(
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState)
@@ -138,6 +179,7 @@ fun AppNavigation() {
                     currentRoute = currentRoute,
                     onNavigate = { route ->
                         if (route == "home") {
+                            detailAnchorRoute = null
                             navController.navigate("home") {
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = false
@@ -146,6 +188,7 @@ fun AppNavigation() {
                                 restoreState = false
                             }
                         } else {
+                            detailAnchorRoute = null
                             navController.navigate(route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true
@@ -167,13 +210,14 @@ fun AppNavigation() {
             composable("home") {
                 HomeScreen(
                     onSpeciesClick = { speciesId ->
-                        navController.navigate("speciesDetail/${Uri.encode(speciesId)}")
+                        navigateAboveAnchor("home", speciesDetailRoute(speciesId))
                     },
                     onOpenSpeciesList = {
+                        detailAnchorRoute = null
                         navController.navigate("list")
                     },
                     onOpenRoutePlans = {
-                        navController.navigate("routePlans")
+                        navigateAboveAnchor("home", "routePlans")
                     }
                 )
             }
@@ -181,8 +225,8 @@ fun AppNavigation() {
             composable("community") {
                 CommunityScreen(
                     refreshTrigger = networkRefreshVersion,
-                    onSpeciesClick = { speciesId ->
-                        navController.navigate("speciesDetail/${Uri.encode(speciesId)}")
+                    onPublicationClick = { observationId ->
+                        navigateAboveAnchor("community", observationDetailRoute(observationId))
                     }
                 )
             }
@@ -194,14 +238,14 @@ fun AppNavigation() {
                         latestMultiImageUris = emptyList()
                         latestCaptureLatitude = inferenceResult.latitude
                         latestCaptureLongitude = inferenceResult.longitude
-                        navController.navigate("results")
+                        navigateAboveAnchor("identify", "results")
                     },
                     onIdentifyMultipleClick = { imageUris, latitude, longitude ->
                         latestInferenceResult = null
                         latestMultiImageUris = imageUris
                         latestCaptureLatitude = latitude
                         latestCaptureLongitude = longitude
-                        navController.navigate("results")
+                        navigateAboveAnchor("identify", "results")
                     },
                     clearCapturesTrigger = clearIdentifyCapturesVersion
                 )
@@ -210,7 +254,7 @@ fun AppNavigation() {
             composable("list") {
                 SpeciesListScreen(
                     onSpeciesClick = { speciesId ->
-                        navController.navigate("speciesDetail/${Uri.encode(speciesId)}")
+                        navigateAboveAnchor("list", speciesDetailRoute(speciesId))
                     }
                 )
             }
@@ -224,7 +268,7 @@ fun AppNavigation() {
                         }
                     },
                     onObservationClick = { observationId ->
-                        navController.navigate("observationDetail/${Uri.encode(observationId)}")
+                        navigateAboveAnchor("profile", observationDetailRoute(observationId))
                     }
                 )
             }
@@ -232,23 +276,23 @@ fun AppNavigation() {
             composable("routePlans") {
                 RoutePlanListScreen(
                     onRoutePlanClick = { routePlanId ->
-                        navController.navigate("routePlanDetail/$routePlanId")
+                        navigateAboveAnchor("routePlans", routePlanDetailRoute(routePlanId))
                     },
-                    onBackClick = { navController.popBackStack() }
+                    onBackClick = { popToDetailAnchorOrBack() }
                 )
             }
 
 
             composable("visitTargets") {
                 VisitTargetScreen(
-                    onBackClick = { navController.popBackStack() }
+                    onBackClick = { popToDetailAnchorOrBack() }
                 )
             }
             composable("results") {
                 ResultsScreen(
                     refreshTrigger = networkRefreshVersion,
                     onBackClick = {
-                        navController.popBackStack()
+                        popToDetailAnchorOrBack()
                     },
                     onConfirmResult = {
                         latestInferenceResult = null
@@ -256,7 +300,7 @@ fun AppNavigation() {
                         latestCaptureLatitude = null
                         latestCaptureLongitude = null
                         clearIdentifyCapturesVersion += 1
-                        navController.popBackStack()
+                        popToDetailAnchorOrBack()
                     },
                     multiImageUris = latestMultiImageUris,
                     captureLatitude = latestCaptureLatitude,
@@ -281,7 +325,7 @@ fun AppNavigation() {
             ) { backStackEntry ->
                 RoutePlanDetailScreen(
                     routePlanId = backStackEntry.arguments?.getInt("routePlanId") ?: -1,
-                    onBackClick = { navController.popBackStack() }
+                    onBackClick = { popToDetailAnchorOrBack() }
                 )
             }
 
@@ -291,9 +335,9 @@ fun AppNavigation() {
             ) { backStackEntry ->
                 SpeciesDetailScreen(
                     speciesId = backStackEntry.arguments?.getString("speciesId").orEmpty(),
-                    onBackClick = { navController.popBackStack() },
+                    onBackClick = { popToDetailAnchorOrBack() },
                     onObservationClick = { observationId ->
-                        navController.navigate("observationDetail/${Uri.encode(observationId)}")
+                        navigateWithinDetailFlow(observationDetailRoute(observationId))
                     }
                 )
             }
@@ -304,9 +348,9 @@ fun AppNavigation() {
             ) { backStackEntry ->
                 ObservationDetailScreen(
                     observationId = backStackEntry.arguments?.getString("observationId").orEmpty(),
-                    onBackClick = { navController.popBackStack() },
+                    onBackClick = { popToDetailAnchorOrBack() },
                     onOpenSpecies = { speciesId ->
-                        navController.navigate("speciesDetail/${Uri.encode(speciesId)}")
+                        navigateWithinDetailFlow(speciesDetailRoute(speciesId))
                     }
                 )
             }

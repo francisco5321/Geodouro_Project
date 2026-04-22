@@ -75,6 +75,7 @@ class RemotePublicationService(
                     ?.map { publication ->
                         RemoteCommunityPublication(
                             publicationId = publication.publicationId,
+                            deviceObservationId = publication.deviceObservationId,
                             scientificName = publication.scientificName,
                             commonName = publication.commonName,
                             userDisplayName = publication.userDisplayName,
@@ -101,6 +102,7 @@ class RemotePublicationService(
 
 data class RemoteCommunityPublication(
     val publicationId: Int,
+    val deviceObservationId: String,
     val scientificName: String,
     val commonName: String?,
     val userDisplayName: String,
@@ -116,6 +118,7 @@ private data class RemotePublishObservationPayload(
 
 private data class RemotePublicationResponse(
     val publicationId: Int,
+    val deviceObservationId: String,
     val scientificName: String,
     val commonName: String?,
     val userDisplayName: String,
