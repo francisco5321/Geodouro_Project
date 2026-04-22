@@ -81,8 +81,11 @@ class ObservationService(
         request: UpdateObservationMetadataRequest,
         authenticatedUserId: Int? = null
     ): ObservationDetailResponse {
+        if (authenticatedUserId == null) {
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao obrigatoria para editar observacoes")
+        }
         val current = getObservationDetail(deviceObservationId)
-        if (authenticatedUserId != null && current.userId != authenticatedUserId) {
+        if (current.userId != authenticatedUserId) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para editar esta observacao")
         }
         if (current.isPublished) {
@@ -114,6 +117,9 @@ class ObservationService(
         authenticatedUserId: Int? = null
     ): ObservationResponse {
         validateCoordinates(request.latitude, request.longitude)
+        if (authenticatedUserId == null && request.userId != null) {
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao obrigatoria para guardar observacoes de utilizadores autenticados")
+        }
 
         val deviceObservationId = request.deviceObservationId ?: UUID.randomUUID()
         val userId = authenticatedUserId ?: resolveUserId(request)
@@ -145,7 +151,12 @@ class ObservationService(
             .addValue("lastSyncAttemptAt", request.lastSyncAttemptAt)
             .addValue("notes", request.notes)
 
-        val response = jdbcTemplate.query(UPSERT_OBSERVATION_SQL, parameters, observationResponseRowMapper).first()
+        val response = jdbcTemplate.query(UPSERT_OBSERVATION_SQL, parameters, observationResponseRowMapper)
+            .firstOrNull()
+            ?: throw ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Nao tens permissao para substituir esta observacao"
+            )
         replaceObservationImages(response.observationId, storedImagePaths)
         refreshPlantSpeciesImageCount(plantSpeciesId)
         return response
@@ -432,6 +443,7 @@ class ObservationService(
                 last_sync_attempt_at = EXCLUDED.last_sync_attempt_at,
                 notes = EXCLUDED.notes,
                 updated_at = NOW()
+            WHERE observation.user_id = EXCLUDED.user_id
             RETURNING observation_id, device_observation_id, user_id, predicted_scientific_name,
                       confidence, sync_status, is_published, observed_at, image_uri
         """.trimIndent()

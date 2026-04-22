@@ -25,6 +25,7 @@ import com.example.geodouro_project.data.remote.RemotePlantSpecies
 import com.example.geodouro_project.data.remote.RemotePlantSpeciesDetail
 import com.example.geodouro_project.data.remote.RemoteSpeciesObservation
 import com.example.geodouro_project.data.remote.RemoteSpeciesService
+import com.example.geodouro_project.data.remote.RemoteUserIdentity
 import com.example.geodouro_project.data.remote.api.INaturalistApiService
 import com.example.geodouro_project.data.remote.model.InaturalistTaxonDto
 import com.example.geodouro_project.domain.model.ConfidencePolicy
@@ -66,7 +67,8 @@ class PlantRepository(
     private val remoteObservationSyncService: RemoteObservationSyncService,
     private val remotePublicationService: RemotePublicationService,
     private val remoteSpeciesService: RemoteSpeciesService,
-    private val remoteObservationCatalogService: RemoteObservationCatalogService
+    private val remoteObservationCatalogService: RemoteObservationCatalogService,
+    private val currentIdentityProvider: () -> RemoteUserIdentity?
 ) {
 
     private val classifier by lazy { MobileNetV3Classifier(appContext) }
@@ -178,8 +180,11 @@ class PlantRepository(
             .ifEmpty { listOf(localResult.imageUri) }
 
         val primaryImageUri = normalizedImageUris.firstOrNull().orEmpty()
+        val ownerIdentity = currentIdentityProvider()
         val newObservation = ObservationEntity(
             id = UUID.randomUUID().toString(),
+            ownerUserId = ownerIdentity?.userId,
+            ownerGuestLabel = ownerIdentity?.guestLabel,
             imageUri = primaryImageUri,
             imageUrisSerialized = ObservationEntity.serializeImageUris(normalizedImageUris, primaryImageUri),
             capturedAt = localResult.capturedAt,
@@ -230,11 +235,14 @@ class PlantRepository(
             return 0
         }
 
-        val pendingObservations = observationDao.getBySyncStatuses(
-            listOf(
+        val ownerIdentity = currentIdentityProvider() ?: return 0
+        val pendingObservations = observationDao.getBySyncStatusesForOwner(
+            syncStatuses = listOf(
                 ObservationSyncStatus.PENDING.name,
                 ObservationSyncStatus.FAILED.name
-            )
+            ),
+            ownerUserId = ownerIdentity.userId,
+            ownerGuestLabel = ownerIdentity.guestLabel
         )
         Log.d(TAG, "syncPendingObservations found ${pendingObservations.size} pending/failed observations")
         var syncedCount = 0
@@ -269,7 +277,11 @@ class PlantRepository(
     }
 
     fun observeObservations(): Flow<List<ObservationEntity>> {
-        return observationDao.observeAll()
+        val ownerIdentity = currentIdentityProvider()
+        return observationDao.observeAllForOwner(
+            ownerUserId = ownerIdentity?.userId,
+            ownerGuestLabel = ownerIdentity?.guestLabel
+        )
     }
 
     fun observePublishedObservations(): Flow<List<ObservationEntity>> {
@@ -278,7 +290,11 @@ class PlantRepository(
 
     suspend fun fetchLocalObservations(): List<ObservationEntity> {
         return withContext(Dispatchers.IO) {
-            observationDao.getAll()
+            val ownerIdentity = currentIdentityProvider()
+            observationDao.getAllForOwner(
+                ownerUserId = ownerIdentity?.userId,
+                ownerGuestLabel = ownerIdentity?.guestLabel
+            )
         }
     }
 
@@ -288,7 +304,8 @@ class PlantRepository(
                 return@withContext emptyList()
             }
 
-            remoteObservationCatalogService.fetchObservations().map { it.toObservationEntity() }
+            val ownerIdentity = currentIdentityProvider()
+            remoteObservationCatalogService.fetchObservations().map { it.toObservationEntity(ownerIdentity) }
         }
     }
 
@@ -303,13 +320,19 @@ class PlantRepository(
                 return@withContext null
             }
 
-            remoteObservationCatalogService.fetchObservationDetail(observationId)?.toObservationEntity()
+            val ownerIdentity = currentIdentityProvider()
+            remoteObservationCatalogService.fetchObservationDetail(observationId)?.toObservationEntity(ownerIdentity)
         }
     }
 
     suspend fun publishObservation(observationId: String): Boolean {
         return withContext(Dispatchers.IO) {
-            val observation = observationDao.getById(observationId)
+            val ownerIdentity = currentIdentityProvider() ?: return@withContext false
+            val observation = observationDao.getByIdForOwner(
+                id = observationId,
+                ownerUserId = ownerIdentity.userId,
+                ownerGuestLabel = ownerIdentity.guestLabel
+            )
             if (observation != null) {
                 if (observation.syncStatus != ObservationSyncStatus.SYNCED.name) {
                     return@withContext false
@@ -341,7 +364,12 @@ class PlantRepository(
         family: String
     ): Boolean {
         return withContext(Dispatchers.IO) {
-            val observation = observationDao.getById(observationId)
+            val ownerIdentity = currentIdentityProvider() ?: return@withContext false
+            val observation = observationDao.getByIdForOwner(
+                id = observationId,
+                ownerUserId = ownerIdentity.userId,
+                ownerGuestLabel = ownerIdentity.guestLabel
+            )
             if (observation != null) {
                 if (observation.isPublished) {
                     return@withContext false
@@ -374,7 +402,11 @@ class PlantRepository(
     }
 
     fun observeObservationStats(): Flow<ObservationStats> {
-        return observationDao.observeAll().map { observations ->
+        val ownerIdentity = currentIdentityProvider()
+        return observationDao.observeAllForOwner(
+            ownerUserId = ownerIdentity?.userId,
+            ownerGuestLabel = ownerIdentity?.guestLabel
+        ).map { observations ->
             ObservationStats(
                 observationsCount = observations.size,
                 publishedCount = observations.count { it.isPublished },
@@ -842,10 +874,12 @@ class PlantRepository(
         )
     }
 
-    private fun RemoteObservationDetail.toObservationEntity(): ObservationEntity {
+    private fun RemoteObservationDetail.toObservationEntity(ownerIdentity: RemoteUserIdentity?): ObservationEntity {
         val primaryImage = imageUrls.firstOrNull() ?: photoUrl.orEmpty()
         return ObservationEntity(
             id = deviceObservationId,
+            ownerUserId = ownerIdentity?.userId,
+            ownerGuestLabel = ownerIdentity?.guestLabel,
             imageUri = primaryImage,
             imageUrisSerialized = ObservationEntity.serializeImageUris(
                 imageUris = if (imageUrls.isNotEmpty()) imageUrls else listOfNotNull(photoUrl),
@@ -957,6 +991,8 @@ class PlantRepository(
         val primaryImage = imageUrl.orEmpty()
         return ObservationEntity(
             id = deviceObservationId,
+            ownerUserId = null,
+            ownerGuestLabel = null,
             imageUri = primaryImage,
             imageUrisSerialized = ObservationEntity.serializeImageUris(
                 imageUris = listOfNotNull(imageUrl),

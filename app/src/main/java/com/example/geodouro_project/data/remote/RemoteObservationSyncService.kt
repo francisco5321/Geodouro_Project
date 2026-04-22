@@ -37,6 +37,10 @@ class RemoteObservationSyncService(
             Log.w(TAG, "Skipping sync because there is no active session identity.")
             return false
         }
+        if (!identityMatchesObservationOwner(identity, observation)) {
+            Log.w(TAG, "Skipping sync because observation ${observation.id} does not belong to the active session.")
+            return false
+        }
         if (identity.authToken.isNullOrBlank() && identity.userId == null && identity.guestLabel.isNullOrBlank()) {
             Log.w(TAG, "Skipping sync because the active session has no remote identity configured.")
             return false
@@ -158,6 +162,17 @@ class RemoteObservationSyncService(
             config.defaultUserId > 0 -> RemoteUserIdentity(userId = config.defaultUserId, guestLabel = null, authToken = null)
             config.guestLabel.isNotBlank() -> RemoteUserIdentity(userId = null, guestLabel = config.guestLabel, authToken = null)
             else -> null
+        }
+    }
+
+    private fun identityMatchesObservationOwner(
+        identity: RemoteUserIdentity,
+        observation: ObservationEntity
+    ): Boolean {
+        return when {
+            observation.ownerUserId != null -> observation.ownerUserId == identity.userId
+            !observation.ownerGuestLabel.isNullOrBlank() -> observation.ownerGuestLabel == identity.guestLabel
+            else -> false
         }
     }
 

@@ -6,11 +6,18 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "observation",
-    indices = [Index(value = ["syncStatus"]), Index(value = ["capturedAt"])]
+    indices = [
+        Index(value = ["syncStatus"]),
+        Index(value = ["capturedAt"]),
+        Index(value = ["ownerUserId"]),
+        Index(value = ["ownerGuestLabel"])
+    ]
 )
 data class ObservationEntity(
     @PrimaryKey
     val id: String,
+    val ownerUserId: Int?,
+    val ownerGuestLabel: String?,
     val imageUri: String,
     val imageUrisSerialized: String,
     val capturedAt: Long,

@@ -184,7 +184,8 @@ object AppContainer {
             remoteObservationSyncService = remoteDbSyncService,
             remotePublicationService = remotePublicationService,
             remoteSpeciesService = remoteSpeciesService,
-            remoteObservationCatalogService = remoteObservationCatalogService
+            remoteObservationCatalogService = remoteObservationCatalogService,
+            currentIdentityProvider = authRepository::currentRemoteIdentity
         )
     }
 }
