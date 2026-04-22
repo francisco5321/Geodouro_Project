@@ -92,6 +92,23 @@ interface ObservationDao {
     )
     fun observeAllForOwner(ownerUserId: Int?, ownerGuestLabel: String?): Flow<List<ObservationEntity>>
 
+    @Query(
+        """
+        SELECT id FROM observation
+        WHERE syncStatus = :syncStatus
+          AND (
+              (:ownerUserId IS NOT NULL AND ownerUserId = :ownerUserId)
+              OR (:ownerGuestLabel IS NOT NULL AND ownerGuestLabel = :ownerGuestLabel)
+          )
+        ORDER BY capturedAt DESC
+        """
+    )
+    fun observeIdsBySyncStatusForOwner(
+        syncStatus: String,
+        ownerUserId: Int?,
+        ownerGuestLabel: String?
+    ): Flow<List<String>>
+
     @Query("SELECT * FROM observation ORDER BY capturedAt DESC")
     suspend fun getAll(): List<ObservationEntity>
 

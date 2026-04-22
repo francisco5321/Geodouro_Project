@@ -15,7 +15,10 @@ import com.example.geodouro_project.domain.model.LocalPredictionCandidate
 import com.example.geodouro_project.domain.model.MultiImageAggregationConfig
 import com.example.geodouro_project.domain.model.MultiImageAggregationResult
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -79,6 +82,9 @@ class ResultsViewModel(
 
     private val _uiState = MutableStateFlow<ResultsUiState>(ResultsUiState.Idle)
     val uiState: StateFlow<ResultsUiState> = _uiState.asStateFlow()
+
+    private val _confirmedEvents = MutableSharedFlow<Unit>()
+    val confirmedEvents: SharedFlow<Unit> = _confirmedEvents.asSharedFlow()
 
     private var lastInferenceResult: LocalInferenceResult? = null
     private var lastEnrichedData: EnrichedSpeciesData? = null
@@ -284,6 +290,7 @@ class ResultsViewModel(
                     is ResultsUiState.MultiImageSuccess -> current.copy(saveMessage = message)
                     else -> current
                 }
+                _confirmedEvents.emit(Unit)
             } catch (e: Exception) {
                 Log.e(TAG, "Error while confirming observation", e)
                 _uiState.value = ResultsUiState.Error(

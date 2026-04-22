@@ -81,7 +81,8 @@ import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
 @Composable
 fun IdentifyScreen(
     onIdentifyClick: (LocalInferenceResult) -> Unit,
-    onIdentifyMultipleClick: (List<String>, Double?, Double?) -> Unit = { _, _, _ -> }
+    onIdentifyMultipleClick: (List<String>, Double?, Double?) -> Unit = { _, _, _ -> },
+    clearCapturesTrigger: Int = 0
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -120,6 +121,12 @@ fun IdentifyScreen(
 
     LaunchedEffect(Unit) {
         viewModel.requestInitialLocation()
+    }
+
+    LaunchedEffect(clearCapturesTrigger) {
+        if (clearCapturesTrigger > 0) {
+            viewModel.clearCaptures()
+        }
     }
 
     LaunchedEffect(uiState.shouldRequestLocationPermission) {

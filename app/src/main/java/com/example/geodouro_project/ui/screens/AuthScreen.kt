@@ -219,7 +219,7 @@ fun AuthScreen() {
                         lineHeight = 28.sp
                     )
                     Text(
-                        text = "Explora, identifica e guarda observacoes da flora portuguesa.",
+                        text = "Descobre o mundo da flora do Douro e guarda as tuas observacoes na tua conta pessoal.",
                         color = Color.White.copy(alpha = 0.88f),
                         style = MaterialTheme.typography.bodySmall,
                         lineHeight = 18.sp

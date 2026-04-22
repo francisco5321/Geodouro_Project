@@ -1,0 +1,16 @@
+data/raw/
+data/processed/
+artifacts/
+*.pt
+*.pth
+*.ptl
+*.csv
+*.json
+!.gitignore
+!data/.gitkeep
+!scripts/*.py
+!scripts/*.ps1
+!scripts/*.sh
+!README.md
+!requirements.txt
+!config.example.json

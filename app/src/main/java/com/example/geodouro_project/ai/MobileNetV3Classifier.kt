@@ -218,6 +218,18 @@ class MobileNetV3Classifier(
 
     private fun copyAssetToFilesDir(assetName: String): String {
         val destinationFile = File(context.filesDir, assetName)
+        val assetLength = runCatching {
+            context.assets.openFd(assetName).use { descriptor -> descriptor.length }
+        }.getOrNull()
+
+        if (
+            destinationFile.exists() &&
+            destinationFile.length() > 0 &&
+            (assetLength == null || destinationFile.length() == assetLength)
+        ) {
+            return destinationFile.absolutePath
+        }
+
         context.assets.open(assetName).use { inputStream ->
             FileOutputStream(destinationFile, false).use { outputStream ->
                 inputStream.copyTo(outputStream)
@@ -241,8 +253,19 @@ class MobileNetV3Classifier(
     }
 
     private fun preprocessBitmap(bitmap: Bitmap): Tensor {
-        val scaled = Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, true)
-        return TensorImageUtils.bitmapToFloat32Tensor(scaled, TORCHVISION_MEAN_RGB, TORCHVISION_STD_RGB)
+        val scaled = if (bitmap.width == inputSize && bitmap.height == inputSize) {
+            bitmap
+        } else {
+            Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, true)
+        }
+
+        return try {
+            TensorImageUtils.bitmapToFloat32Tensor(scaled, TORCHVISION_MEAN_RGB, TORCHVISION_STD_RGB)
+        } finally {
+            if (scaled !== bitmap) {
+                scaled.recycle()
+            }
+        }
     }
 
     private fun toProbabilities(rawOutput: FloatArray): FloatArray {

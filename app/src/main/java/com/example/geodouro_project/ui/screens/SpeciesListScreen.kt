@@ -38,6 +38,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -54,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.data.repository.PlantRepository.PlantSpeciesCatalogItem
 import com.example.geodouro_project.di.AppContainer
@@ -138,23 +140,25 @@ fun SpeciesListScreen(
     var selectedFilter by rememberSaveable { mutableStateOf(SpeciesFilter.SPECIES) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
 
-    val filteredSpecies = uiState.species.filter { species ->
+    val filteredSpecies = remember(uiState.species, searchQuery, selectedFilter) {
         val query = searchQuery.trim().lowercase(Locale.ROOT)
-        if (query.isBlank()) {
-            true
-        } else {
-            species.scientificName.lowercase(Locale.ROOT).contains(query) ||
-                species.commonName.lowercase(Locale.ROOT).contains(query) ||
-                species.family.lowercase(Locale.ROOT).contains(query) ||
-                species.genus.lowercase(Locale.ROOT).contains(query)
-        }
-    }.sortedWith(
-        when (selectedFilter) {
-            SpeciesFilter.FAMILY -> compareBy<SpeciesListItem> { it.family }.thenBy { it.scientificName }
-            SpeciesFilter.GENUS -> compareBy<SpeciesListItem> { it.genus }.thenBy { it.scientificName }
-            SpeciesFilter.SPECIES -> compareBy<SpeciesListItem> { it.scientificName }
-        }
-    )
+        uiState.species.filter { species ->
+            if (query.isBlank()) {
+                true
+            } else {
+                species.scientificName.lowercase(Locale.ROOT).contains(query) ||
+                    species.commonName.lowercase(Locale.ROOT).contains(query) ||
+                    species.family.lowercase(Locale.ROOT).contains(query) ||
+                    species.genus.lowercase(Locale.ROOT).contains(query)
+            }
+        }.sortedWith(
+            when (selectedFilter) {
+                SpeciesFilter.FAMILY -> compareBy<SpeciesListItem> { it.family }.thenBy { it.scientificName }
+                SpeciesFilter.GENUS -> compareBy<SpeciesListItem> { it.genus }.thenBy { it.scientificName }
+                SpeciesFilter.SPECIES -> compareBy<SpeciesListItem> { it.scientificName }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -291,6 +295,15 @@ fun SpeciesCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val thumbnailRequest = remember(species.thumbnailUri) {
+        ImageRequest.Builder(context)
+            .data(species.thumbnailUri)
+            .size(SPECIES_THUMBNAIL_MAX_SIZE)
+            .crossfade(false)
+            .build()
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -312,7 +325,7 @@ fun SpeciesCard(
             ) {
                 if (!species.thumbnailUri.isNullOrBlank()) {
                     AsyncImage(
-                        model = species.thumbnailUri,
+                        model = thumbnailRequest,
                         contentDescription = species.scientificName,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -441,3 +454,5 @@ fun String.toSpeciesId(): String {
         .lowercase(Locale.ROOT)
         .replace(Regex("\\s+"), "_")
 }
+
+private const val SPECIES_THUMBNAIL_MAX_SIZE = 240

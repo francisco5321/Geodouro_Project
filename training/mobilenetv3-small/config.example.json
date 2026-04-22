@@ -1,0 +1,33 @@
+{
+  "server": {
+    "ssh_host": "sudoe@ubuntu-server",
+    "remote_images_path": "/caminho/no/servidor/com/imagens/",
+    "remote_metadata_path": ""
+  },
+  "dataset": {
+    "raw_dir": "data/raw",
+    "processed_dir": "data/processed",
+    "splits_dir": "data/processed/splits",
+    "image_size": 224,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "seed": 42
+  },
+  "training": {
+    "batch_size": 32,
+    "epochs": 30,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0005,
+    "label_smoothing": 0.1,
+    "freeze_features": true,
+    "freeze_epochs": 4,
+    "unfreeze_lr_scale": 0.5,
+    "dropout": 0.3
+  },
+  "outputs": {
+    "artifacts_dir": "artifacts/mobilenetv3_small",
+    "checkpoint_name": "mobilenetv3_small_best.pt",
+    "android_model_name": "mobilenetv3_small_best_android.pt",
+    "labels_name": "species_labels.txt"
+  }
+}

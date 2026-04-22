@@ -68,10 +68,10 @@ class PlantRepository(
     private val remotePublicationService: RemotePublicationService,
     private val remoteSpeciesService: RemoteSpeciesService,
     private val remoteObservationCatalogService: RemoteObservationCatalogService,
+    private val classifier: MobileNetV3Classifier,
     private val currentIdentityProvider: () -> RemoteUserIdentity?
 ) {
 
-    private val classifier by lazy { MobileNetV3Classifier(appContext) }
     private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(appContext) }
     private val multiImageAggregator by lazy {
         MultiImageAggregator(nonPlantLabel = MobileNetV3Classifier.NON_PLANT_LABEL)
@@ -103,7 +103,7 @@ class PlantRepository(
         }
 
         return withContext(Dispatchers.IO) {
-            val capturedBitmap = decodeLocalBitmap(localResult.imageUri)
+            val capturedBitmap = decodeLocalBitmap(localResult.imageUri, MAX_INFERENCE_BITMAP_SIZE)
                 ?: return@withContext localResult
             val queryEmbedding = classifier.extractEmbedding(capturedBitmap)
                 ?: return@withContext localResult
@@ -282,6 +282,15 @@ class PlantRepository(
             ownerUserId = ownerIdentity?.userId,
             ownerGuestLabel = ownerIdentity?.guestLabel
         )
+    }
+
+    fun observeFailedObservationIds(): Flow<Set<String>> {
+        val ownerIdentity = currentIdentityProvider()
+        return observationDao.observeIdsBySyncStatusForOwner(
+            syncStatus = ObservationSyncStatus.FAILED.name,
+            ownerUserId = ownerIdentity?.userId,
+            ownerGuestLabel = ownerIdentity?.guestLabel
+        ).map { ids -> ids.toSet() }
     }
 
     fun observePublishedObservations(): Flow<List<ObservationEntity>> {
@@ -666,11 +675,30 @@ class PlantRepository(
         return RankedCandidate(candidate = candidate, similarity = similarity, fusedScore = fusedScore)
     }
 
-    private fun decodeLocalBitmap(imageUri: String): Bitmap? {
+    private fun decodeLocalBitmap(
+        imageUri: String,
+        maxDimension: Int = MAX_INFERENCE_BITMAP_SIZE
+    ): Bitmap? {
         val parsedUri = Uri.parse(imageUri)
         return runCatching {
+            val bounds = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
             openImageInputStream(parsedUri)?.use { inputStream ->
-                BitmapFactory.decodeStream(inputStream)
+                BitmapFactory.decodeStream(inputStream, null, bounds)
+            }
+
+            val options = BitmapFactory.Options().apply {
+                inSampleSize = calculateInSampleSize(
+                    width = bounds.outWidth,
+                    height = bounds.outHeight,
+                    maxDimension = maxDimension
+                )
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
+
+            openImageInputStream(parsedUri)?.use { inputStream ->
+                BitmapFactory.decodeStream(inputStream, null, options)
             }
         }.getOrNull()
     }
@@ -687,9 +715,44 @@ class PlantRepository(
                 }
 
                 val bytes = response.body?.bytes() ?: return@use null
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                decodeByteArraySampled(bytes, MAX_REFERENCE_BITMAP_SIZE)
             }
         }.getOrNull()
+    }
+
+    private fun decodeByteArraySampled(bytes: ByteArray, maxDimension: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = calculateInSampleSize(
+                width = bounds.outWidth,
+                height = bounds.outHeight,
+                maxDimension = maxDimension
+            )
+            inPreferredConfig = Bitmap.Config.RGB_565
+        }
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+    }
+
+    private fun calculateInSampleSize(width: Int, height: Int, maxDimension: Int): Int {
+        if (width <= 0 || height <= 0 || maxDimension <= 0) {
+            return 1
+        }
+
+        var sampleSize = 1
+        var sampledWidth = width
+        var sampledHeight = height
+
+        while (sampledWidth / 2 >= maxDimension || sampledHeight / 2 >= maxDimension) {
+            sampleSize *= 2
+            sampledWidth /= 2
+            sampledHeight /= 2
+        }
+
+        return sampleSize.coerceAtLeast(1)
     }
 
     private fun cosineSimilarity(vectorA: FloatArray, vectorB: FloatArray): Float {
@@ -1030,7 +1093,7 @@ class PlantRepository(
 
         val imageResults = imagesToProcess.map { imageUri ->
             runCatching {
-                val bitmap = decodeLocalBitmap(imageUri)
+                val bitmap = decodeLocalBitmap(imageUri, MAX_INFERENCE_BITMAP_SIZE)
                     ?: return@runCatching ImageInferenceResult(
                         imageUri = imageUri,
                         predictedSpecies = "UNKNOWN",
@@ -1095,6 +1158,8 @@ class PlantRepository(
         private const val MODEL_WEIGHT = 0.60f
         private const val SIMILARITY_WEIGHT = 0.40f
         private const val MIN_RERANK_GAIN = 0.02f
+        private const val MAX_INFERENCE_BITMAP_SIZE = 640
+        private const val MAX_REFERENCE_BITMAP_SIZE = 512
     }
 }
 

@@ -2,6 +2,7 @@ package com.example.geodouro_project.di
 
 import android.content.Context
 import com.example.geodouro_project.BuildConfig
+import com.example.geodouro_project.ai.MobileNetV3Classifier
 import com.example.geodouro_project.core.network.ConnectivityChecker
 import com.example.geodouro_project.data.local.AuthSessionStorage
 import com.example.geodouro_project.data.local.GeodouroDatabase
@@ -34,6 +35,8 @@ object AppContainer {
     private var routePlanRepositoryInstance: RoutePlanRepository? = null
     @Volatile
     private var visitTargetRepositoryInstance: VisitTargetRepository? = null
+    @Volatile
+    private var classifierInstance: MobileNetV3Classifier? = null
 
     fun provideAuthRepository(context: Context): AuthRepository {
         return authRepositoryInstance ?: synchronized(this) {
@@ -65,6 +68,13 @@ object AppContainer {
         return repositoryInstance ?: synchronized(this) {
             repositoryInstance ?: buildRepository(context.applicationContext)
                 .also { repositoryInstance = it }
+        }
+    }
+
+    fun provideMobileNetV3Classifier(context: Context): MobileNetV3Classifier {
+        return classifierInstance ?: synchronized(this) {
+            classifierInstance ?: MobileNetV3Classifier(context.applicationContext)
+                .also { classifierInstance = it }
         }
     }
 
@@ -185,6 +195,7 @@ object AppContainer {
             remotePublicationService = remotePublicationService,
             remoteSpeciesService = remoteSpeciesService,
             remoteObservationCatalogService = remoteObservationCatalogService,
+            classifier = provideMobileNetV3Classifier(appContext),
             currentIdentityProvider = authRepository::currentRemoteIdentity
         )
     }

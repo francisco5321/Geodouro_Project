@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,6 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.di.AppContainer
@@ -181,28 +183,30 @@ fun ProfileScreen(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedFilter by rememberSaveable { mutableStateOf(ProfileObservationFilter.ALL) }
 
-    val filteredObservations = uiState.observations.filter { observation ->
+    val filteredObservations = remember(uiState.observations, searchQuery, selectedFilter) {
         val normalizedQuery = searchQuery.trim().lowercase(Locale.ROOT)
-        val matchesQuery = normalizedQuery.isBlank() ||
-            listOf(
-                observation.enrichedScientificName,
-                observation.enrichedCommonName,
-                observation.predictedSpecies,
-                observation.enrichedFamily
-            ).filterNotNull().any { it.lowercase(Locale.ROOT).contains(normalizedQuery) }
+        uiState.observations.filter { observation ->
+            val matchesQuery = normalizedQuery.isBlank() ||
+                listOf(
+                    observation.enrichedScientificName,
+                    observation.enrichedCommonName,
+                    observation.predictedSpecies,
+                    observation.enrichedFamily
+                ).filterNotNull().any { it.lowercase(Locale.ROOT).contains(normalizedQuery) }
 
-        val matchesFilter = when (selectedFilter) {
-            ProfileObservationFilter.ALL -> true
-            ProfileObservationFilter.PENDING -> {
-                !observation.isPublished && observation.syncStatus != ObservationSyncStatus.SYNCED.name
+            val matchesFilter = when (selectedFilter) {
+                ProfileObservationFilter.ALL -> true
+                ProfileObservationFilter.PENDING -> {
+                    !observation.isPublished && observation.syncStatus != ObservationSyncStatus.SYNCED.name
+                }
+                ProfileObservationFilter.SYNCED -> {
+                    !observation.isPublished && observation.syncStatus == ObservationSyncStatus.SYNCED.name
+                }
+                ProfileObservationFilter.PUBLISHED -> observation.isPublished
             }
-            ProfileObservationFilter.SYNCED -> {
-                !observation.isPublished && observation.syncStatus == ObservationSyncStatus.SYNCED.name
-            }
-            ProfileObservationFilter.PUBLISHED -> observation.isPublished
+
+            matchesQuery && matchesFilter
         }
-
-        matchesQuery && matchesFilter
     }
 
     Scaffold(
@@ -463,6 +467,15 @@ private fun ObservationProfileCard(
     onPublish: () -> Unit,
     onClick: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val imageRequest = androidx.compose.runtime.remember(observation.imageUri) {
+        ImageRequest.Builder(context)
+            .data(observation.imageUri)
+            .size(PROFILE_IMAGE_MAX_SIZE)
+            .crossfade(false)
+            .build()
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -473,7 +486,7 @@ private fun ObservationProfileCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             AsyncImage(
-                model = observation.imageUri,
+                model = imageRequest,
                 contentDescription = observation.predictedSpecies,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -636,3 +649,5 @@ private fun profileSessionLabel(sessionState: SessionState): String {
         SessionState.LoggedOut -> "Sem sessao"
     }
 }
+
+private const val PROFILE_IMAGE_MAX_SIZE = 900

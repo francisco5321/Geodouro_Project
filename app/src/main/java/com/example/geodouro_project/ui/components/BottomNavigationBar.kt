@@ -9,7 +9,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.geodouro_project.ui.theme.*
 
 enum class BottomNavItem(
@@ -18,7 +20,7 @@ enum class BottomNavItem(
     val label: String
 ) {
     HOME("home", Icons.Default.Home, "Início"),
-    COMMUNITY("community", Icons.Default.Group, "Comunidade"),
+    COMMUNITY("community", Icons.Default.Group, "Publicações"),
     IDENTIFY("identify", Icons.Default.CameraAlt, "Identificar"),
     LIST("list", Icons.Default.List, "Lista"),
     PROFILE("profile", Icons.Default.Person, "Perfil")
@@ -69,7 +71,12 @@ fun BottomNavigationBar(
                     label = {
                         Text(
                             item.label,
-                            style = MaterialTheme.typography.labelSmall
+                            modifier = Modifier.wrapContentWidth(unbounded = true),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = if (item == BottomNavItem.COMMUNITY) 10.5.sp else MaterialTheme.typography.labelSmall.fontSize,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Visible
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(

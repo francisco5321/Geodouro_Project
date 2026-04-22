@@ -58,6 +58,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.geodouro_project.domain.model.LocalInferenceResult
 import com.example.geodouro_project.domain.model.LocalPredictionCandidate
 import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
@@ -133,6 +134,42 @@ fun ResultsScreen(
             )
         } else {
             viewModel.loadHybridResult(localInferenceResult)
+        }
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.confirmedEvents.collect {
+            when (val state = uiState) {
+                is ResultsUiState.Success -> {
+                    onConfirmResult(
+                        IdentificationResult(
+                            scientificName = state.result.scientificName,
+                            commonName = state.result.commonName,
+                            family = state.result.family,
+                            confidence = state.result.confidence,
+                            sourceLabel = state.sourceLabel,
+                            wikipediaUrl = state.result.wikipediaUrl,
+                            photoUrl = state.result.photoUrl
+                        )
+                    )
+                }
+
+                is ResultsUiState.MultiImageSuccess -> {
+                    onConfirmResult(
+                        IdentificationResult(
+                            scientificName = state.result.finalSpecies,
+                            commonName = state.result.commonName,
+                            family = state.result.family,
+                            confidence = state.result.aggregatedConfidence,
+                            sourceLabel = state.sourceLabel,
+                            wikipediaUrl = state.result.wikipediaUrl,
+                            photoUrl = state.result.photoUrl
+                        )
+                    )
+                }
+
+                else -> Unit
+            }
         }
     }
 
@@ -438,6 +475,15 @@ private fun ResultPhotoCard(
     imageModel: String?,
     emptyMessage: String
 ) {
+    val context = LocalContext.current
+    val request = remember(imageModel) {
+        ImageRequest.Builder(context)
+            .data(imageModel)
+            .size(RESULT_IMAGE_MAX_SIZE)
+            .crossfade(false)
+            .build()
+    }
+
     Column(
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -475,7 +521,7 @@ private fun ResultPhotoCard(
             }
         } else {
             AsyncImage(
-                model = imageModel,
+                model = request,
                 contentDescription = title,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -806,9 +852,18 @@ private fun MultiImagePhotosSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 capturedImageUris.forEachIndexed { index, imageUri ->
+                    val context = LocalContext.current
+                    val thumbnailRequest = remember(imageUri) {
+                        ImageRequest.Builder(context)
+                            .data(imageUri)
+                            .size(THUMBNAIL_IMAGE_MAX_SIZE)
+                            .crossfade(false)
+                            .build()
+                    }
+
                     Box {
                         AsyncImage(
-                            model = imageUri,
+                            model = thumbnailRequest,
                             contentDescription = "Foto capturada ${index + 1}",
                             modifier = Modifier
                                 .size(110.dp)
@@ -864,6 +919,14 @@ private fun MultiImagePhotosSection(
     if (selectedImageIndex != null && capturedImageUris.isNotEmpty()) {
         val currentIndex = selectedImageIndex!!.coerceIn(0, capturedImageUris.lastIndex)
         val currentImageUri = capturedImageUris[currentIndex]
+        val context = LocalContext.current
+        val fullImageRequest = remember(currentImageUri) {
+            ImageRequest.Builder(context)
+                .data(currentImageUri)
+                .size(FULL_IMAGE_MAX_SIZE)
+                .crossfade(false)
+                .build()
+        }
 
         Dialog(
             onDismissRequest = { selectedImageIndex = null },
@@ -879,7 +942,7 @@ private fun MultiImagePhotosSection(
                         .padding(12.dp)
                 ) {
                     AsyncImage(
-                        model = currentImageUri,
+                        model = fullImageRequest,
                         contentDescription = "Foto capturada ampliada",
                         modifier = Modifier
                             .fillMaxWidth()
@@ -977,6 +1040,10 @@ private fun MultiImageResultUiModel.toIdentificationResult(sourceLabel: String):
         photoUrl = photoUrl
     )
 }
+
+private const val RESULT_IMAGE_MAX_SIZE = 1200
+private const val THUMBNAIL_IMAGE_MAX_SIZE = 240
+private const val FULL_IMAGE_MAX_SIZE = 1800
 
 @Composable
 private fun WikipediaLink(

@@ -8,8 +8,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.geodouro_project.ai.MobileNetV3Classifier
 import com.example.geodouro_project.core.location.LocationResolver
 import com.example.geodouro_project.core.storage.PersistentImageStorage
+import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.LocalInferenceResult
 import com.example.geodouro_project.domain.model.LocalPredictionCandidate
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 data class IdentifyUiState(
@@ -167,7 +170,9 @@ class IdentifyViewModel(
 
         viewModelScope.launch {
             runCatching {
-                val importedUris = uris.map { imageStorage.importFromUri(it) }
+                val importedUris = withContext(Dispatchers.IO) {
+                    uris.map { imageStorage.importFromUri(it) }
+                }
                     .filterNot { imported -> _uiState.value.capturedImageUris.contains(imported) }
                 _uiState.update { state ->
                     state.copy(capturedImageUris = state.capturedImageUris + importedUris)
@@ -218,8 +223,8 @@ class IdentifyViewModel(
                     )
                 } else {
                     val imageUri = latestState.capturedImageUris.first()
-                    val bitmap = imageStorage.openInputStream(imageUri)?.use { stream ->
-                        android.graphics.BitmapFactory.decodeStream(stream)
+                    val bitmap = withContext(Dispatchers.IO) {
+                        imageStorage.decodeSampledBitmap(imageUri)
                     } ?: throw IllegalStateException("Nao foi possivel ler a imagem selecionada")
                     val prediction = classifier.classify(bitmap)
 
@@ -287,7 +292,7 @@ class IdentifyViewModel(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     val appContext = context.applicationContext
                     return IdentifyViewModel(
-                        classifier = MobileNetV3Classifier(appContext),
+                        classifier = AppContainer.provideMobileNetV3Classifier(appContext),
                         locationResolver = LocationResolver(appContext),
                         imageStorage = PersistentImageStorage(appContext)
                     ) as T

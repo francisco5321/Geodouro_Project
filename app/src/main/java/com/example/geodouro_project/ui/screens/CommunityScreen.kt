@@ -53,6 +53,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -73,6 +74,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.data.repository.PlantRepository.CommunityPublication
 import com.example.geodouro_project.di.AppContainer
@@ -167,20 +169,22 @@ fun CommunityScreen(
         if (refreshTrigger > 0) viewModel.refresh()
     }
 
-    val filteredPublications = uiState.publications.filter { publication ->
+    val filteredPublications = remember(uiState.publications, searchQuery, selectedFilter) {
         val query = searchQuery.trim().lowercase(Locale.ROOT)
-        val matchesQuery = query.isBlank() ||
-            publication.scientificName.lowercase(Locale.ROOT).contains(query) ||
-            (publication.commonName?.lowercase(Locale.ROOT)?.contains(query) == true) ||
-            publication.userDisplayName.lowercase(Locale.ROOT).contains(query)
+        uiState.publications.filter { publication ->
+            val matchesQuery = query.isBlank() ||
+                publication.scientificName.lowercase(Locale.ROOT).contains(query) ||
+                (publication.commonName?.lowercase(Locale.ROOT)?.contains(query) == true) ||
+                publication.userDisplayName.lowercase(Locale.ROOT).contains(query)
 
-        val matchesFilter = when (selectedFilter) {
-            CommunityFilter.ALL -> true
-            CommunityFilter.WITH_LOCATION -> publication.latitude != null && publication.longitude != null
-            CommunityFilter.WITHOUT_LOCATION -> publication.latitude == null || publication.longitude == null
+            val matchesFilter = when (selectedFilter) {
+                CommunityFilter.ALL -> true
+                CommunityFilter.WITH_LOCATION -> publication.latitude != null && publication.longitude != null
+                CommunityFilter.WITHOUT_LOCATION -> publication.latitude == null || publication.longitude == null
+            }
+
+            matchesQuery && matchesFilter
         }
-
-        matchesQuery && matchesFilter
     }
 
     Scaffold(
@@ -447,6 +451,15 @@ fun CommunityPostCard(
     post: CommunityPublication,
     onClick: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val imageRequest = remember(post.imageUrl) {
+        ImageRequest.Builder(context)
+            .data(post.imageUrl)
+            .size(COMMUNITY_IMAGE_MAX_SIZE)
+            .crossfade(false)
+            .build()
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -465,7 +478,7 @@ fun CommunityPostCard(
                     .height(230.dp)
             ) {
                 AsyncImage(
-                    model = post.imageUrl,
+                    model = imageRequest,
                     contentDescription = post.scientificName,
                     modifier = Modifier
                         .fillMaxSize()
@@ -636,3 +649,5 @@ private fun formatTimeAgo(timestamp: String): String {
         else -> "há ${days} d"
     }
 }
+
+private const val COMMUNITY_IMAGE_MAX_SIZE = 1000

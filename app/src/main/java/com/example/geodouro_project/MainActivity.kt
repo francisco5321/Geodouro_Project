@@ -33,7 +33,6 @@ import androidx.navigation.navArgument
 import com.example.geodouro_project.core.network.ConnectivityChecker
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.LocalInferenceResult
-import com.example.geodouro_project.domain.model.ObservationSyncStatus
 import com.example.geodouro_project.domain.model.SessionState
 import com.example.geodouro_project.ui.components.BottomNavigationBar
 import com.example.geodouro_project.ui.screens.AuthScreen
@@ -79,7 +78,6 @@ fun AppNavigation() {
     val hasInternet by connectivityChecker.observeInternetAvailability().collectAsStateWithLifecycle(
         initialValue = connectivityChecker.hasInternetConnection()
     )
-    val observations by repository.observeObservations().collectAsStateWithLifecycle(initialValue = emptyList())
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "home"
     val snackbarHostState = remember { SnackbarHostState() }
@@ -87,9 +85,9 @@ fun AppNavigation() {
     var latestMultiImageUris by remember { mutableStateOf<List<String>>(emptyList()) }
     var latestCaptureLatitude by remember { mutableStateOf<Double?>(null) }
     var latestCaptureLongitude by remember { mutableStateOf<Double?>(null) }
+    var clearIdentifyCapturesVersion by remember { mutableStateOf(0) }
     var networkRefreshVersion by remember { mutableStateOf(0) }
     var previousInternetState by remember { mutableStateOf<Boolean?>(null) }
-    var previousFailedObservationIds by remember { mutableStateOf<Set<String>?>(null) }
 
     if (sessionState == SessionState.Loading) {
         SessionLoadingScreen()
@@ -115,19 +113,18 @@ fun AppNavigation() {
         }
     }
 
-    LaunchedEffect(observations) {
-        val failedObservationIds = observations
-            .filter { it.syncStatus == ObservationSyncStatus.FAILED.name }
-            .map { it.id }
-            .toSet()
+    LaunchedEffect(repository) {
+        var previousFailedObservationIds: Set<String>? = null
 
-        val previous = previousFailedObservationIds
-        previousFailedObservationIds = failedObservationIds
+        repository.observeFailedObservationIds().collect { failedObservationIds ->
+            val previous = previousFailedObservationIds
+            previousFailedObservationIds = failedObservationIds
 
-        if (previous != null && (failedObservationIds - previous).isNotEmpty()) {
-            snackbarHostState.showSnackbar(
-                "Backend indisponivel. As observacoes foram guardadas localmente e serao sincronizadas mais tarde."
-            )
+            if (previous != null && (failedObservationIds - previous).isNotEmpty()) {
+                snackbarHostState.showSnackbar(
+                    "Backend indisponivel. As observacoes foram guardadas localmente e serao sincronizadas mais tarde."
+                )
+            }
         }
     }
 
@@ -177,9 +174,6 @@ fun AppNavigation() {
                     },
                     onOpenRoutePlans = {
                         navController.navigate("routePlans")
-                    },
-                    onOpenVisitTargets = {
-                        navController.navigate("visitTargets")
                     }
                 )
             }
@@ -208,7 +202,8 @@ fun AppNavigation() {
                         latestCaptureLatitude = latitude
                         latestCaptureLongitude = longitude
                         navController.navigate("results")
-                    }
+                    },
+                    clearCapturesTrigger = clearIdentifyCapturesVersion
                 )
             }
 
@@ -256,6 +251,11 @@ fun AppNavigation() {
                         navController.popBackStack()
                     },
                     onConfirmResult = {
+                        latestInferenceResult = null
+                        latestMultiImageUris = emptyList()
+                        latestCaptureLatitude = null
+                        latestCaptureLongitude = null
+                        clearIdentifyCapturesVersion += 1
                         navController.popBackStack()
                     },
                     multiImageUris = latestMultiImageUris,

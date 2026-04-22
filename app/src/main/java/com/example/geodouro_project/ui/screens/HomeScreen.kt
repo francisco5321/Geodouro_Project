@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Eco
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
@@ -112,8 +111,7 @@ class HomeViewModel(
 fun HomeScreen(
     onSpeciesClick: (String) -> Unit = {},
     onOpenSpeciesList: () -> Unit = {},
-    onOpenRoutePlans: () -> Unit = {},
-    onOpenVisitTargets: () -> Unit = {}
+    onOpenRoutePlans: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: HomeViewModel = viewModel(
@@ -268,51 +266,6 @@ fun HomeScreen(
                             )
                             Text(
                                 text = "Abre os percursos criados na web e consulta a ordem das paragens.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = GeodouroTextSecondary
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp)
-                        .padding(bottom = 4.dp)
-                        .clickable(onClick = onOpenVisitTargets),
-                    shape = RoundedCornerShape(18.dp),
-                    color = GeodouroCardBg
-                ) {
-                    Row(
-                        modifier = Modifier.padding(18.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(GeodouroBrandGreen.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = GeodouroBrandGreen
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Quero visitar",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = GeodouroTextPrimary
-                            )
-                            Text(
-                                text = "Consulta os alvos guardados na web e remove pontos que ja nao queres visitar.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = GeodouroTextSecondary
                             )
