@@ -9,7 +9,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,7 +60,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -69,8 +67,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.geodouro_project.R
 import com.example.geodouro_project.domain.model.LocalInferenceResult
+import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
+import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroGrey
@@ -158,25 +157,21 @@ fun IdentifyScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Image(
-                        painter = painterResource(id = R.drawable.logo_s_fundo),
-                        contentDescription = "Geodouro",
-                        modifier = Modifier.height(80.dp)
-                    )
+                    GeoFloraHeaderLogo()
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = GeodouroWhite
+                    containerColor = GeodouroBg
                 )
             )
         },
-        containerColor = GeodouroWhite
+        containerColor = GeodouroBg
     ) { padding ->
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(GeodouroWhite)
+                .background(GeodouroBg)
                 .verticalScroll(rememberScrollState())
         ) {
             Surface(

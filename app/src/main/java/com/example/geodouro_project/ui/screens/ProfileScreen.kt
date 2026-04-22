@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -24,7 +23,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,13 +43,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -66,10 +64,12 @@ import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.SessionState
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
+import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
+import com.example.geodouro_project.ui.theme.GeodouroCardBg
+import com.example.geodouro_project.ui.theme.GeodouroDarkGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
-import com.example.geodouro_project.ui.theme.GeodouroLightGreen
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
@@ -217,82 +217,86 @@ fun ProfileScreen(
                     )
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = GeodouroWhite
+                    containerColor = GeodouroBg
                 )
             )
-        }
+        },
+        containerColor = GeodouroBg
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(GeodouroWhite),
+                .background(GeodouroBg),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
-                    elevation = CardDefaults.cardElevation(2.dp),
-                    shape = RoundedCornerShape(8.dp)
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                    elevation = CardDefaults.cardElevation(4.dp),
+                    shape = RoundedCornerShape(24.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        GeodouroBrandGreen,
+                                        GeodouroGreen
+                                    )
+                                )
+                            )
+                            .padding(22.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(RoundedCornerShape(40.dp))
-                                .background(GeodouroLightGreen),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            androidx.compose.material3.Icon(
-                                Icons.Default.Person,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(48.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
                         Text(
                             profileDisplayName(sessionState),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = GeodouroTextPrimary
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = GeodouroWhite
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         Surface(
-                            color = GeodouroLightBg,
+                            color = GeodouroWhite.copy(alpha = 0.16f),
                             shape = RoundedCornerShape(999.dp)
                         ) {
                             Text(
                                 text = profileSessionLabel(sessionState),
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                 style = MaterialTheme.typography.labelMedium,
-                                color = GeodouroBrandGreen
+                                color = GeodouroWhite
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            StatItem(uiState.observationsCount.toString(), "Observacoes")
-                            StatItem(uiState.publishedCount.toString(), "Publicacoes")
-                            StatItem(uiState.speciesCount.toString(), "Especies")
+                            StatItem(
+                                value = uiState.observationsCount.toString(),
+                                label = "Observacoes",
+                                modifier = Modifier.weight(1f)
+                            )
+                            StatItem(
+                                value = uiState.publishedCount.toString(),
+                                label = "Publicacoes",
+                                modifier = Modifier.weight(1f)
+                            )
+                            StatItem(
+                                value = uiState.speciesCount.toString(),
+                                label = "Especies",
+                                modifier = Modifier.weight(1f)
+                            )
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
 
                         OutlinedButton(
                             onClick = onLogout,
@@ -589,19 +593,29 @@ private fun buildProfileObservationStatusLabel(observation: ObservationEntity): 
 }
 
 @Composable
-fun StatItem(value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            value,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = GeodouroGreen
-        )
-        Text(
-            label,
-            style = MaterialTheme.typography.bodySmall,
-            color = GeodouroTextSecondary
-        )
+fun StatItem(value: String, label: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = GeodouroCardBg
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = GeodouroDarkGreen
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = GeodouroTextSecondary
+            )
+        }
     }
 }
 

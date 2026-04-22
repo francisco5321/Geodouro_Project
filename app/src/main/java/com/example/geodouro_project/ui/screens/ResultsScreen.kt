@@ -1,6 +1,5 @@
 package com.example.geodouro_project.ui.screens
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -51,7 +50,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -60,14 +58,16 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.geodouro_project.R
 import com.example.geodouro_project.domain.model.LocalInferenceResult
 import com.example.geodouro_project.domain.model.LocalPredictionCandidate
+import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
+import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
+import com.example.geodouro_project.ui.theme.GeodouroWarningBg
 import com.example.geodouro_project.ui.theme.GeodouroWhite
 import com.example.geodouro_project.ui.theme.geodouroOutlinedBorderColor
 import com.example.geodouro_project.ui.theme.geodouroOutlinedButtonColors
@@ -147,11 +147,7 @@ fun ResultsScreen(
                             fontWeight = FontWeight.Bold,
                             color = GeodouroBrandGreen
                         )
-                        Image(
-                            painter = painterResource(id = R.drawable.logo_s_fundo),
-                            contentDescription = "Geodouro",
-                            modifier = Modifier.height(28.dp)
-                        )
+                        GeoFloraHeaderLogo(height = 24.dp)
                     }
                 },
                 navigationIcon = {
@@ -164,16 +160,17 @@ fun ResultsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = GeodouroWhite
+                    containerColor = GeodouroBg
                 )
             )
-        }
+        },
+        containerColor = GeodouroBg
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(GeodouroWhite)
+                .background(GeodouroBg)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -704,7 +701,7 @@ fun MultiImageResultCard(
                 Spacer(modifier = Modifier.height(12.dp))
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    color = Color(0xFFFFF3E0),
+                    color = GeodouroWarningBg,
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Row(

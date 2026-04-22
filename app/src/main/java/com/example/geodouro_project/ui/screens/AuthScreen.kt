@@ -1,7 +1,6 @@
 package com.example.geodouro_project.ui.screens
 
 import android.content.Context
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,7 +44,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -58,9 +56,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.geodouro_project.R
 import com.example.geodouro_project.data.repository.AuthRepository
 import com.example.geodouro_project.di.AppContainer
+import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
+import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
@@ -174,7 +173,7 @@ fun AuthScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(GeodouroWhite)
+            .background(GeodouroBg)
             .verticalScroll(rememberScrollState())
             .imePadding()
             .navigationBarsPadding()
@@ -185,50 +184,42 @@ fun AuthScreen() {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(220.dp)
+                .height(190.dp)
                 .background(
                     brush = Brush.linearGradient(
                         colors = listOf(
                             GeodouroBrandGreen,
-                            GeodouroGreen.copy(alpha = 0.85f)
+                            GeodouroGreen.copy(alpha = 0.92f)
                         )
                     ),
                     shape = RoundedCornerShape(28.dp)
                 )
-                .padding(horizontal = 24.dp, vertical = 26.dp)
+                .padding(horizontal = 22.dp, vertical = 22.dp)
         ) {
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Surface(
-                    shape = RoundedCornerShape(50),
-                    color = Color.White.copy(alpha = 0.18f)
+                    shape = RoundedCornerShape(16.dp),
+                    color = GeodouroWhite
                 ) {
-                    Text(
-                        text = "Sessao GeoDouro",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold
+                    GeoFloraHeaderLogo(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        height = 34.dp
                     )
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Image(
-                        painter = painterResource(id = R.drawable.logo_s_fundo),
-                        contentDescription = "Geodouro",
-                        modifier = Modifier.height(64.dp)
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Entra para continuar a explorar a flora do Douro.",
+                        text = "Entra para continuar",
                         color = Color.White,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.ExtraBold,
-                        lineHeight = 30.sp
+                        lineHeight = 28.sp
                     )
                     Text(
-                        text = "Podes autenticar-te ou seguir como convidado. A sessao fica guardada neste dispositivo.",
+                        text = "Explora, identifica e guarda observacoes da flora portuguesa.",
                         color = Color.White.copy(alpha = 0.88f),
                         style = MaterialTheme.typography.bodySmall,
                         lineHeight = 18.sp

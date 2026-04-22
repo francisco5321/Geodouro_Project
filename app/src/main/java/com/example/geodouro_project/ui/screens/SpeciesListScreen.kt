@@ -46,7 +46,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -55,10 +54,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.geodouro_project.R
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.data.repository.PlantRepository.PlantSpeciesCatalogItem
 import com.example.geodouro_project.di.AppContainer
+import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
+import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroGrey
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
@@ -160,23 +160,20 @@ fun SpeciesListScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    androidx.compose.foundation.Image(
-                        painter = painterResource(id = R.drawable.logo_s_fundo),
-                        contentDescription = "Geodouro",
-                        modifier = Modifier.height(80.dp)
-                    )
+                    GeoFloraHeaderLogo()
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = GeodouroWhite
+                    containerColor = GeodouroBg
                 )
             )
-        }
+        },
+        containerColor = GeodouroBg
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(GeodouroWhite)
+                .background(GeodouroBg)
         ) {
             OutlinedTextField(
                 value = searchQuery,

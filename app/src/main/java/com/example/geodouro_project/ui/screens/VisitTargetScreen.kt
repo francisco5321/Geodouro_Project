@@ -53,6 +53,7 @@ import com.example.geodouro_project.data.repository.AuthRepository
 import com.example.geodouro_project.data.repository.VisitTargetRepository
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.SessionState
+import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
@@ -163,10 +164,10 @@ fun VisitTargetScreen(
                         Icon(Icons.Default.ArrowBack, contentDescription = "Voltar", tint = GeodouroBrandGreen)
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = GeodouroWhite)
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = GeodouroBg)
             )
         },
-        containerColor = GeodouroWhite
+        containerColor = GeodouroBg
     ) { padding ->
         when (val state = uiState) {
             VisitTargetUiState.Loading -> VisitTargetCenteredState(padding) {
@@ -208,7 +209,7 @@ private fun VisitTargetList(
         modifier = Modifier
             .fillMaxSize()
             .padding(padding)
-            .background(GeodouroWhite),
+            .background(GeodouroBg),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {

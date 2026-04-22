@@ -54,7 +54,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -67,14 +66,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.geodouro_project.R
 import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
+import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
+import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
+import com.example.geodouro_project.ui.theme.GeodouroDarkGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
+import com.example.geodouro_project.ui.theme.GeodouroLightGreen
+import com.example.geodouro_project.ui.theme.GeodouroMint
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
@@ -85,11 +88,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-
-private val GeodouroGreenSoft = Color(0xFFC0DD97)
-private val GeodouroGreenLight = Color(0xFFEAF3DE)
-private val GeodouroGreenDark = Color(0xFF27500A)
-private val GeodouroGreenMid = Color(0xFF639922)
 
 data class SpeciesDetailUiState(
     val detail: SpeciesDetail? = null,
@@ -168,11 +166,7 @@ fun SpeciesDetailScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    androidx.compose.foundation.Image(
-                        painter = painterResource(id = R.drawable.logo_s_fundo),
-                        contentDescription = "Geodouro",
-                        modifier = Modifier.height(56.dp)
-                    )
+                    GeoFloraHeaderLogo()
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
@@ -184,11 +178,11 @@ fun SpeciesDetailScreen(
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = GeodouroWhite
+                    containerColor = GeodouroBg
                 )
             )
         },
-        containerColor = GeodouroLightBg
+        containerColor = GeodouroBg
     ) { padding ->
         when {
             uiState.isLoading -> CenteredMessage(padding, "A carregar detalhe da especie...")
@@ -276,7 +270,7 @@ private fun CenteredMessage(padding: PaddingValues, text: String) {
         modifier = Modifier
             .fillMaxSize()
             .padding(padding)
-            .background(GeodouroWhite),
+            .background(GeodouroBg),
         contentAlignment = Alignment.Center
     ) {
         Text(text, color = GeodouroTextSecondary)
@@ -338,7 +332,7 @@ private fun HeroImage(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Medium,
-                color = GeodouroGreenDark
+                color = GeodouroDarkGreen
             )
         }
     }
@@ -415,14 +409,14 @@ private fun IdentityCard(
 private fun TaxonChip(label: String) {
     Surface(
         shape = RoundedCornerShape(20.dp),
-        color = GeodouroGreenLight
+        color = GeodouroLightGreen
     ) {
         Text(
             text = label,
             modifier = Modifier.padding(horizontal = 13.dp, vertical = 5.dp),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Medium,
-            color = GeodouroGreenDark
+            color = GeodouroDarkGreen
         )
     }
 }
@@ -432,7 +426,7 @@ private fun StatCell(modifier: Modifier, value: String, label: String) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(10.dp),
-        color = GeodouroGreenSoft.copy(alpha = 0.45f)
+        color = GeodouroMint
     ) {
         Column(
             modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp),
@@ -442,13 +436,13 @@ private fun StatCell(modifier: Modifier, value: String, label: String) {
                 text = value,
                 style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
                 fontWeight = FontWeight.Bold,
-                color = GeodouroGreenMid
+                color = GeodouroBrandGreen
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = GeodouroGreenDark,
+                color = GeodouroDarkGreen,
                 fontSize = 10.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -511,7 +505,7 @@ private fun LocationCard(summary: String) {
             Surface(
                 modifier = Modifier.size(36.dp),
                 shape = RoundedCornerShape(8.dp),
-                color = GeodouroGreenLight
+                color = GeodouroLightGreen
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -642,8 +636,8 @@ private fun ConfidenceBadge(text: String) {
 
 @Composable
 private fun StatusBadge(status: String, isPublished: Boolean) {
-    val bgColor = if (isPublished) GeodouroGreenLight else GeodouroLightBg
-    val textColor = if (isPublished) GeodouroGreenDark else GeodouroTextSecondary
+    val bgColor = if (isPublished) GeodouroLightGreen else GeodouroLightBg
+    val textColor = if (isPublished) GeodouroDarkGreen else GeodouroTextSecondary
 
     Surface(
         shape = RoundedCornerShape(10.dp),

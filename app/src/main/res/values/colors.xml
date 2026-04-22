@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Cores da marca Geodouro -->
-    <color name="geodouro_green">#4A7364</color>
-    <color name="geodouro_light_green">#6BA587</color>
-    <color name="geodouro_dark_green">#3A5D52</color>
-    <color name="geodouro_grey">#575756</color>
-    <color name="geodouro_bg">#F8F9FA</color>
+    <!-- Paleta GeoFlora -->
+    <color name="geodouro_brand_green">#3E7A57</color>
+    <color name="geodouro_green">#6FA878</color>
+    <color name="geodouro_light_green">#DDEEDC</color>
+    <color name="geodouro_dark_green">#2F5E43</color>
+    <color name="geodouro_outline">#C9DCC8</color>
+    <color name="geodouro_grey">#6F7C72</color>
+    <color name="geodouro_bg">#EAF3E7</color>
     
     <!-- Cores padrão -->
     <color name="black">#FF000000</color>

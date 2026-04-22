@@ -76,9 +76,11 @@ import coil.compose.AsyncImage
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.data.repository.PlantRepository.CommunityPublication
 import com.example.geodouro_project.di.AppContainer
+import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroLightGreen
+import com.example.geodouro_project.ui.theme.GeodouroOutline
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
@@ -187,7 +189,7 @@ fun CommunityScreen(
             // Top bar com gradiente sutil e sombra
             Surface(
                 shadowElevation = 4.dp,
-                color = GeodouroWhite
+                color = GeodouroBg
             ) {
                 CenterAlignedTopAppBar(
                     title = {
@@ -214,13 +216,14 @@ fun CommunityScreen(
                     )
                 )
             }
-        }
+        },
+        containerColor = GeodouroBg
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(GeodouroLightBg)
+                .background(GeodouroBg)
                 .pullRefresh(pullRefreshState)
         ) {
             LazyColumn(
@@ -306,7 +309,7 @@ fun CommunityScreen(
                                         border = FilterChipDefaults.filterChipBorder(
                                             enabled = true,
                                             selected = selectedFilter == filter,
-                                            borderColor = Color(0xFFDDE8DC),
+                                            borderColor = GeodouroOutline,
                                             selectedBorderColor = Color.Transparent
                                         )
                                     )

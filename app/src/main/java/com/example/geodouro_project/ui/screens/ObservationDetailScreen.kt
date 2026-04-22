@@ -48,7 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -57,10 +56,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.geodouro_project.R
 import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.di.AppContainer
+import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
+import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
@@ -212,11 +212,7 @@ fun ObservationDetailScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    androidx.compose.foundation.Image(
-                        painter = painterResource(id = R.drawable.logo_s_fundo),
-                        contentDescription = "Geodouro",
-                        modifier = Modifier.height(56.dp)
-                    )
+                    GeoFloraHeaderLogo()
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
@@ -228,10 +224,11 @@ fun ObservationDetailScreen(
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = GeodouroWhite
+                    containerColor = GeodouroBg
                 )
             )
-        }
+        },
+        containerColor = GeodouroBg
     ) { padding ->
         when {
             uiState.isLoading -> {
@@ -239,7 +236,7 @@ fun ObservationDetailScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding)
-                        .background(GeodouroWhite),
+                        .background(GeodouroBg),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("A carregar observacao...", color = GeodouroTextSecondary)
@@ -251,7 +248,7 @@ fun ObservationDetailScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding)
-                        .background(GeodouroWhite),
+                        .background(GeodouroBg),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("Observacao nao encontrada.", color = GeodouroTextSecondary)
@@ -264,7 +261,7 @@ fun ObservationDetailScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding)
-                        .background(GeodouroWhite),
+                        .background(GeodouroBg),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {

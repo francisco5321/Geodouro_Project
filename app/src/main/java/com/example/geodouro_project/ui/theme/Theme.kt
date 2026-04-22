@@ -6,28 +6,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
     primary = GeodouroGreen,
     onPrimary = GeodouroWhite,
-    primaryContainer = GeodouroBrandGreen,
+    primaryContainer = GeodouroDarkGreen,
     onPrimaryContainer = GeodouroWhite,
-    secondary = GeodouroLightGreen,
-    onSecondary = GeodouroTextPrimary,
-    secondaryContainer = GeodouroDarkGreen,
+    secondary = GeodouroMint,
+    onSecondary = GeodouroDarkGreen,
+    secondaryContainer = GeodouroBrandGreen,
     onSecondaryContainer = GeodouroWhite,
-    tertiary = GeodouroWhite,
-    onTertiary = GeodouroTextPrimary,
-    background = GeodouroTextPrimary,
+    tertiary = GeodouroLightGreen,
+    onTertiary = GeodouroDarkGreen,
+    background = GeodouroDarkSurface,
     onBackground = GeodouroWhite,
-    surface = Color(0xFF1E1E1E),
+    surface = GeodouroDarkSurface,
     onSurface = GeodouroWhite,
-    surfaceVariant = Color(0xFF2B2B2B),
-    onSurfaceVariant = Color(0xFFD0D0D0),
-    outline = GeodouroGrey,
-    outlineVariant = Color(0xFF4A4A4A),
-    error = Color(0xFFCF6679),
+    surfaceVariant = GeodouroDarkSurfaceVariant,
+    onSurfaceVariant = GeodouroLightGreen,
+    outline = GeodouroDarkOutline,
+    outlineVariant = GeodouroDarkOutline,
+    error = GeodouroError,
     onError = GeodouroWhite
 )
 
@@ -40,17 +39,17 @@ private val LightColorScheme = lightColorScheme(
     onSecondary = GeodouroTextPrimary,
     secondaryContainer = GeodouroLightGreen,
     onSecondaryContainer = GeodouroTextPrimary,
-    tertiary = GeodouroWhite,
-    onTertiary = GeodouroTextPrimary,
+    tertiary = GeodouroMint,
+    onTertiary = GeodouroBrandGreen,
     background = GeodouroBg,
     onBackground = GeodouroTextPrimary,
     surface = GeodouroWhite,
     onSurface = GeodouroTextPrimary,
     surfaceVariant = GeodouroLightBg,
     onSurfaceVariant = GeodouroTextSecondary,
-    outline = GeodouroGreen.copy(alpha = 0.7f),
-    outlineVariant = GeodouroLightBg,
-    error = Color(0xFFB3261E),
+    outline = GeodouroOutline,
+    outlineVariant = GeodouroLightGreen,
+    error = GeodouroError,
     onError = GeodouroWhite
 )
 

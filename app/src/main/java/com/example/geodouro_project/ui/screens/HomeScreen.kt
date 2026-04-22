@@ -1,6 +1,5 @@
 package com.example.geodouro_project.ui.screens
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,7 +44,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -55,17 +53,17 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.geodouro_project.R
 import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.data.repository.PlantRepository.PlantSpeciesCatalogItem
 import com.example.geodouro_project.di.AppContainer
+import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
+import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
+import com.example.geodouro_project.ui.theme.GeodouroCardBg
 import com.example.geodouro_project.ui.theme.GeodouroGrey
-import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
-import com.example.geodouro_project.ui.theme.GeodouroWhite
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -127,11 +125,7 @@ fun HomeScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Image(
-                        painter = painterResource(id = R.drawable.logo_s_fundo),
-                        contentDescription = "Geodouro",
-                        modifier = Modifier.height(80.dp)
-                    )
+                    GeoFloraHeaderLogo()
                 },
                 actions = {
                     Box(
@@ -139,7 +133,7 @@ fun HomeScreen(
                             .padding(end = 8.dp)
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(GeodouroLightBg),
+                            .background(GeodouroCardBg),
                         contentAlignment = Alignment.Center
                     ) {
                         IconButton(onClick = onOpenSpeciesList) {
@@ -153,17 +147,17 @@ fun HomeScreen(
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = GeodouroWhite
+                    containerColor = GeodouroBg
                 )
             )
         },
-        containerColor = GeodouroWhite
+        containerColor = GeodouroBg
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(GeodouroWhite),
+                .background(GeodouroBg),
             contentPadding = PaddingValues(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
@@ -245,7 +239,7 @@ fun HomeScreen(
                         .padding(horizontal = 24.dp, vertical = 18.dp)
                         .clickable(onClick = onOpenRoutePlans),
                     shape = RoundedCornerShape(18.dp),
-                    color = GeodouroLightBg
+                    color = GeodouroCardBg
                 ) {
                     Row(
                         modifier = Modifier.padding(18.dp),
@@ -290,7 +284,7 @@ fun HomeScreen(
                         .padding(bottom = 4.dp)
                         .clickable(onClick = onOpenVisitTargets),
                     shape = RoundedCornerShape(18.dp),
-                    color = GeodouroLightBg
+                    color = GeodouroCardBg
                 ) {
                     Row(
                         modifier = Modifier.padding(18.dp),
@@ -359,7 +353,7 @@ fun HomeScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp),
                         shape = RoundedCornerShape(18.dp),
-                        color = GeodouroLightBg
+                        color = GeodouroCardBg
                     ) {
                         Column(
                             modifier = Modifier.padding(28.dp),
@@ -421,7 +415,7 @@ fun StatCard(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
-        color = GeodouroLightBg,
+        color = GeodouroCardBg,
         tonalElevation = 0.dp
     ) {
         Column(

@@ -59,6 +59,7 @@ import com.example.geodouro_project.core.location.LocationResolver
 import com.example.geodouro_project.data.repository.RoutePlanRepository
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.SessionState
+import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
@@ -174,11 +175,11 @@ fun RoutePlanDetailScreen(
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = GeodouroWhite
+                    containerColor = GeodouroBg
                 )
             )
         },
-        containerColor = GeodouroWhite
+        containerColor = GeodouroBg
     ) { padding ->
         when (val state = uiState) {
             RoutePlanDetailUiState.Loading -> {
@@ -228,7 +229,7 @@ private fun RoutePlanDetailContent(
         modifier = Modifier
             .fillMaxSize()
             .padding(padding)
-            .background(GeodouroWhite),
+            .background(GeodouroBg),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {

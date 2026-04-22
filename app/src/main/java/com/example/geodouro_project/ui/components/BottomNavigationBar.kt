@@ -8,7 +8,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.example.geodouro_project.ui.theme.*
@@ -33,7 +32,7 @@ fun BottomNavigationBar(
     NavigationBar(
         containerColor = GeodouroWhite,
         contentColor = GeodouroGrey,
-        tonalElevation = 8.dp
+        tonalElevation = 0.dp
     ) {
         BottomNavItem.entries.forEach { item ->
             if (item == BottomNavItem.IDENTIFY) {
@@ -44,8 +43,8 @@ fun BottomNavigationBar(
                 ) {
                     FloatingActionButton(
                         onClick = { onNavigate(item.route) },
-                        containerColor = GeodouroGreen,
-                        contentColor = Color.White,
+                        containerColor = GeodouroBrandGreen,
+                        contentColor = GeodouroWhite,
                         shape = CircleShape,
                         modifier = Modifier.size(56.dp)
                     ) {
@@ -74,11 +73,11 @@ fun BottomNavigationBar(
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = GeodouroDarkGreen,
-                        selectedTextColor = GeodouroDarkGreen,
+                        selectedIconColor = GeodouroBrandGreen,
+                        selectedTextColor = GeodouroBrandGreen,
                         unselectedIconColor = GeodouroGrey,
                         unselectedTextColor = GeodouroGrey,
-                        indicatorColor = GeodouroLightGreen.copy(alpha = 0.2f)
+                        indicatorColor = GeodouroCardBg
                     )
                 )
             }

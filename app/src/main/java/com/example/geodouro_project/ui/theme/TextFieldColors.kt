@@ -14,7 +14,7 @@ fun geodouroOutlinedTextFieldColors(): TextFieldColors {
         unfocusedContainerColor = GeodouroWhite,
         disabledContainerColor = GeodouroLightBg,
         focusedBorderColor = GeodouroBrandGreen,
-        unfocusedBorderColor = GeodouroGreen.copy(alpha = 0.45f),
+        unfocusedBorderColor = GeodouroOutline,
         disabledBorderColor = GeodouroGrey.copy(alpha = 0.3f),
         focusedLabelColor = GeodouroBrandGreen,
         unfocusedLabelColor = GeodouroTextSecondary,

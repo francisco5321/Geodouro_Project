@@ -27,7 +27,7 @@ fun geodouroOutlinedButtonColors() = ButtonDefaults.outlinedButtonColors(
 )
 
 fun geodouroOutlinedBorderColor(enabled: Boolean): Color {
-    return if (enabled) GeodouroGreen.copy(alpha = 0.75f) else GeodouroLightBg
+    return if (enabled) GeodouroOutline else GeodouroLightBg
 }
 
 fun geodouroLoadingIndicatorColor(enabled: Boolean = true): Color {
