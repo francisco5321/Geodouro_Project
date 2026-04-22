@@ -212,6 +212,7 @@ fun ProfileScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
+                expandedHeight = 48.dp,
                 title = {
                     Text(
                         "Perfil",

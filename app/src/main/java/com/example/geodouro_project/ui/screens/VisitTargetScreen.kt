@@ -151,6 +151,7 @@ fun VisitTargetScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
+                expandedHeight = 48.dp,
                 title = {
                     Text(
                         text = "Quero visitar",

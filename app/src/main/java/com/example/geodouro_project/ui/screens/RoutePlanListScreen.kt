@@ -141,6 +141,7 @@ fun RoutePlanListScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
+                expandedHeight = 48.dp,
                 title = {
                     Text(
                         "Percursos",

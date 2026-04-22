@@ -14,7 +14,7 @@ import com.example.geodouro_project.R
 @Composable
 fun GeoFloraHeaderLogo(
     modifier: Modifier = Modifier,
-    height: Dp = 42.dp
+    height: Dp = 34.dp
 ) {
     Image(
         painter = painterResource(id = R.drawable.logo_geoflora),

@@ -122,6 +122,7 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
+                expandedHeight = 48.dp,
                 title = {
                     GeoFloraHeaderLogo()
                 },

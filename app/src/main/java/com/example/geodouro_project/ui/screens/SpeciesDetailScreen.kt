@@ -165,6 +165,7 @@ fun SpeciesDetailScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
+                expandedHeight = 48.dp,
                 title = {
                     GeoFloraHeaderLogo()
                 },

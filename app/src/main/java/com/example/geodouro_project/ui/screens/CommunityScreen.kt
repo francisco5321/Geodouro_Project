@@ -195,6 +195,7 @@ fun CommunityScreen(
                 color = GeodouroBg
             ) {
                 CenterAlignedTopAppBar(
+                    expandedHeight = 48.dp,
                     title = {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(

@@ -176,6 +176,7 @@ fun ResultsScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
+                expandedHeight = 48.dp,
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
@@ -184,7 +185,7 @@ fun ResultsScreen(
                             fontWeight = FontWeight.Bold,
                             color = GeodouroBrandGreen
                         )
-                        GeoFloraHeaderLogo(height = 24.dp)
+                        GeoFloraHeaderLogo()
                     }
                 },
                 navigationIcon = {
