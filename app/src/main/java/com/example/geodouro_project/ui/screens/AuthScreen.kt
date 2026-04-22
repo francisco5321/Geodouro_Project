@@ -388,11 +388,11 @@ fun AuthScreen() {
             color = GeodouroLightBg
         ) {
             Text(
-                text = "O login autentica agora diretamente contra os utilizadores autenticados da tua base de dados.",
-                modifier = Modifier.padding(18.dp),
-                style = MaterialTheme.typography.bodySmall,
+                text = "Faz login para sincronizar as tuas observacoes e aceder a funcionalidades exclusivas. Podes continuar como convidado, mas as tuas observacoes não serão guardadas na tua conta.",
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                 color = GeodouroTextSecondary,
-                lineHeight = 18.sp
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
     }

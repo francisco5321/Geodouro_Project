@@ -84,7 +84,6 @@ import com.example.geodouro_project.ui.theme.GeodouroOutline
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
-import com.example.geodouro_project.ui.theme.geodouroOutlinedTextFieldColors
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -250,7 +249,21 @@ fun CommunityScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 shape = RoundedCornerShape(24.dp),
-                                colors = geodouroOutlinedTextFieldColors(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = GeodouroTextPrimary,
+                                    unfocusedTextColor = GeodouroTextPrimary,
+                                    focusedContainerColor = GeodouroBg,
+                                    unfocusedContainerColor = GeodouroBg,
+                                    focusedBorderColor = GeodouroBrandGreen,
+                                    unfocusedBorderColor = GeodouroOutline,
+                                    focusedPlaceholderColor = GeodouroTextSecondary,
+                                    unfocusedPlaceholderColor = GeodouroTextSecondary,
+                                    cursorColor = GeodouroBrandGreen,
+                                    focusedLeadingIconColor = GeodouroBrandGreen,
+                                    unfocusedLeadingIconColor = GeodouroBrandGreen,
+                                    focusedTrailingIconColor = GeodouroTextSecondary,
+                                    unfocusedTrailingIconColor = GeodouroTextSecondary
+                                ),
                                 leadingIcon = {
                                     Icon(
                                         Icons.Default.Search,

@@ -8,7 +8,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,7 +41,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -57,7 +55,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -71,13 +68,13 @@ import com.example.geodouro_project.domain.model.LocalInferenceResult
 import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
 import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
+import com.example.geodouro_project.ui.theme.GeodouroCardBg
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroGrey
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
-import com.example.geodouro_project.ui.theme.geodouroOutlinedButtonColors
 import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -262,23 +259,19 @@ fun IdentifyScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            Box(
+            Surface(
                 modifier = Modifier
                     .padding(horizontal = 24.dp)
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                GeodouroLightBg,
-                                GeodouroLightBg.copy(alpha = 0.6f)
-                            )
-                        )
-                    )
-                    .padding(vertical = 36.dp),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                color = GeodouroCardBg
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 36.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
                         text = if (uiState.isProcessing) "A identificar..." else "Identificar especie",
                         style = MaterialTheme.typography.titleMedium,
@@ -434,46 +427,54 @@ fun IdentifyScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(
-                onClick = { viewModel.analyzeSelection() },
-                enabled = !uiState.isProcessing && uiState.capturedImageUris.isNotEmpty(),
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .height(54.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = geodouroPrimaryButtonColors(),
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = 0.dp,
-                    pressedElevation = 2.dp
-                )
+                    .padding(horizontal = 24.dp),
+                shape = RoundedCornerShape(18.dp),
+                color = GeodouroCardBg
             ) {
-                val label = when {
-                    uiState.isProcessing -> "A analisar..."
-                    uiState.capturedImageUris.isEmpty() -> "Analisar imagem"
-                    uiState.capturedImageUris.size >= 2 -> "Analisar ${uiState.capturedImageUris.size} imagens"
-                    else -> "Analisar 1 imagem"
+                Button(
+                    onClick = { viewModel.analyzeSelection() },
+                    enabled = !uiState.isProcessing && uiState.capturedImageUris.isNotEmpty(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                        .height(54.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = geodouroPrimaryButtonColors(),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 0.dp,
+                        pressedElevation = 2.dp
+                    )
+                ) {
+                    val label = when {
+                        uiState.isProcessing -> "A analisar..."
+                        uiState.capturedImageUris.isEmpty() -> "Analisar imagem"
+                        uiState.capturedImageUris.size >= 2 -> "Analisar ${uiState.capturedImageUris.size} imagens"
+                        else -> "Analisar 1 imagem"
+                    }
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.3.sp
+                    )
                 }
-                Text(
-                    label,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.3.sp
-                )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = GeodouroLightBg),
+                colors = CardDefaults.cardColors(containerColor = GeodouroCardBg),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(18.dp),
                     verticalAlignment = Alignment.Top
                 ) {
                     Box(
