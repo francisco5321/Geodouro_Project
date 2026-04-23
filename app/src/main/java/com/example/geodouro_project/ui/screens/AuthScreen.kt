@@ -80,7 +80,8 @@ data class AuthUiState(
     val identifier: String = "",
     val password: String = "",
     val isSubmitting: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val hasAttemptedSubmit: Boolean = false
 ) {
     val identifierError: String?
         get() = if (identifier.isBlank()) "Introduz o username ou email." else null
@@ -88,7 +89,7 @@ data class AuthUiState(
     val passwordError: String?
         get() = when {
             password.isBlank() -> "Introduz a password."
-            password.length < 6 -> "A password deve ter pelo menos 6 caracteres."
+            password.length < 8 -> "A password deve ter pelo menos 8 caracteres."
             else -> null
         }
 
@@ -120,13 +121,18 @@ class AuthViewModel(
         val currentState = _uiState.value
         if (!currentState.canSubmit) {
             _uiState.value = currentState.copy(
+                hasAttemptedSubmit = true,
                 errorMessage = "Preenche os campos obrigatorios para continuar."
             )
             return
         }
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSubmitting = true, errorMessage = null)
+            _uiState.value = _uiState.value.copy(
+                isSubmitting = true,
+                errorMessage = null,
+                hasAttemptedSubmit = true
+            )
             val result = authRepository.login(
                 identifier = _uiState.value.identifier,
                 password = _uiState.value.password
@@ -257,7 +263,7 @@ fun AuthScreen() {
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(18.dp),
-                    isError = uiState.identifier.isNotBlank() && uiState.identifierError != null,
+                    isError = uiState.hasAttemptedSubmit && uiState.identifierError != null,
                     colors = geodouroOutlinedTextFieldColors(),
                     leadingIcon = {
                         Icon(Icons.Default.PersonOutline, contentDescription = null)
@@ -266,7 +272,7 @@ fun AuthScreen() {
                         Text("Username ou email")
                     },
                     supportingText = {
-                        val showError = uiState.identifier.isNotBlank() && uiState.identifierError != null
+                        val showError = uiState.hasAttemptedSubmit && uiState.identifierError != null
                         if (showError) {
                             Text(uiState.identifierError.orEmpty())
                         }
@@ -283,7 +289,7 @@ fun AuthScreen() {
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(18.dp),
-                    isError = uiState.password.isNotBlank() && uiState.passwordError != null,
+                    isError = uiState.hasAttemptedSubmit && uiState.passwordError != null,
                     colors = geodouroOutlinedTextFieldColors(),
                     leadingIcon = {
                         Icon(Icons.Default.Lock, contentDescription = null)
@@ -313,7 +319,7 @@ fun AuthScreen() {
                         PasswordVisualTransformation()
                     },
                     supportingText = {
-                        val showError = uiState.password.isNotBlank() && uiState.passwordError != null
+                        val showError = uiState.hasAttemptedSubmit && uiState.passwordError != null
                         if (showError) {
                             Text(uiState.passwordError.orEmpty())
                         }

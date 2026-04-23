@@ -90,6 +90,28 @@ fun AppNavigation() {
     var savedObservationRefreshVersion by remember { mutableStateOf(0) }
     var previousInternetState by remember { mutableStateOf<Boolean?>(null) }
     var detailAnchorRoute by remember { mutableStateOf<String?>(null) }
+    var previousSessionState by remember { mutableStateOf<SessionState>(SessionState.Loading) }
+    val shouldRedirectToHomeAfterLogin = previousSessionState == SessionState.LoggedOut &&
+        sessionState != SessionState.LoggedOut &&
+        sessionState != SessionState.Loading
+
+    LaunchedEffect(sessionState) {
+        val previous = previousSessionState
+
+        if (shouldRedirectToHomeAfterLogin) {
+            detailAnchorRoute = null
+            navController.navigate("home") {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    inclusive = false
+                    saveState = false
+                }
+                launchSingleTop = true
+                restoreState = false
+            }
+        }
+
+        previousSessionState = sessionState
+    }
 
     if (sessionState == SessionState.Loading) {
         SessionLoadingScreen()
@@ -98,6 +120,11 @@ fun AppNavigation() {
 
     if (sessionState == SessionState.LoggedOut) {
         AuthScreen()
+        return
+    }
+
+    if (shouldRedirectToHomeAfterLogin) {
+        SessionLoadingScreen()
         return
     }
 
