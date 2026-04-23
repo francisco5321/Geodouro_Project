@@ -240,13 +240,6 @@ fun AppNavigation() {
                         latestCaptureLongitude = inferenceResult.longitude
                         navigateAboveAnchor("identify", "results")
                     },
-                    onIdentifyMultipleClick = { imageUris, latitude, longitude ->
-                        latestInferenceResult = null
-                        latestMultiImageUris = imageUris
-                        latestCaptureLatitude = latitude
-                        latestCaptureLongitude = longitude
-                        navigateAboveAnchor("identify", "results")
-                    },
                     clearCapturesTrigger = clearIdentifyCapturesVersion
                 )
             }

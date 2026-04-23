@@ -180,7 +180,7 @@ fun ResultsScreen(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "Identificacao de resultados",
+                            text = "Identificação de resultados",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = GeodouroBrandGreen
@@ -228,6 +228,7 @@ fun ResultsScreen(
                         result = state.result,
                         sourceLabel = state.sourceLabel,
                         saveMessage = state.saveMessage,
+                        isConfirming = state.isConfirming,
                         onConfirm = { viewModel.confirmObservation() },
                         onRetakePhotos = onBackClick
                     )
@@ -238,6 +239,7 @@ fun ResultsScreen(
                         result = state.result,
                         sourceLabel = state.sourceLabel,
                         saveMessage = state.saveMessage,
+                        isConfirming = state.isConfirming,
                         onConfirm = { viewModel.confirmObservation() },
                         onRetakePhotos = onBackClick
                     )
@@ -297,6 +299,7 @@ fun ResultCard(
     result: ResultUiModel,
     sourceLabel: String,
     saveMessage: String?,
+    isConfirming: Boolean,
     onConfirm: () -> Unit,
     onRetakePhotos: () -> Unit
 ) {
@@ -419,12 +422,17 @@ fun ResultCard(
 
             Button(
                 onClick = if (result.isPlantDetected) onConfirm else onRetakePhotos,
+                enabled = !isConfirming,
                 modifier = Modifier.fillMaxWidth(),
                 colors = geodouroPrimaryButtonColors(),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
-                    text = if (result.isPlantDetected) "Confirmar e guardar" else "Tirar novas fotos"
+                    text = when {
+                        isConfirming -> "A guardar..."
+                        result.isPlantDetected -> "Confirmar e guardar"
+                        else -> "Tirar novas fotos"
+                    }
                 )
             }
         }
@@ -619,6 +627,7 @@ fun MultiImageResultCard(
     result: MultiImageResultUiModel,
     sourceLabel: String,
     saveMessage: String?,
+    isConfirming: Boolean,
     onConfirm: () -> Unit,
     onRetakePhotos: () -> Unit
 ) {
@@ -808,12 +817,17 @@ fun MultiImageResultCard(
 
             Button(
                 onClick = if (result.isPlantDetected) onConfirm else onRetakePhotos,
+                enabled = !isConfirming,
                 modifier = Modifier.fillMaxWidth(),
                 colors = geodouroPrimaryButtonColors(),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
-                    text = if (result.isPlantDetected) "Confirmar e guardar" else "Tirar novas fotos"
+                    text = when {
+                        isConfirming -> "A guardar..."
+                        result.isPlantDetected -> "Confirmar e guardar"
+                        else -> "Tirar novas fotos"
+                    }
                 )
             }
         }

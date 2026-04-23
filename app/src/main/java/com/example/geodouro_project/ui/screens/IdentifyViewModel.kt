@@ -36,11 +36,6 @@ data class IdentifyUiState(
 
 sealed interface IdentifyNavigationEvent {
     data class SingleResult(val result: LocalInferenceResult) : IdentifyNavigationEvent
-    data class MultiResult(
-        val imageUris: List<String>,
-        val latitude: Double?,
-        val longitude: Double?
-    ) : IdentifyNavigationEvent
 }
 
 class IdentifyViewModel(
@@ -152,9 +147,9 @@ class IdentifyViewModel(
         viewModelScope.launch {
             runCatching {
                 _uiState.update { state ->
-                    state.copy(capturedImageUris = state.capturedImageUris + imageUri.toString())
+                    state.copy(capturedImageUris = listOf(imageUri.toString()))
                 }
-                emitMessage("Imagem ${_uiState.value.capturedImageUris.size} capturada.")
+                emitMessage("Imagem capturada.")
                 refreshLocation()
             }.onFailure {
                 emitMessage("Falha ao guardar captura: ${it.message ?: "erro desconhecido"}")
@@ -162,22 +157,21 @@ class IdentifyViewModel(
         }
     }
 
-    fun onGallerySelection(uris: List<Uri>) {
-        if (uris.isEmpty()) {
+    fun onGallerySelection(uri: Uri?) {
+        if (uri == null) {
             emitMessage("Nenhuma imagem selecionada na galeria.")
             return
         }
 
         viewModelScope.launch {
             runCatching {
-                val importedUris = withContext(Dispatchers.IO) {
-                    uris.map { imageStorage.importFromUri(it) }
+                val importedUri = withContext(Dispatchers.IO) {
+                    imageStorage.importFromUri(uri)
                 }
-                    .filterNot { imported -> _uiState.value.capturedImageUris.contains(imported) }
                 _uiState.update { state ->
-                    state.copy(capturedImageUris = state.capturedImageUris + importedUris)
+                    state.copy(capturedImageUris = listOf(importedUri))
                 }
-                emitMessage("${importedUris.size} imagem(ns) adicionada(s) da galeria.")
+                emitMessage("Imagem adicionada da galeria.")
                 refreshLocation()
             }.onFailure {
                 emitMessage("Falha ao importar imagens: ${it.message ?: "erro desconhecido"}")
@@ -213,52 +207,42 @@ class IdentifyViewModel(
                 }
 
                 val latestState = _uiState.value
-                if (latestState.capturedImageUris.size >= 2) {
-                    _navigation.emit(
-                        IdentifyNavigationEvent.MultiResult(
-                            imageUris = latestState.capturedImageUris,
-                            latitude = latestState.latitude,
-                            longitude = latestState.longitude
-                        )
-                    )
-                } else {
-                    val imageUri = latestState.capturedImageUris.first()
-                    val bitmap = withContext(Dispatchers.IO) {
-                        imageStorage.decodeSampledBitmap(imageUri)
-                    } ?: throw IllegalStateException("Nao foi possivel ler a imagem selecionada")
-                    val prediction = classifier.classify(bitmap)
+                val imageUri = latestState.capturedImageUris.first()
+                val bitmap = withContext(Dispatchers.IO) {
+                    imageStorage.decodeSampledBitmap(imageUri)
+                } ?: throw IllegalStateException("Nao foi possivel ler a imagem selecionada")
+                val prediction = classifier.classify(bitmap)
 
-                    if (!prediction.fromModel) {
-                        val diagnostic = classifier.getModelLoadDiagnostic()
-                        emitMessage(
-                            if (diagnostic.isNullOrBlank()) {
-                                "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} ainda indisponivel. Resultado de fallback aplicado."
-                            } else {
-                                "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} indisponivel: $diagnostic"
-                            }
-                        )
-                    }
-
-                    _navigation.emit(
-                        IdentifyNavigationEvent.SingleResult(
-                            LocalInferenceResult(
-                                imageUri = imageUri,
-                                latitude = latestState.latitude,
-                                longitude = latestState.longitude,
-                                predictedSpecies = prediction.label,
-                                confidence = prediction.confidence,
-                                candidatePredictions = prediction.candidates.map { candidate ->
-                                    LocalPredictionCandidate(
-                                        species = candidate.label,
-                                        confidence = candidate.confidence
-                                    )
-                                }
-                            )
-                        )
+                if (!prediction.fromModel) {
+                    val diagnostic = classifier.getModelLoadDiagnostic()
+                    emitMessage(
+                        if (diagnostic.isNullOrBlank()) {
+                            "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} ainda indisponivel. Resultado de fallback aplicado."
+                        } else {
+                            "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} indisponivel: $diagnostic"
+                        }
                     )
                 }
+
+                _navigation.emit(
+                    IdentifyNavigationEvent.SingleResult(
+                        LocalInferenceResult(
+                            imageUri = imageUri,
+                            latitude = latestState.latitude,
+                            longitude = latestState.longitude,
+                            predictedSpecies = prediction.label,
+                            confidence = prediction.confidence,
+                            candidatePredictions = prediction.candidates.map { candidate ->
+                                LocalPredictionCandidate(
+                                    species = candidate.label,
+                                    confidence = candidate.confidence
+                                )
+                            }
+                        )
+                    )
+                )
             }.onFailure {
-                emitMessage("Falha na identificacao local: ${it.message ?: "erro desconhecido"}")
+                emitMessage("Falha na identificação local: ${it.message ?: "erro desconhecido"}")
             }
             _uiState.update { it.copy(isProcessing = false) }
         }

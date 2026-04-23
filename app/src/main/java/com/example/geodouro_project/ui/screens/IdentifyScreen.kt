@@ -81,7 +81,6 @@ import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
 @Composable
 fun IdentifyScreen(
     onIdentifyClick: (LocalInferenceResult) -> Unit,
-    onIdentifyMultipleClick: (List<String>, Double?, Double?) -> Unit = { _, _, _ -> },
     clearCapturesTrigger: Int = 0
 ) {
     val context = LocalContext.current
@@ -92,9 +91,9 @@ fun IdentifyScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(MAX_GALLERY_IMAGES)
-    ) { uris ->
-        viewModel.onGallerySelection(uris)
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        viewModel.onGallerySelection(uri)
     }
 
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -145,12 +144,6 @@ fun IdentifyScreen(
     LaunchedEffect(viewModel) {
         viewModel.navigation.collect { event ->
             when (event) {
-                is IdentifyNavigationEvent.MultiResult -> onIdentifyMultipleClick(
-                    event.imageUris,
-                    event.latitude,
-                    event.longitude
-                )
-
                 is IdentifyNavigationEvent.SingleResult -> onIdentifyClick(event.result)
             }
         }
@@ -405,11 +398,7 @@ fun IdentifyScreen(
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = if (uiState.capturedImageUris.size == 1) {
-                                    "imagem pronta para analise"
-                                } else {
-                                    "imagens prontas para analise"
-                                },
+                                text = "imagem pronta para analise",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = GeodouroTextPrimary,
                                 fontWeight = FontWeight.Medium
@@ -459,7 +448,6 @@ fun IdentifyScreen(
                     val label = when {
                         uiState.isProcessing -> "A analisar..."
                         uiState.capturedImageUris.isEmpty() -> "Analisar imagem"
-                        uiState.capturedImageUris.size >= 2 -> "Analisar ${uiState.capturedImageUris.size} imagens"
                         else -> "Analisar 1 imagem"
                     }
                     Text(
@@ -511,7 +499,7 @@ fun IdentifyScreen(
                         )
                         Spacer(modifier = Modifier.height(3.dp))
                         Text(
-                            text = "Combina fotos da camara e da galeria para ativar o modo multi-imagem com consenso para maior precisao.",
+                            text = "Usa uma foto nítida da folha, flor ou fruto para melhorar a identificação.",
                             style = MaterialTheme.typography.bodySmall,
                             color = GeodouroTextSecondary,
                             lineHeight = 18.sp
@@ -524,5 +512,3 @@ fun IdentifyScreen(
         }
     }
 }
-
-private const val MAX_GALLERY_IMAGES = 10

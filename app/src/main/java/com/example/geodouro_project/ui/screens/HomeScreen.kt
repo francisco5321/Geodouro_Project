@@ -192,7 +192,7 @@ fun HomeScreen(
                             )
                         }
                         Text(
-                            text = "Identificacao\nde Flora",
+                            text = "Identificação\nde Flora",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color.White,

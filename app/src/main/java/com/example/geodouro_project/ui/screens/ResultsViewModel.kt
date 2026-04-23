@@ -62,13 +62,15 @@ sealed class ResultsUiState {
     data class Success(
         val result: ResultUiModel,
         val sourceLabel: String,
-        val saveMessage: String? = null
+        val saveMessage: String? = null,
+        val isConfirming: Boolean = false
     ) : ResultsUiState()
 
     data class MultiImageSuccess(
         val result: MultiImageResultUiModel,
         val sourceLabel: String,
-        val saveMessage: String? = null
+        val saveMessage: String? = null,
+        val isConfirming: Boolean = false
     ) : ResultsUiState()
 
     data class Error(
@@ -91,6 +93,7 @@ class ResultsViewModel(
     private var lastMultiImageResult: MultiImageAggregationResult? = null
     private var lastCaptureLatitude: Double? = null
     private var lastCaptureLongitude: Double? = null
+    private var confirmationInProgress = false
 
     fun loadHybridResult(localInferenceResult: LocalInferenceResult) {
         viewModelScope.launch {
@@ -199,10 +202,24 @@ class ResultsViewModel(
     }
 
     fun confirmObservation() {
+        if (confirmationInProgress) {
+            return
+        }
+
+        confirmationInProgress = true
         viewModelScope.launch {
             try {
                 Log.d(TAG, "confirmObservation tapped")
                 val current = _uiState.value
+
+                _uiState.value = when (current) {
+                    is ResultsUiState.Success -> current.copy(isConfirming = true)
+                    is ResultsUiState.MultiImageSuccess -> current.copy(isConfirming = true)
+                    else -> {
+                        confirmationInProgress = false
+                        return@launch
+                    }
+                }
 
                 val inferenceToPersist = when (current) {
                     is ResultsUiState.Success -> {
@@ -296,6 +313,8 @@ class ResultsViewModel(
                 _uiState.value = ResultsUiState.Error(
                     "Erro ao guardar observacao: ${e.message ?: "Desconhecido"}"
                 )
+            } finally {
+                confirmationInProgress = false
             }
         }
     }
