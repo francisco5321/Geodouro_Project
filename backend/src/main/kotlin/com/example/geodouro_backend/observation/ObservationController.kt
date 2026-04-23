@@ -78,9 +78,13 @@ class ObservationController(
     }
 
     @GetMapping("/{deviceObservationId}")
-    fun getByDeviceObservationId(@PathVariable deviceObservationId: UUID): ObservationDetailResponse {
-        logger.info("GET /api/observations/{}", deviceObservationId)
-        return observationService.getObservationDetail(deviceObservationId)
+    fun getByDeviceObservationId(
+        @PathVariable deviceObservationId: UUID,
+        @RequestHeader(name = "Authorization", required = false) authorizationHeader: String?
+    ): ObservationDetailResponse {
+        val authenticatedUserId = authTokenService.resolveUserId(authorizationHeader)
+        logger.info("GET /api/observations/{} authenticatedUserId={}", deviceObservationId, authenticatedUserId)
+        return observationService.getObservationDetail(deviceObservationId, authenticatedUserId)
     }
 
     @PatchMapping("/{deviceObservationId}")

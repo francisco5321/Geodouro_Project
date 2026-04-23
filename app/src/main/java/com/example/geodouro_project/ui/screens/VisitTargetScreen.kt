@@ -17,6 +17,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -134,18 +138,26 @@ class VisitTargetViewModel(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun VisitTargetScreen(
+    refreshTrigger: Int = 0,
     onBackClick: () -> Unit,
     viewModel: VisitTargetViewModel = viewModel(
         factory = VisitTargetViewModel.factory(LocalContext.current.applicationContext)
     )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isLoading = uiState is VisitTargetUiState.Loading
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isLoading,
+        onRefresh = { viewModel.refresh() }
+    )
 
-    LaunchedEffect(Unit) {
-        viewModel.refresh()
+    LaunchedEffect(refreshTrigger) {
+        if (refreshTrigger > 0) {
+            viewModel.refresh()
+        }
     }
 
     Scaffold(
@@ -170,31 +182,47 @@ fun VisitTargetScreen(
         },
         containerColor = GeodouroBg
     ) { padding ->
-        when (val state = uiState) {
-            VisitTargetUiState.Loading -> VisitTargetCenteredState(padding) {
-                CircularProgressIndicator(color = GeodouroBrandGreen)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(GeodouroBg)
+                .pullRefresh(pullRefreshState)
+        ) {
+            when (val state = uiState) {
+                VisitTargetUiState.Loading -> VisitTargetCenteredState(PaddingValues(0.dp)) {
+                    CircularProgressIndicator(color = GeodouroBrandGreen)
+                }
+                VisitTargetUiState.Empty -> VisitTargetMessageState(
+                    padding = PaddingValues(0.dp),
+                    title = "Ainda sem alvos guardados",
+                    message = "Guarda especies, publicacoes ou observacoes para aparecerem aqui e depois planeares percursos."
+                )
+                is VisitTargetUiState.Error -> VisitTargetMessageState(
+                    padding = PaddingValues(0.dp),
+                    title = "Nao foi possivel abrir Quero visitar",
+                    message = state.message,
+                    actionLabel = "Tentar novamente",
+                    onAction = viewModel::refresh
+                )
+                VisitTargetUiState.GuestRestricted -> VisitTargetMessageState(
+                    padding = PaddingValues(0.dp),
+                    title = "Inicia sessao para guardar visitas",
+                    message = "O modo convidado permite explorar a app, mas a lista Quero visitar fica associada a uma conta autenticada."
+                )
+                is VisitTargetUiState.Success -> VisitTargetList(
+                    padding = PaddingValues(0.dp),
+                    targets = state.targets,
+                    onRemove = viewModel::removeTarget
+                )
             }
-            VisitTargetUiState.Empty -> VisitTargetMessageState(
-                padding = padding,
-                title = "Ainda sem alvos guardados",
-                message = "Guarda especies, publicacoes ou observacoes para aparecerem aqui e depois planeares percursos."
-            )
-            is VisitTargetUiState.Error -> VisitTargetMessageState(
-                padding = padding,
-                title = "Nao foi possivel abrir Quero visitar",
-                message = state.message,
-                actionLabel = "Tentar novamente",
-                onAction = viewModel::refresh
-            )
-            VisitTargetUiState.GuestRestricted -> VisitTargetMessageState(
-                padding = padding,
-                title = "Inicia sessao para guardar visitas",
-                message = "O modo convidado permite explorar a app, mas a lista Quero visitar fica associada a uma conta autenticada."
-            )
-            is VisitTargetUiState.Success -> VisitTargetList(
-                padding = padding,
-                targets = state.targets,
-                onRemove = viewModel::removeTarget
+
+            PullRefreshIndicator(
+                refreshing = isLoading,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                backgroundColor = GeodouroBg,
+                contentColor = GeodouroBrandGreen
             )
         }
     }

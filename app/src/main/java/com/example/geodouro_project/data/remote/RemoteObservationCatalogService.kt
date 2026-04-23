@@ -110,6 +110,7 @@ class RemoteObservationCatalogService(
     private fun RemoteObservationDetailResponse.toDomain(): RemoteObservationDetail {
         return RemoteObservationDetail(
             deviceObservationId = deviceObservationId,
+            userId = userId,
             scientificName = scientificName,
             commonName = commonName,
             family = family,
@@ -150,6 +151,7 @@ class RemoteObservationCatalogService(
 
 data class RemoteObservationDetail(
     val deviceObservationId: String,
+    val userId: Int,
     val scientificName: String,
     val commonName: String?,
     val family: String?,
@@ -167,6 +169,8 @@ data class RemoteObservationDetail(
 private data class RemoteObservationDetailResponse(
     @SerializedName("deviceObservationId")
     val deviceObservationId: String,
+    @SerializedName("userId")
+    val userId: Int,
     @SerializedName("scientificName")
     val scientificName: String,
     @SerializedName("commonName")

@@ -17,6 +17,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
@@ -41,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,6 +64,7 @@ import coil.compose.AsyncImage
 import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.di.AppContainer
+import com.example.geodouro_project.domain.model.SessionState
 import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
 import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
@@ -98,7 +104,7 @@ class ObservationDetailViewModel(
         refresh()
     }
 
-    private fun refresh() {
+    fun refresh() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             _uiState.value = _uiState.value.copy(
@@ -176,10 +182,13 @@ private fun buildObservationStatusLabelForDetail(observation: ObservationEntity)
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun ObservationDetailScreen(
+    refreshTrigger: Int = 0,
     observationId: String,
+    hideSpeciesAction: Boolean = false,
+    sessionState: SessionState,
     onBackClick: () -> Unit,
     onOpenSpecies: (String) -> Unit = {}
 ) {
@@ -189,8 +198,30 @@ fun ObservationDetailScreen(
         factory = ObservationDetailViewModel.factory(context.applicationContext, observationId)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = uiState.isLoading,
+        onRefresh = { viewModel.refresh() }
+    )
     val observation = uiState.observation
     val statusMessage = uiState.statusMessage
+    val canEditObservation = remember(observation, sessionState) {
+        val currentObservation = observation ?: return@remember false
+        if (currentObservation.isPublished) {
+            return@remember false
+        }
+
+        when (sessionState) {
+            is SessionState.Authenticated -> {
+                sessionState.userId != null && currentObservation.ownerUserId == sessionState.userId
+            }
+            is SessionState.Guest -> {
+                !currentObservation.ownerGuestLabel.isNullOrBlank() &&
+                    currentObservation.ownerGuestLabel == sessionState.guestLabel
+            }
+            SessionState.Loading,
+            SessionState.LoggedOut -> false
+        }
+    }
     var isEditing by rememberSaveable(observation?.id) { mutableStateOf(false) }
     var scientificNameInput by rememberSaveable(observation?.id) {
         mutableStateOf(observation?.enrichedScientificName ?: observation?.predictedSpecies.orEmpty())
@@ -205,6 +236,12 @@ fun ObservationDetailScreen(
     LaunchedEffect(statusMessage, uiState.isSaving) {
         if (!uiState.isSaving && statusMessage == "Observacao atualizada localmente.") {
             isEditing = false
+        }
+    }
+
+    LaunchedEffect(refreshTrigger, observationId) {
+        if (refreshTrigger > 0) {
+            viewModel.refresh()
         }
     }
 
@@ -231,41 +268,39 @@ fun ObservationDetailScreen(
         },
         containerColor = GeodouroBg
     ) { padding ->
-        when {
-            uiState.isLoading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .background(GeodouroBg),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("A carregar observacao...", color = GeodouroTextSecondary)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(GeodouroBg)
+                .pullRefresh(pullRefreshState)
+        ) {
+            when {
+                uiState.isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("A carregar observacao...", color = GeodouroTextSecondary)
+                    }
                 }
-            }
 
-            uiState.observation == null -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .background(GeodouroBg),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Observacao nao encontrada.", color = GeodouroTextSecondary)
+                uiState.observation == null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Observacao nao encontrada.", color = GeodouroTextSecondary)
+                    }
                 }
-            }
 
-            else -> {
-                val observation = uiState.observation ?: return@Scaffold
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .background(GeodouroBg),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
+                else -> {
+                    val observation = uiState.observation ?: return@Scaffold
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -357,7 +392,7 @@ fun ObservationDetailScreen(
                                     }
                                 }
 
-                                if (!observation.isPublished) {
+                                if (canEditObservation) {
                                     Surface(
                                         color = GeodouroLightBg,
                                         shape = RoundedCornerShape(10.dp)
@@ -450,41 +485,45 @@ fun ObservationDetailScreen(
                                     }
                                 }
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Button(
-                                        onClick = {
-                                            onOpenSpecies(
-                                                (if (isEditing) scientificNameInput else observation.enrichedScientificName ?: observation.predictedSpecies).toSpeciesId()
-                                            )
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        colors = geodouroPrimaryButtonColors()
+                                if (!hideSpeciesAction || !observation.enrichedWikipediaUrl.isNullOrBlank()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Image,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.size(8.dp))
-                                        Text("Ver especie")
-                                    }
+                                        if (!hideSpeciesAction) {
+                                            Button(
+                                                onClick = {
+                                                    onOpenSpecies(
+                                                        (if (isEditing) scientificNameInput else observation.enrichedScientificName ?: observation.predictedSpecies).toSpeciesId()
+                                                    )
+                                                },
+                                                modifier = Modifier.weight(1f),
+                                                colors = geodouroPrimaryButtonColors()
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Image,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.size(8.dp))
+                                                Text("Ver especie")
+                                            }
+                                        }
 
-                                    if (!observation.enrichedWikipediaUrl.isNullOrBlank()) {
-                                        Button(
-                                            onClick = { uriHandler.openUri(observation.enrichedWikipediaUrl) },
-                                            modifier = Modifier.weight(1f),
-                                            colors = geodouroSecondaryButtonColors()
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Link,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.size(8.dp))
-                                            Text("Wikipedia")
+                                        if (!observation.enrichedWikipediaUrl.isNullOrBlank()) {
+                                            Button(
+                                                onClick = { uriHandler.openUri(observation.enrichedWikipediaUrl) },
+                                                modifier = Modifier.weight(1f),
+                                                colors = geodouroSecondaryButtonColors()
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Link,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.size(8.dp))
+                                                Text("Wikipedia")
+                                            }
                                         }
                                     }
                                 }
@@ -509,8 +548,17 @@ fun ObservationDetailScreen(
                             }
                         }
                     }
+                    }
                 }
             }
+
+            PullRefreshIndicator(
+                refreshing = uiState.isLoading,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                backgroundColor = GeodouroBg,
+                contentColor = GeodouroBrandGreen
+            )
         }
     }
 }

@@ -64,8 +64,11 @@ class ObservationService(
         ).map(::withObservationImages)
     }
 
-    fun getObservationDetail(deviceObservationId: UUID): ObservationDetailResponse {
-        return jdbcTemplate.query(
+    fun getObservationDetail(
+        deviceObservationId: UUID,
+        authenticatedUserId: Int? = null
+    ): ObservationDetailResponse {
+        val detail = jdbcTemplate.query(
             OBSERVATION_DETAIL_SQL,
             MapSqlParameterSource("deviceObservationId", deviceObservationId),
             observationDetailSummaryRowMapper
@@ -74,6 +77,12 @@ class ObservationService(
                 HttpStatus.NOT_FOUND,
                 "Observation not found for deviceObservationId=$deviceObservationId"
             )
+
+        if (!detail.isPublished && detail.userId != authenticatedUserId) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para consultar esta observacao")
+        }
+
+        return detail
     }
 
     fun updateObservationMetadata(

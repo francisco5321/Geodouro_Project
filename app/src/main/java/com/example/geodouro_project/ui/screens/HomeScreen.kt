@@ -18,6 +18,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Eco
@@ -35,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,7 +76,8 @@ import kotlinx.coroutines.launch
 data class HomeUiState(
     val speciesCount: Int = 0,
     val observationsCount: Int = 0,
-    val recentSpecies: List<SpeciesListItem> = emptyList()
+    val recentSpecies: List<SpeciesListItem> = emptyList(),
+    val isLoading: Boolean = true
 )
 
 class HomeViewModel(
@@ -82,13 +88,19 @@ class HomeViewModel(
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
+        refresh()
+    }
+
+    fun refresh() {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
             val speciesCatalog = repository.fetchSpeciesCatalogRemoteFirst()
             val stats = repository.fetchObservationStatsRemoteFirst()
             _uiState.value = HomeUiState(
                 speciesCount = stats.speciesCount,
                 observationsCount = stats.observationsCount,
-                recentSpecies = speciesCatalog.toRemoteRecentSpeciesItems()
+                recentSpecies = speciesCatalog.toRemoteRecentSpeciesItems(),
+                isLoading = false
             )
         }
     }
@@ -106,9 +118,10 @@ class HomeViewModel(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun HomeScreen(
+    refreshTrigger: Int = 0,
     onSpeciesClick: (String) -> Unit = {},
     onOpenSpeciesList: () -> Unit = {},
     onOpenRoutePlans: () -> Unit = {}
@@ -118,6 +131,16 @@ fun HomeScreen(
         factory = HomeViewModel.factory(context.applicationContext)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = uiState.isLoading,
+        onRefresh = { viewModel.refresh() }
+    )
+
+    LaunchedEffect(refreshTrigger) {
+        if (refreshTrigger > 0) {
+            viewModel.refresh()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -152,15 +175,19 @@ fun HomeScreen(
         },
         containerColor = GeodouroBg
     ) { padding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(GeodouroBg),
-            contentPadding = PaddingValues(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(0.dp)
+                .background(GeodouroBg)
+                .pullRefresh(pullRefreshState)
         ) {
-            item {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -207,9 +234,9 @@ fun HomeScreen(
                         )
                     }
                 }
-            }
+                }
 
-            item {
+                item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -229,9 +256,9 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f)
                     )
                 }
-            }
+                }
 
-            item {
+                item {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -273,9 +300,9 @@ fun HomeScreen(
                         }
                     }
                 }
-            }
+                }
 
-            item {
+                item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -298,10 +325,10 @@ fun HomeScreen(
                         color = GeodouroTextPrimary
                     )
                 }
-            }
+                }
 
-            if (uiState.recentSpecies.isEmpty()) {
-                item {
+                if (uiState.recentSpecies.isEmpty()) {
+                    item {
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -345,16 +372,25 @@ fun HomeScreen(
                             )
                         }
                     }
-                }
-            } else {
-                items(uiState.recentSpecies) { species ->
+                    }
+                } else {
+                    items(uiState.recentSpecies) { species ->
                     SpeciesCard(
                         species = species,
                         onClick = { onSpeciesClick(species.id) },
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 5.dp)
                     )
+                    }
                 }
             }
+
+            PullRefreshIndicator(
+                refreshing = uiState.isLoading,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                backgroundColor = GeodouroBg,
+                contentColor = GeodouroBrandGreen
+            )
         }
     }
 }
@@ -444,5 +480,4 @@ private fun List<PlantSpeciesCatalogItem>.toRemoteRecentSpeciesItems(): List<Spe
             )
         }
 }
-
 

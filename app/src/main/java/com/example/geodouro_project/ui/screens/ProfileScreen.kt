@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,6 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Check
@@ -41,6 +46,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.rememberScrollState
@@ -93,6 +99,7 @@ data class ProfileUiState(
     val observationsCount: Int = 0,
     val publishedCount: Int = 0,
     val speciesCount: Int = 0,
+    val isLoading: Boolean = true,
     val publishingIds: Set<String> = emptySet(),
     val statusMessage: String? = null
 )
@@ -112,18 +119,20 @@ class ProfileViewModel(
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
     init {
-        refreshRemoteProfile()
+        refresh()
     }
 
-    private fun refreshRemoteProfile() {
+    fun refresh() {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
             val observations = repository.fetchObservationsRemoteFirst()
             val stats = repository.fetchObservationStatsRemoteFirst()
             _uiState.value = _uiState.value.copy(
                 observations = observations,
                 observationsCount = stats.observationsCount,
                 publishedCount = stats.publishedCount,
-                speciesCount = stats.speciesCount
+                speciesCount = stats.speciesCount,
+                isLoading = false
             )
         }
     }
@@ -150,7 +159,7 @@ class ProfileViewModel(
                 }
             )
             if (published) {
-                refreshRemoteProfile()
+                refresh()
             }
         }
     }
@@ -168,9 +177,10 @@ class ProfileViewModel(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun ProfileScreen(
+    refreshTrigger: Int = 0,
     sessionState: SessionState,
     onLogout: () -> Unit,
     onObservationClick: (String) -> Unit = {}
@@ -180,6 +190,11 @@ fun ProfileScreen(
         factory = ProfileViewModel.factory(context.applicationContext)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = uiState.isLoading,
+        onRefresh = { viewModel.refresh() }
+    )
+    val canPublishObservations = sessionState is SessionState.Authenticated
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedFilter by rememberSaveable { mutableStateOf(ProfileObservationFilter.ALL) }
 
@@ -209,6 +224,12 @@ fun ProfileScreen(
         }
     }
 
+    LaunchedEffect(refreshTrigger) {
+        if (refreshTrigger > 0) {
+            viewModel.refresh()
+        }
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -228,15 +249,19 @@ fun ProfileScreen(
         },
         containerColor = GeodouroBg
     ) { padding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(GeodouroBg),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .background(GeodouroBg)
+                .pullRefresh(pullRefreshState)
         ) {
-            item {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color.Transparent),
@@ -321,18 +346,35 @@ fun ProfileScreen(
                         }
                     }
                 }
-            }
+                }
 
-            item {
+                item {
                 Text(
                     "As minhas observacoes",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = GeodouroTextPrimary
                 )
-            }
+                }
 
-            item {
+                if (!canPublishObservations) {
+                    item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = GeodouroLightBg,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = "Em modo convidado podes guardar observacoes, mas nao podes transformá-las em publicacoes.",
+                            modifier = Modifier.padding(12.dp),
+                            color = GeodouroTextPrimary,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    }
+                }
+
+                item {
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
@@ -357,9 +399,9 @@ fun ProfileScreen(
                         Text("Pesquisar observacoes")
                     }
                 )
-            }
+                }
 
-            item {
+                item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -386,10 +428,10 @@ fun ProfileScreen(
                         )
                     }
                 }
-            }
+                }
 
-            uiState.statusMessage?.let { message ->
-                item {
+                uiState.statusMessage?.let { message ->
+                    item {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         color = GeodouroLightBg,
@@ -402,27 +444,37 @@ fun ProfileScreen(
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
+                    }
                 }
-            }
 
-            if (uiState.observations.isEmpty()) {
-                item {
+                if (uiState.observations.isEmpty()) {
+                    item {
                     EmptyProfileState()
-                }
-            } else if (filteredObservations.isEmpty()) {
-                item {
+                    }
+                } else if (filteredObservations.isEmpty()) {
+                    item {
                     EmptyFilteredProfileState()
-                }
-            } else {
-                items(filteredObservations, key = { it.id }) { observation ->
+                    }
+                } else {
+                    items(filteredObservations, key = { it.id }) { observation ->
                     ObservationProfileCard(
                         observation = observation,
                         isPublishing = uiState.publishingIds.contains(observation.id),
+                        canPublish = canPublishObservations,
                         onPublish = { viewModel.publishObservation(observation.id) },
                         onClick = { onObservationClick(observation.id) }
                     )
+                    }
                 }
             }
+
+            PullRefreshIndicator(
+                refreshing = uiState.isLoading,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                backgroundColor = GeodouroBg,
+                contentColor = GeodouroBrandGreen
+            )
         }
     }
 }
@@ -465,6 +517,7 @@ private fun EmptyFilteredProfileState() {
 private fun ObservationProfileCard(
     observation: ObservationEntity,
     isPublishing: Boolean,
+    canPublish: Boolean,
     onPublish: () -> Unit,
     onClick: () -> Unit
 ) {
@@ -558,7 +611,7 @@ private fun ObservationProfileCard(
                         fontWeight = FontWeight.Bold
                     )
                 }
-            } else {
+            } else if (canPublish) {
                 Button(
                     onClick = onPublish,
                     enabled = !isPublishing,
@@ -579,6 +632,19 @@ private fun ObservationProfileCard(
                     }
                     Spacer(modifier = Modifier.size(8.dp))
                     Text("Transformar em publicacao")
+                }
+            } else {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = GeodouroLightBg,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Publicacao indisponivel em modo convidado.",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        color = GeodouroTextSecondary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
             }
         }

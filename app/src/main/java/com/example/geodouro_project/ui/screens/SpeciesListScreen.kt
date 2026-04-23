@@ -18,6 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
@@ -36,6 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -127,9 +132,10 @@ class SpeciesListViewModel(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun SpeciesListScreen(
+    refreshTrigger: Int = 0,
     onSpeciesClick: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -137,6 +143,10 @@ fun SpeciesListScreen(
         factory = SpeciesListViewModel.factory(context.applicationContext)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = uiState.isLoading,
+        onRefresh = { viewModel.refresh() }
+    )
     var selectedFilter by rememberSaveable { mutableStateOf(SpeciesFilter.SPECIES) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
 
@@ -160,6 +170,12 @@ fun SpeciesListScreen(
         )
     }
 
+    LaunchedEffect(refreshTrigger) {
+        if (refreshTrigger > 0) {
+            viewModel.refresh()
+        }
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -174,79 +190,90 @@ fun SpeciesListScreen(
         },
         containerColor = GeodouroBg
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .background(GeodouroBg)
+                .pullRefresh(pullRefreshState)
         ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                colors = geodouroOutlinedTextFieldColors(),
-                leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = GeodouroGrey)
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotBlank()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(
-                                Icons.Default.Clear,
-                                contentDescription = "Limpar pesquisa",
-                                tint = GeodouroGrey
+            Column(modifier = Modifier.fillMaxSize()) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = geodouroOutlinedTextFieldColors(),
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = null, tint = GeodouroGrey)
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotBlank()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    Icons.Default.Clear,
+                                    contentDescription = "Limpar pesquisa",
+                                    tint = GeodouroGrey
+                                )
+                            }
+                        }
+                    },
+                    placeholder = {
+                        Text("Pesquisar por especie, nome comum, familia...")
+                    }
+                )
+
+                FilterTabRow(
+                    selectedFilter = selectedFilter,
+                    onFilterSelected = { selectedFilter = it }
+                )
+
+                when {
+                    uiState.isLoading -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "A carregar especies observadas...",
+                                color = GeodouroTextSecondary
                             )
                         }
                     }
-                },
-                placeholder = {
-                    Text("Pesquisar por especie, nome comum, familia...")
-                }
-            )
 
-            FilterTabRow(
-                selectedFilter = selectedFilter,
-                onFilterSelected = { selectedFilter = it }
-            )
-
-            when {
-                uiState.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "A carregar especies observadas...",
-                            color = GeodouroTextSecondary
+                    filteredSpecies.isEmpty() -> {
+                        EmptySpeciesState(
+                            hasQuery = searchQuery.isNotBlank(),
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
-                }
 
-                filteredSpecies.isEmpty() -> {
-                    EmptySpeciesState(
-                        hasQuery = searchQuery.isNotBlank(),
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
-                else -> {
-                    LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(filteredSpecies) { species ->
-                            SpeciesCard(
-                                species = species,
-                                onClick = { onSpeciesClick(species.id) }
-                            )
+                    else -> {
+                        LazyColumn(
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(filteredSpecies) { species ->
+                                SpeciesCard(
+                                    species = species,
+                                    onClick = { onSpeciesClick(species.id) }
+                                )
+                            }
                         }
                     }
                 }
             }
+
+            PullRefreshIndicator(
+                refreshing = uiState.isLoading,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                backgroundColor = GeodouroBg,
+                contentColor = GeodouroGreen
+            )
         }
     }
 }

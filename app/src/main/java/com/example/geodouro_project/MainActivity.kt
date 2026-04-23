@@ -87,6 +87,7 @@ fun AppNavigation() {
     var latestCaptureLongitude by remember { mutableStateOf<Double?>(null) }
     var clearIdentifyCapturesVersion by remember { mutableStateOf(0) }
     var networkRefreshVersion by remember { mutableStateOf(0) }
+    var savedObservationRefreshVersion by remember { mutableStateOf(0) }
     var previousInternetState by remember { mutableStateOf<Boolean?>(null) }
     var detailAnchorRoute by remember { mutableStateOf<String?>(null) }
 
@@ -134,6 +135,9 @@ fun AppNavigation() {
 
     fun observationDetailRoute(observationId: String): String =
         "observationDetail/${Uri.encode(observationId)}"
+
+    fun observationDetailFromSpeciesRoute(observationId: String): String =
+        "${observationDetailRoute(observationId)}?hideSpeciesAction=true"
 
     fun routePlanDetailRoute(routePlanId: Int): String =
         "routePlanDetail/$routePlanId"
@@ -209,6 +213,7 @@ fun AppNavigation() {
         ) {
             composable("home") {
                 HomeScreen(
+                    refreshTrigger = savedObservationRefreshVersion,
                     onSpeciesClick = { speciesId ->
                         navigateAboveAnchor("home", speciesDetailRoute(speciesId))
                     },
@@ -224,7 +229,7 @@ fun AppNavigation() {
 
             composable("community") {
                 CommunityScreen(
-                    refreshTrigger = networkRefreshVersion,
+                    refreshTrigger = networkRefreshVersion + savedObservationRefreshVersion,
                     onPublicationClick = { observationId ->
                         navigateAboveAnchor("community", observationDetailRoute(observationId))
                     }
@@ -246,6 +251,7 @@ fun AppNavigation() {
 
             composable("list") {
                 SpeciesListScreen(
+                    refreshTrigger = savedObservationRefreshVersion,
                     onSpeciesClick = { speciesId ->
                         navigateAboveAnchor("list", speciesDetailRoute(speciesId))
                     }
@@ -254,6 +260,7 @@ fun AppNavigation() {
 
             composable("profile") {
                 ProfileScreen(
+                    refreshTrigger = savedObservationRefreshVersion,
                     sessionState = sessionState,
                     onLogout = {
                         coroutineScope.launch {
@@ -268,6 +275,7 @@ fun AppNavigation() {
 
             composable("routePlans") {
                 RoutePlanListScreen(
+                    refreshTrigger = savedObservationRefreshVersion,
                     onRoutePlanClick = { routePlanId ->
                         navigateAboveAnchor("routePlans", routePlanDetailRoute(routePlanId))
                     },
@@ -278,6 +286,7 @@ fun AppNavigation() {
 
             composable("visitTargets") {
                 VisitTargetScreen(
+                    refreshTrigger = savedObservationRefreshVersion,
                     onBackClick = { popToDetailAnchorOrBack() }
                 )
             }
@@ -293,6 +302,7 @@ fun AppNavigation() {
                         latestCaptureLatitude = null
                         latestCaptureLongitude = null
                         clearIdentifyCapturesVersion += 1
+                        savedObservationRefreshVersion += 1
                         popToDetailAnchorOrBack()
                     },
                     multiImageUris = latestMultiImageUris,
@@ -317,6 +327,7 @@ fun AppNavigation() {
                 arguments = listOf(navArgument("routePlanId") { defaultValue = -1 })
             ) { backStackEntry ->
                 RoutePlanDetailScreen(
+                    refreshTrigger = savedObservationRefreshVersion,
                     routePlanId = backStackEntry.arguments?.getInt("routePlanId") ?: -1,
                     onBackClick = { popToDetailAnchorOrBack() }
                 )
@@ -327,20 +338,27 @@ fun AppNavigation() {
                 arguments = listOf(navArgument("speciesId") { defaultValue = "" })
             ) { backStackEntry ->
                 SpeciesDetailScreen(
+                    refreshTrigger = savedObservationRefreshVersion,
                     speciesId = backStackEntry.arguments?.getString("speciesId").orEmpty(),
                     onBackClick = { popToDetailAnchorOrBack() },
                     onObservationClick = { observationId ->
-                        navigateWithinDetailFlow(observationDetailRoute(observationId))
+                        navigateWithinDetailFlow(observationDetailFromSpeciesRoute(observationId))
                     }
                 )
             }
 
             composable(
-                route = "observationDetail/{observationId}",
-                arguments = listOf(navArgument("observationId") { defaultValue = "" })
+                route = "observationDetail/{observationId}?hideSpeciesAction={hideSpeciesAction}",
+                arguments = listOf(
+                    navArgument("observationId") { defaultValue = "" },
+                    navArgument("hideSpeciesAction") { defaultValue = false }
+                )
             ) { backStackEntry ->
                 ObservationDetailScreen(
+                    refreshTrigger = savedObservationRefreshVersion,
                     observationId = backStackEntry.arguments?.getString("observationId").orEmpty(),
+                    hideSpeciesAction = backStackEntry.arguments?.getBoolean("hideSpeciesAction") ?: false,
+                    sessionState = sessionState,
                     onBackClick = { popToDetailAnchorOrBack() },
                     onOpenSpecies = { speciesId ->
                         navigateWithinDetailFlow(speciesDetailRoute(speciesId))

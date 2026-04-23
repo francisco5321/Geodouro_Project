@@ -337,6 +337,9 @@ class PlantRepository(
     suspend fun publishObservation(observationId: String): Boolean {
         return withContext(Dispatchers.IO) {
             val ownerIdentity = currentIdentityProvider() ?: return@withContext false
+            if (ownerIdentity.userId == null) {
+                return@withContext false
+            }
             val observation = observationDao.getByIdForOwner(
                 id = observationId,
                 ownerUserId = ownerIdentity.userId,
@@ -397,7 +400,15 @@ class PlantRepository(
                 return@withContext true
             }
 
+            if (ownerIdentity.userId == null) {
+                return@withContext false
+            }
             if (!connectivityChecker.hasInternetConnection() || !remoteObservationCatalogService.isConfigured()) {
+                return@withContext false
+            }
+            val remoteObservation = remoteObservationCatalogService.fetchObservationDetail(observationId)
+                ?: return@withContext false
+            if (remoteObservation.userId != ownerIdentity.userId || remoteObservation.isPublished) {
                 return@withContext false
             }
 
@@ -941,8 +952,8 @@ class PlantRepository(
         val primaryImage = imageUrls.firstOrNull() ?: photoUrl.orEmpty()
         return ObservationEntity(
             id = deviceObservationId,
-            ownerUserId = ownerIdentity?.userId,
-            ownerGuestLabel = ownerIdentity?.guestLabel,
+            ownerUserId = userId,
+            ownerGuestLabel = null,
             imageUri = primaryImage,
             imageUrisSerialized = ObservationEntity.serializeImageUris(
                 imageUris = if (imageUrls.isNotEmpty()) imageUrls else listOfNotNull(photoUrl),

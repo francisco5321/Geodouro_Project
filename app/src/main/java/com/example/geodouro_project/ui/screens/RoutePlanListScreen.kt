@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -32,6 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -126,9 +131,10 @@ class RoutePlanListViewModel(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun RoutePlanListScreen(
+    refreshTrigger: Int = 0,
     onRoutePlanClick: (Int) -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -137,6 +143,17 @@ fun RoutePlanListScreen(
         factory = RoutePlanListViewModel.factory(context.applicationContext)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isLoading = uiState is RoutePlanListUiState.Loading
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isLoading,
+        onRefresh = { viewModel.refresh() }
+    )
+
+    LaunchedEffect(refreshTrigger) {
+        if (refreshTrigger > 0) {
+            viewModel.refresh()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -162,65 +179,70 @@ fun RoutePlanListScreen(
         },
         containerColor = GeodouroBg
     ) { padding ->
-        when (val state = uiState) {
-            RoutePlanListUiState.Loading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(GeodouroBg)
+                .pullRefresh(pullRefreshState)
+        ) {
+            when (val state = uiState) {
+                RoutePlanListUiState.Loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
                 }
-            }
 
-            RoutePlanListUiState.Empty -> {
-                RoutePlanEmptyState(
-                    title = "Ainda nao existem percursos planeados.",
-                    message = "Os percursos criados na web vao aparecer aqui quando estiverem associados a esta conta.",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                )
-            }
+                RoutePlanListUiState.Empty -> {
+                    RoutePlanEmptyState(
+                        title = "Ainda nao existem percursos planeados.",
+                        message = "Os percursos criados na web vao aparecer aqui quando estiverem associados a esta conta.",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
-            is RoutePlanListUiState.Error -> {
-                RoutePlanEmptyState(
-                    title = "Nao foi possivel carregar os percursos.",
-                    message = state.message,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                )
-            }
+                is RoutePlanListUiState.Error -> {
+                    RoutePlanEmptyState(
+                        title = "Nao foi possivel carregar os percursos.",
+                        message = state.message,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
-            RoutePlanListUiState.GuestRestricted -> {
-                RoutePlanEmptyState(
-                    title = "Percursos disponiveis apenas com sessao autenticada.",
-                    message = "Entra com a tua conta para veres os percursos planeados criados na web.",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                )
-            }
+                RoutePlanListUiState.GuestRestricted -> {
+                    RoutePlanEmptyState(
+                        title = "Percursos disponiveis apenas com sessao autenticada.",
+                        message = "Entra com a tua conta para veres os percursos planeados criados na web.",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
-            is RoutePlanListUiState.Success -> {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .background(GeodouroBg),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(state.routePlans, key = { it.routePlanId }) { routePlan ->
-                        RoutePlanSummaryCard(
-                            routePlan = routePlan,
-                            onClick = { onRoutePlanClick(routePlan.routePlanId) }
-                        )
+                is RoutePlanListUiState.Success -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(state.routePlans, key = { it.routePlanId }) { routePlan ->
+                            RoutePlanSummaryCard(
+                                routePlan = routePlan,
+                                onClick = { onRoutePlanClick(routePlan.routePlanId) }
+                            )
+                        }
                     }
                 }
             }
+
+            PullRefreshIndicator(
+                refreshing = isLoading,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                backgroundColor = GeodouroBg,
+                contentColor = GeodouroBrandGreen
+            )
         }
     }
 }

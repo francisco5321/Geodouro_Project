@@ -20,6 +20,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -42,6 +46,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -146,9 +151,10 @@ class RoutePlanDetailViewModel(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun RoutePlanDetailScreen(
+    refreshTrigger: Int = 0,
     routePlanId: Int,
     onBackClick: () -> Unit
 ) {
@@ -157,6 +163,17 @@ fun RoutePlanDetailScreen(
         factory = RoutePlanDetailViewModel.factory(context.applicationContext, routePlanId)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isLoading = uiState is RoutePlanDetailUiState.Loading
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isLoading,
+        onRefresh = { viewModel.refresh() }
+    )
+
+    LaunchedEffect(refreshTrigger, routePlanId) {
+        if (refreshTrigger > 0) {
+            viewModel.refresh()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -182,41 +199,51 @@ fun RoutePlanDetailScreen(
         },
         containerColor = GeodouroBg
     ) { padding ->
-        when (val state = uiState) {
-            RoutePlanDetailUiState.Loading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(GeodouroBg)
+                .pullRefresh(pullRefreshState)
+        ) {
+            when (val state = uiState) {
+                RoutePlanDetailUiState.Loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                is RoutePlanDetailUiState.Error -> {
+                    RoutePlanEmptyState(
+                        title = "Nao foi possivel abrir o percurso.",
+                        message = state.message,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                RoutePlanDetailUiState.GuestRestricted -> {
+                    RoutePlanEmptyState(
+                        title = "Percurso indisponivel em modo convidado.",
+                        message = "Entra com a tua conta para veres os detalhes e o circuito do percurso.",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                is RoutePlanDetailUiState.Success -> {
+                    RoutePlanDetailContent(routePlan = state.routePlan, padding = PaddingValues(0.dp))
                 }
             }
 
-            is RoutePlanDetailUiState.Error -> {
-                RoutePlanEmptyState(
-                    title = "Nao foi possivel abrir o percurso.",
-                    message = state.message,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                )
-            }
-
-            RoutePlanDetailUiState.GuestRestricted -> {
-                RoutePlanEmptyState(
-                    title = "Percurso indisponivel em modo convidado.",
-                    message = "Entra com a tua conta para veres os detalhes e o circuito do percurso.",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                )
-            }
-
-            is RoutePlanDetailUiState.Success -> {
-                RoutePlanDetailContent(routePlan = state.routePlan, padding = padding)
-            }
+            PullRefreshIndicator(
+                refreshing = isLoading,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                backgroundColor = GeodouroBg,
+                contentColor = GeodouroBrandGreen
+            )
         }
     }
 }

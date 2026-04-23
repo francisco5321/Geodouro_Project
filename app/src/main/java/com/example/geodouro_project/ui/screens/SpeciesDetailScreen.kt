@@ -20,6 +20,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -41,6 +45,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -123,7 +128,7 @@ class SpeciesDetailViewModel(
         refresh()
     }
 
-    private fun refresh() {
+    fun refresh() {
         viewModelScope.launch {
             _uiState.value = SpeciesDetailUiState(isLoading = true)
             _uiState.value = SpeciesDetailUiState(
@@ -146,9 +151,10 @@ class SpeciesDetailViewModel(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun SpeciesDetailScreen(
+    refreshTrigger: Int = 0,
     speciesId: String,
     onBackClick: () -> Unit,
     onObservationClick: (String) -> Unit = {}
@@ -161,6 +167,16 @@ fun SpeciesDetailScreen(
         factory = SpeciesDetailViewModel.factory(context.applicationContext, decodedId)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = uiState.isLoading,
+        onRefresh = { viewModel.refresh() }
+    )
+
+    LaunchedEffect(refreshTrigger, decodedId) {
+        if (refreshTrigger > 0) {
+            viewModel.refresh()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -185,18 +201,23 @@ fun SpeciesDetailScreen(
         },
         containerColor = GeodouroBg
     ) { padding ->
-        when {
-            uiState.isLoading -> CenteredMessage(padding, "A carregar detalhe da especie...")
-            uiState.detail == null -> CenteredMessage(padding, "Nao foi possivel encontrar esta especie.")
-            else -> {
-                val detail = uiState.detail ?: return@Scaffold
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(GeodouroBg)
+                .pullRefresh(pullRefreshState)
+        ) {
+            when {
+                uiState.isLoading -> CenteredMessage(PaddingValues(0.dp), "A carregar detalhe da especie...")
+                uiState.detail == null -> CenteredMessage(PaddingValues(0.dp), "Nao foi possivel encontrar esta especie.")
+                else -> {
+                    val detail = uiState.detail ?: return@Scaffold
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                     item {
                         HeroImage(
                             detail = detail,
@@ -251,8 +272,17 @@ fun SpeciesDetailScreen(
                             )
                         }
                     }
+                    }
                 }
             }
+
+            PullRefreshIndicator(
+                refreshing = uiState.isLoading,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                backgroundColor = GeodouroBg,
+                contentColor = GeodouroBrandGreen
+            )
         }
     }
 
