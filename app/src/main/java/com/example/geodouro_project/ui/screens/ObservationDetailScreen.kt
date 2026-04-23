@@ -98,7 +98,7 @@ class ObservationDetailViewModel(
     fun refresh() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-            val localObservation = repository.fetchLocalObservations().firstOrNull { it.id == observationId }
+            val localObservation = repository.fetchLocalObservationById(observationId)
             val remoteObservation = repository.fetchRemoteObservationDetail(observationId)
             _uiState.value = _uiState.value.copy(
                 observation = remoteObservation?.copy(

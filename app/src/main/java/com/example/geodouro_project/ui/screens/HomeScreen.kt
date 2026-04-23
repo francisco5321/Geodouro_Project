@@ -374,7 +374,10 @@ fun HomeScreen(
                     }
                     }
                 } else {
-                    items(uiState.recentSpecies) { species ->
+                    items(
+                        items = uiState.recentSpecies,
+                        key = { it.id }
+                    ) { species ->
                     SpeciesCard(
                         species = species,
                         onClick = { onSpeciesClick(species.id) },
@@ -480,4 +483,3 @@ private fun List<PlantSpeciesCatalogItem>.toRemoteRecentSpeciesItems(): List<Spe
             )
         }
 }
-

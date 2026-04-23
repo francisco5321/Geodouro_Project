@@ -177,7 +177,7 @@ fun ResultsScreen(
                 else -> Unit
             }
         }
-    }
+    } 
 
     Scaffold(
         topBar = {

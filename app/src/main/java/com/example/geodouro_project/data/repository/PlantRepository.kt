@@ -47,6 +47,7 @@ import java.util.Locale
 import java.util.UUID
 import java.time.Instant
 import java.io.FileInputStream
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
 import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
@@ -76,6 +77,8 @@ class PlantRepository(
     private val multiImageAggregator by lazy {
         MultiImageAggregator(nonPlantLabel = MobileNetV3Classifier.NON_PLANT_LABEL)
     }
+    private val speciesLookupCache = ConcurrentHashMap<String, CachedTaxonResult>()
+    private val referenceEmbeddingCache = ConcurrentHashMap<String, FloatArray>()
 
     suspend fun rerankLowConfidenceInference(localResult: LocalInferenceResult): LocalInferenceResult {
         if (isNonPlantPrediction(localResult.predictedSpecies) || localResult.confidence >= LOW_CONFIDENCE_THRESHOLD) {
@@ -144,11 +147,13 @@ class PlantRepository(
         val cached = taxonCacheDao.getBySpeciesQuery(normalizedQuery)
 
         if (cached != null) {
-            val remoteTaxon = fetchTopTaxon(speciesName)
-            if (remoteTaxon != null) {
-                val updatedCache = remoteTaxon.toCacheEntity(normalizedQuery)
-                taxonCacheDao.upsert(updatedCache)
-                return EnrichmentResult(updatedCache.toDomain(), EnrichmentOrigin.NETWORK)
+            if (!cached.isFresh()) {
+                val remoteTaxon = fetchTopTaxon(speciesName)
+                if (remoteTaxon != null) {
+                    val updatedCache = remoteTaxon.toCacheEntity(normalizedQuery)
+                    taxonCacheDao.upsert(updatedCache)
+                    return EnrichmentResult(updatedCache.toDomain(), EnrichmentOrigin.NETWORK)
+                }
             }
             return EnrichmentResult(cached.toDomain(), EnrichmentOrigin.CACHE)
         }
@@ -161,6 +166,12 @@ class PlantRepository(
         }
 
         return EnrichmentResult(data = null, origin = EnrichmentOrigin.LOCAL_ONLY)
+    }
+
+    suspend fun fetchLocalObservationById(observationId: String): ObservationEntity? {
+        return withContext(Dispatchers.IO) {
+            observationDao.getById(observationId)
+        }
     }
 
     suspend fun saveObservation(
@@ -514,16 +525,16 @@ class PlantRepository(
             }
 
             val normalizedSpeciesId = speciesId.trim()
-            val remoteSpecies = remoteSpeciesService.fetchSpecies()
-            val matchedSpecies = remoteSpecies.firstOrNull { species ->
-                species.id == normalizedSpeciesId ||
-                    species.scientificName.toSpeciesId() == normalizedSpeciesId
-            }
-
             remoteSpeciesService.fetchSpeciesDetail(normalizedSpeciesId)?.toDetailData()
-                ?: matchedSpecies
-                    ?.let { remoteSpeciesService.fetchSpeciesDetail(it.id)?.toDetailData() }
-                ?: matchedSpecies?.toFallbackDetailData()
+                ?: remoteSpeciesService.fetchSpecies()
+                    .firstOrNull { species ->
+                        species.id == normalizedSpeciesId ||
+                            species.scientificName.toSpeciesId() == normalizedSpeciesId
+                    }
+                    ?.let { matchedSpecies ->
+                        remoteSpeciesService.fetchSpeciesDetail(matchedSpecies.id)?.toDetailData()
+                            ?: matchedSpecies.toFallbackDetailData()
+                    }
         }
     }
 
@@ -647,14 +658,19 @@ class PlantRepository(
         val apiQuery = speciesName
             .replace('_', ' ')
             .trim()
+            .lowercase(Locale.ROOT)
 
         if (apiQuery.isBlank()) {
             return null
         }
 
+        speciesLookupCache[apiQuery]?.takeIf { it.isFresh() }?.let { cached ->
+            return cached.taxon
+        }
+
         return try {
             val primaryResult = apiService.searchTaxa(apiQuery).results.firstOrNull()
-            if (primaryResult != null) {
+            val resolved = if (primaryResult != null) {
                 primaryResult
             } else {
                 val genusQuery = apiQuery.substringBefore(' ').trim()
@@ -664,6 +680,11 @@ class PlantRepository(
                     apiService.searchTaxa(genusQuery).results.firstOrNull()
                 }
             }
+            speciesLookupCache[apiQuery] = CachedTaxonResult(
+                taxon = resolved,
+                cachedAt = System.currentTimeMillis()
+            )
+            resolved
         } catch (_: Exception) {
             null
         }
@@ -676,11 +697,14 @@ class PlantRepository(
         val referencePhotoUrl = fetchTopTaxon(candidate.species)?.defaultPhoto?.mediumUrl
             ?: return RankedCandidate(candidate = candidate, similarity = 0f, fusedScore = candidate.confidence)
 
-        val referenceBitmap = downloadBitmap(referencePhotoUrl)
-            ?: return RankedCandidate(candidate = candidate, similarity = 0f, fusedScore = candidate.confidence)
+        val referenceEmbedding = referenceEmbeddingCache[referencePhotoUrl] ?: run {
+            val referenceBitmap = downloadBitmap(referencePhotoUrl)
+                ?: return RankedCandidate(candidate = candidate, similarity = 0f, fusedScore = candidate.confidence)
 
-        val referenceEmbedding = classifier.extractEmbedding(referenceBitmap)
-            ?: return RankedCandidate(candidate = candidate, similarity = 0f, fusedScore = candidate.confidence)
+            classifier.extractEmbedding(referenceBitmap)
+                ?.also { embedding -> referenceEmbeddingCache[referencePhotoUrl] = embedding }
+                ?: return RankedCandidate(candidate = candidate, similarity = 0f, fusedScore = candidate.confidence)
+        }
 
         val similarity = cosineSimilarity(queryEmbedding, referenceEmbedding)
             .coerceIn(0f, 1f)
@@ -830,6 +854,10 @@ class PlantRepository(
         )
     }
 
+    private fun TaxonCacheEntity.isFresh(now: Long = System.currentTimeMillis()): Boolean {
+        return now - updatedAt <= TAXON_LOOKUP_CACHE_TTL_MS
+    }
+
     private fun isNonPlantPrediction(species: String): Boolean {
         return species.trim().equals(MobileNetV3Classifier.NON_PLANT_LABEL, ignoreCase = true)
     }
@@ -839,6 +867,15 @@ class PlantRepository(
         val similarity: Float,
         val fusedScore: Float
     )
+
+    private data class CachedTaxonResult(
+        val taxon: InaturalistTaxonDto?,
+        val cachedAt: Long
+    ) {
+        fun isFresh(now: Long = System.currentTimeMillis()): Boolean {
+            return now - cachedAt <= TAXON_LOOKUP_CACHE_TTL_MS
+        }
+    }
 
     data class ObservationStats(
         val observationsCount: Int,
@@ -1119,8 +1156,8 @@ class PlantRepository(
                         candidatePredictions = emptyList()
                     )
 
-                val prediction = classifier.classify(bitmap)
-                val embedding = classifier.extractEmbedding(bitmap)
+                val analysis = classifier.analyze(bitmap)
+                val prediction = analysis.prediction
 
                 ImageInferenceResult(
                     imageUri = imageUri,
@@ -1132,7 +1169,7 @@ class PlantRepository(
                             confidence = candidate.confidence
                         )
                     },
-                    embedding = embedding,
+                    embedding = analysis.embedding,
                     capturedAt = System.currentTimeMillis()
                 )
             }.getOrNull() ?: ImageInferenceResult(
@@ -1178,6 +1215,7 @@ class PlantRepository(
         private const val MIN_RERANK_GAIN = 0.02f
         private const val MAX_INFERENCE_BITMAP_SIZE = 640
         private const val MAX_REFERENCE_BITMAP_SIZE = 512
+        private const val TAXON_LOOKUP_CACHE_TTL_MS = 24 * 60 * 60 * 1000L
     }
 }
 

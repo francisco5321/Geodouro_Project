@@ -24,6 +24,11 @@ data class InferencePrediction(
     val candidates: List<InferenceCandidate> = emptyList()
 )
 
+data class InferenceAnalysis(
+    val prediction: InferencePrediction,
+    val embedding: FloatArray?
+)
+
 class MobileNetV3Classifier(
     private val context: Context,
     private val modelFileName: String = DEFAULT_MODEL_FILE,
@@ -45,64 +50,14 @@ class MobileNetV3Classifier(
     }
 
     suspend fun classify(bitmap: Bitmap): InferencePrediction = withContext(Dispatchers.Default) {
+        predictionFromProbabilities(runModelProbabilities(bitmap))
+    }
+
+    suspend fun analyze(bitmap: Bitmap): InferenceAnalysis = withContext(Dispatchers.Default) {
         val probabilities = runModelProbabilities(bitmap)
-            ?: return@withContext InferencePrediction(
-                label = FALLBACK_LABEL,
-                confidence = 0f,
-                fromModel = false,
-                candidates = emptyList()
-            )
-
-        if (probabilities.isEmpty()) {
-            return@withContext InferencePrediction(
-                label = FALLBACK_LABEL,
-                confidence = 0f,
-                fromModel = false,
-                candidates = emptyList()
-            )
-        }
-
-        val rankedCandidates = probabilities.indices
-            .map { index ->
-                InferenceCandidate(
-                    label = labels.getOrNull(index) ?: "classe_$index",
-                    confidence = probabilities[index]
-                )
-            }
-            .sortedByDescending { it.confidence }
-
-        val bestPrediction = rankedCandidates.firstOrNull()
-            ?: return@withContext InferencePrediction(
-                label = FALLBACK_LABEL,
-                confidence = 0f,
-                fromModel = false,
-                candidates = emptyList()
-            )
-
-        if (shouldRejectAsNonPlant(rankedCandidates)) {
-            return@withContext InferencePrediction(
-                label = NON_PLANT_LABEL,
-                confidence = rejectionConfidence(bestPrediction),
-                fromModel = true,
-                candidates = emptyList()
-            )
-        }
-
-        val confidentCandidates = rankedCandidates
-            .filter { it.confidence >= MIN_DISPLAY_CONFIDENCE }
-            .take(MAX_DISPLAY_CANDIDATES)
-
-        val exportCandidates = if (confidentCandidates.isNotEmpty()) {
-            confidentCandidates
-        } else {
-            rankedCandidates.take(MAX_DISPLAY_CANDIDATES)
-        }
-
-        InferencePrediction(
-            label = bestPrediction.label,
-            confidence = bestPrediction.confidence,
-            fromModel = true,
-            candidates = exportCandidates
+        InferenceAnalysis(
+            prediction = predictionFromProbabilities(probabilities),
+            embedding = probabilities
         )
     }
 
@@ -130,6 +85,58 @@ class MobileNetV3Classifier(
 
     private fun normalizeLabel(label: String): String {
         return label.trim().lowercase().replace('_', ' ')
+    }
+
+    private fun predictionFromProbabilities(probabilities: FloatArray?): InferencePrediction {
+        if (probabilities == null || probabilities.isEmpty()) {
+            return fallbackPrediction()
+        }
+
+        val rankedCandidates = probabilities.indices
+            .map { index ->
+                InferenceCandidate(
+                    label = labels.getOrNull(index) ?: "classe_$index",
+                    confidence = probabilities[index]
+                )
+            }
+            .sortedByDescending { it.confidence }
+
+        val bestPrediction = rankedCandidates.firstOrNull() ?: return fallbackPrediction()
+
+        if (shouldRejectAsNonPlant(rankedCandidates)) {
+            return InferencePrediction(
+                label = NON_PLANT_LABEL,
+                confidence = rejectionConfidence(bestPrediction),
+                fromModel = true,
+                candidates = emptyList()
+            )
+        }
+
+        val confidentCandidates = rankedCandidates
+            .filter { it.confidence >= MIN_DISPLAY_CONFIDENCE }
+            .take(MAX_DISPLAY_CANDIDATES)
+
+        val exportCandidates = if (confidentCandidates.isNotEmpty()) {
+            confidentCandidates
+        } else {
+            rankedCandidates.take(MAX_DISPLAY_CANDIDATES)
+        }
+
+        return InferencePrediction(
+            label = bestPrediction.label,
+            confidence = bestPrediction.confidence,
+            fromModel = true,
+            candidates = exportCandidates
+        )
+    }
+
+    private fun fallbackPrediction(): InferencePrediction {
+        return InferencePrediction(
+            label = FALLBACK_LABEL,
+            confidence = 0f,
+            fromModel = false,
+            candidates = emptyList()
+        )
     }
 
     private fun runModelProbabilities(bitmap: Bitmap): FloatArray? {

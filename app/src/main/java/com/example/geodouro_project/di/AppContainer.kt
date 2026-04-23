@@ -20,6 +20,9 @@ import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.data.repository.RoutePlanRepository
 import com.example.geodouro_project.data.repository.VisitTargetRepository
 import com.google.gson.Gson
+import java.io.File
+import java.util.concurrent.TimeUnit
+import okhttp3.Cache
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -37,15 +40,12 @@ object AppContainer {
     private var visitTargetRepositoryInstance: VisitTargetRepository? = null
     @Volatile
     private var classifierInstance: MobileNetV3Classifier? = null
+    @Volatile
+    private var sharedHttpClient: OkHttpClient? = null
 
     fun provideAuthRepository(context: Context): AuthRepository {
         return authRepositoryInstance ?: synchronized(this) {
-            val loggingInterceptor = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BASIC
-            }
-            val authHttpClient = OkHttpClient.Builder()
-                .addInterceptor(loggingInterceptor)
-                .build()
+            val authHttpClient = provideHttpClient(context.applicationContext)
 
             authRepositoryInstance ?: AuthRepository(
                 sessionStorage = AuthSessionStorage(context.applicationContext),
@@ -80,12 +80,7 @@ object AppContainer {
 
     fun provideRoutePlanRepository(context: Context): RoutePlanRepository {
         return routePlanRepositoryInstance ?: synchronized(this) {
-            val loggingInterceptor = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BASIC
-            }
-            val httpClient = OkHttpClient.Builder()
-                .addInterceptor(loggingInterceptor)
-                .build()
+            val httpClient = provideHttpClient(context.applicationContext)
 
             routePlanRepositoryInstance ?: RoutePlanRepository(
                 remoteRoutePlanService = RemoteRoutePlanService(
@@ -104,12 +99,7 @@ object AppContainer {
 
     fun provideVisitTargetRepository(context: Context): VisitTargetRepository {
         return visitTargetRepositoryInstance ?: synchronized(this) {
-            val loggingInterceptor = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BASIC
-            }
-            val httpClient = OkHttpClient.Builder()
-                .addInterceptor(loggingInterceptor)
-                .build()
+            val httpClient = provideHttpClient(context.applicationContext)
 
             visitTargetRepositoryInstance ?: VisitTargetRepository(
                 remoteVisitTargetService = RemoteVisitTargetService(
@@ -127,14 +117,7 @@ object AppContainer {
     private fun buildRepository(appContext: Context): PlantRepository {
         val database = GeodouroDatabase.getInstance(appContext)
         val authRepository = provideAuthRepository(appContext)
-
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
-        }
-
-        val okHttpClient = OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor)
-            .build()
+        val okHttpClient = provideHttpClient(appContext)
 
         val retrofit = Retrofit.Builder()
             .baseUrl("https://api.inaturalist.org/")
@@ -198,6 +181,36 @@ object AppContainer {
             classifier = provideMobileNetV3Classifier(appContext),
             currentIdentityProvider = authRepository::currentRemoteIdentity
         )
+    }
+
+    private fun provideHttpClient(context: Context): OkHttpClient {
+        return sharedHttpClient ?: synchronized(this) {
+            sharedHttpClient ?: buildHttpClient(context).also { sharedHttpClient = it }
+        }
+    }
+
+    private fun buildHttpClient(context: Context): OkHttpClient {
+        val loggingInterceptor = HttpLoggingInterceptor().apply {
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BASIC
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
+        }
+
+        return OkHttpClient.Builder()
+            .cache(
+                Cache(
+                    directory = File(context.cacheDir, "http_cache"),
+                    maxSize = 20L * 1024L * 1024L
+                )
+            )
+            .addInterceptor(loggingInterceptor)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .writeTimeout(20, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
     }
 }
 

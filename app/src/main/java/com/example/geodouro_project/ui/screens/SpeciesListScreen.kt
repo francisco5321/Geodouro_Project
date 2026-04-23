@@ -256,7 +256,10 @@ fun SpeciesListScreen(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            items(filteredSpecies) { species ->
+                            items(
+                                items = filteredSpecies,
+                                key = { it.id }
+                            ) { species ->
                                 SpeciesCard(
                                     species = species,
                                     onClick = { onSpeciesClick(species.id) }
