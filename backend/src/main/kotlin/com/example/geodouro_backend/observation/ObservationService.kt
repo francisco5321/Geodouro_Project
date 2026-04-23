@@ -323,6 +323,7 @@ class ObservationService(
             confidence = rs.getObject("confidence")?.toString()?.toFloat(),
             latitude = rs.getBigDecimal("latitude")?.toDouble(),
             longitude = rs.getBigDecimal("longitude")?.toDouble(),
+            notes = rs.getString("notes"),
             syncStatus = rs.getString("sync_status"),
             isPublished = rs.getBoolean("is_published"),
             observedAt = rs.getTimestamp("observed_at").toInstant()
@@ -347,6 +348,7 @@ class ObservationService(
                    o.confidence,
                    o.latitude,
                    o.longitude,
+                   o.notes,
                    o.sync_status,
                    o.is_published,
                    o.observed_at

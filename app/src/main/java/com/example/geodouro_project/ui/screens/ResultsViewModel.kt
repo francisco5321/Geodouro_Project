@@ -201,7 +201,7 @@ class ResultsViewModel(
         }
     }
 
-    fun confirmObservation() {
+    fun confirmObservation(notes: String = "") {
         if (confirmationInProgress) {
             return
         }
@@ -288,7 +288,8 @@ class ResultsViewModel(
                 val saveResult = repository.saveObservation(
                     localResult = inferenceToPersist,
                     enrichedData = lastEnrichedData,
-                    imageUris = imageUrisToPersist
+                    imageUris = imageUrisToPersist,
+                    notes = notes
                 )
 
                 Log.d(TAG, "saveObservation result observationId=${saveResult.observationId} syncStatus=${saveResult.syncStatus}")

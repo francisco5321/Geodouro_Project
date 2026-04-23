@@ -121,6 +121,7 @@ class RemoteObservationCatalogService(
             confidence = confidence ?: 0f,
             latitude = latitude,
             longitude = longitude,
+            notes = notes,
             syncStatus = syncStatus,
             isPublished = isPublished
         )
@@ -162,6 +163,7 @@ data class RemoteObservationDetail(
     val confidence: Float,
     val latitude: Double?,
     val longitude: Double?,
+    val notes: String?,
     val syncStatus: String,
     val isPublished: Boolean
 )
@@ -191,6 +193,8 @@ private data class RemoteObservationDetailResponse(
     val latitude: Double?,
     @SerializedName("longitude")
     val longitude: Double?,
+    @SerializedName("notes")
+    val notes: String?,
     @SerializedName("syncStatus")
     val syncStatus: String,
     @SerializedName("isPublished")

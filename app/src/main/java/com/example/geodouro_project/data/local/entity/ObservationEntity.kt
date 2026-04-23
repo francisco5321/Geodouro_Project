@@ -1,6 +1,7 @@
 package com.example.geodouro_project.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Ignore
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -30,10 +31,14 @@ data class ObservationEntity(
     val enrichedFamily: String?,
     val enrichedWikipediaUrl: String?,
     val enrichedPhotoUrl: String?,
+    val notes: String?,
     val isPublished: Boolean,
     val syncStatus: String,
     val lastSyncAttemptAt: Long?
 ) {
+    @Ignore
+    var publishedByDisplayName: String? = null
+
     fun allImageUris(): List<String> {
         val parsed = imageUrisSerialized
             .split("\n")

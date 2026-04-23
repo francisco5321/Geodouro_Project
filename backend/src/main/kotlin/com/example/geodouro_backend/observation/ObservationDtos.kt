@@ -66,6 +66,7 @@ data class ObservationDetailResponse(
     val confidence: Float?,
     val latitude: Double?,
     val longitude: Double?,
+    val notes: String?,
     val syncStatus: String,
     val isPublished: Boolean,
     val observedAt: Instant

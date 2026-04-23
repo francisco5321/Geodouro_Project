@@ -63,7 +63,8 @@ class RemoteObservationSyncService(
             latitude = observation.latitude,
             longitude = observation.longitude,
             syncStatus = ObservationSyncStatus.SYNCED.name,
-            lastSyncAttemptAt = syncAttemptAt
+            lastSyncAttemptAt = syncAttemptAt,
+            notes = observation.notes
         )
 
         val multipartBody = buildMultipartBody(observation, payload)

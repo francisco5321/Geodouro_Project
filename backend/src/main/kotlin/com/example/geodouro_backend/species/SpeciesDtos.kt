@@ -40,6 +40,7 @@ data class PlantSpeciesObservationResponse(
     val deviceObservationId: UUID,
     val scientificName: String,
     val commonName: String?,
+    val userDisplayName: String?,
     val capturedAt: Long?,
     val confidence: Float?,
     val syncStatus: String,

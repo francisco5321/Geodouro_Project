@@ -31,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -41,6 +42,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,6 +74,7 @@ import com.example.geodouro_project.ui.theme.GeodouroWarningBg
 import com.example.geodouro_project.ui.theme.GeodouroWhite
 import com.example.geodouro_project.ui.theme.geodouroOutlinedBorderColor
 import com.example.geodouro_project.ui.theme.geodouroOutlinedButtonColors
+import com.example.geodouro_project.ui.theme.geodouroOutlinedTextFieldColors
 import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
 import com.example.geodouro_project.ui.theme.geodouroSecondaryButtonColors
 
@@ -108,6 +111,9 @@ fun ResultsScreen(
     )
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var observationNotes by rememberSaveable(localInferenceResult.imageUri, multiImageUris) {
+        mutableStateOf("")
+    }
 
     LaunchedEffect(localInferenceResult, multiImageUris, captureLatitude, captureLongitude) {
         if (multiImageUris.size >= 2) {
@@ -229,7 +235,9 @@ fun ResultsScreen(
                         sourceLabel = state.sourceLabel,
                         saveMessage = state.saveMessage,
                         isConfirming = state.isConfirming,
-                        onConfirm = { viewModel.confirmObservation() },
+                        notes = observationNotes,
+                        onNotesChange = { observationNotes = it },
+                        onConfirm = { viewModel.confirmObservation(observationNotes) },
                         onRetakePhotos = onBackClick
                     )
                 }
@@ -240,7 +248,9 @@ fun ResultsScreen(
                         sourceLabel = state.sourceLabel,
                         saveMessage = state.saveMessage,
                         isConfirming = state.isConfirming,
-                        onConfirm = { viewModel.confirmObservation() },
+                        notes = observationNotes,
+                        onNotesChange = { observationNotes = it },
+                        onConfirm = { viewModel.confirmObservation(observationNotes) },
                         onRetakePhotos = onBackClick
                     )
                 }
@@ -300,6 +310,8 @@ fun ResultCard(
     sourceLabel: String,
     saveMessage: String?,
     isConfirming: Boolean,
+    notes: String,
+    onNotesChange: (String) -> Unit,
     onConfirm: () -> Unit,
     onRetakePhotos: () -> Unit
 ) {
@@ -398,6 +410,14 @@ fun ResultCard(
                 latitude = result.latitude,
                 longitude = result.longitude
             )
+
+            if (result.isPlantDetected) {
+                Spacer(modifier = Modifier.height(12.dp))
+                ObservationNotesField(
+                    value = notes,
+                    onValueChange = onNotesChange
+                )
+            }
 
             if (!saveMessage.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(12.dp))
@@ -628,6 +648,8 @@ fun MultiImageResultCard(
     sourceLabel: String,
     saveMessage: String?,
     isConfirming: Boolean,
+    notes: String,
+    onNotesChange: (String) -> Unit,
     onConfirm: () -> Unit,
     onRetakePhotos: () -> Unit
 ) {
@@ -793,6 +815,14 @@ fun MultiImageResultCard(
                 latitude = result.latitude,
                 longitude = result.longitude
             )
+
+            if (result.isPlantDetected) {
+                Spacer(modifier = Modifier.height(12.dp))
+                ObservationNotesField(
+                    value = notes,
+                    onValueChange = onNotesChange
+                )
+            }
 
             if (!saveMessage.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(12.dp))
@@ -1059,6 +1089,47 @@ private fun MultiImageResultUiModel.toIdentificationResult(sourceLabel: String):
 private const val RESULT_IMAGE_MAX_SIZE = 1200
 private const val THUMBNAIL_IMAGE_MAX_SIZE = 240
 private const val FULL_IMAGE_MAX_SIZE = 1800
+
+@Composable
+private fun ObservationNotesField(
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = GeodouroLightBg,
+        shape = RoundedCornerShape(10.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Descricao opcional",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = GeodouroTextPrimary
+            )
+            Text(
+                text = "Adiciona um pequeno contexto sobre a observacao, se quiseres.",
+                style = MaterialTheme.typography.bodySmall,
+                color = GeodouroTextSecondary
+            )
+            OutlinedTextField(
+                value = value,
+                onValueChange = { onValueChange(it.take(280)) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+                maxLines = 5,
+                placeholder = {
+                    Text("Ex.: junto ao caminho, zona humida, floracao abundante...")
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = geodouroOutlinedTextFieldColors()
+            )
+        }
+    }
+}
 
 @Composable
 private fun WikipediaLink(

@@ -103,6 +103,7 @@ class SpeciesService(
                     ?: fallbackObservationUuid,
                 scientificName = rs.getString("scientific_name"),
                 commonName = rs.getString("common_name"),
+                userDisplayName = rs.getString("user_display_name"),
                 capturedAt = rs.getObject("captured_at", java.lang.Long::class.java)?.toLong(),
                 confidence = rs.getObject("confidence")?.toString()?.toFloat(),
                 syncStatus = rs.getString("sync_status"),
@@ -240,6 +241,17 @@ class SpeciesService(
                    COALESCE(o.device_observation_id, synthetic_device_observation_id(o.observation_id)) AS device_observation_id,
                    COALESCE(o.enriched_scientific_name, o.predicted_scientific_name, ps.scientific_name) AS scientific_name,
                    COALESCE(o.enriched_common_name, ps.common_name) AS common_name,
+                   CASE
+                       WHEN p.publication_id IS NULL THEN NULL
+                       ELSE COALESCE(
+                           NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
+                           NULLIF(u.first_name, ''),
+                           NULLIF(u.last_name, ''),
+                           NULLIF(u.username, ''),
+                           u.guest_label,
+                           'Utilizador'
+                       )
+                   END AS user_display_name,
                    o.captured_at,
                    o.confidence,
                    o.sync_status,
@@ -247,6 +259,8 @@ class SpeciesService(
                    COALESCE(oi.image_path, o.image_uri, o.enriched_photo_url) AS image_path
             FROM observation o
             JOIN plant_species ps ON ps.plant_species_id = o.plant_species_id
+            LEFT JOIN publication p ON p.observation_id = o.observation_id
+            LEFT JOIN app_user u ON u.user_id = p.user_id
             LEFT JOIN LATERAL (
                 SELECT image_path
                 FROM observation_image

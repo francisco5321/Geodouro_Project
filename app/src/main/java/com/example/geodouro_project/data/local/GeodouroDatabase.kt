@@ -13,7 +13,7 @@ import com.example.geodouro_project.data.local.entity.TaxonCacheEntity
 
 @Database(
     entities = [TaxonCacheEntity::class, ObservationEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class GeodouroDatabase : RoomDatabase() {
@@ -33,7 +33,7 @@ abstract class GeodouroDatabase : RoomDatabase() {
                     GeodouroDatabase::class.java,
                     "geodouro.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                     .also { INSTANCE = it }
             }
@@ -66,6 +66,12 @@ abstract class GeodouroDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE observation ADD COLUMN ownerGuestLabel TEXT")
                 database.execSQL("CREATE INDEX IF NOT EXISTS index_observation_ownerUserId ON observation(ownerUserId)")
                 database.execSQL("CREATE INDEX IF NOT EXISTS index_observation_ownerGuestLabel ON observation(ownerGuestLabel)")
+            }
+        }
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE observation ADD COLUMN notes TEXT")
             }
         }
     }

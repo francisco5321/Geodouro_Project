@@ -17,5 +17,6 @@ data class RemoteObservationPayload(
     val latitude: Double?,
     val longitude: Double?,
     val syncStatus: String,
-    val lastSyncAttemptAt: Long
+    val lastSyncAttemptAt: Long,
+    val notes: String?
 )

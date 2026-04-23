@@ -75,6 +75,7 @@ import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
+import com.example.geodouro_project.domain.model.SessionState
 import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
 import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
@@ -161,6 +162,10 @@ fun SpeciesDetailScreen(
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+    val authRepository = remember(context.applicationContext) {
+        AppContainer.provideAuthRepository(context.applicationContext)
+    }
+    val sessionState by authRepository.sessionState.collectAsStateWithLifecycle()
     val decodedId = remember(speciesId) { Uri.decode(speciesId) }
     var fullscreenImageUri by rememberSaveable { mutableStateOf<String?>(null) }
     val viewModel: SpeciesDetailViewModel = viewModel(
@@ -268,6 +273,10 @@ fun SpeciesDetailScreen(
                         items(detail.observations) { obs ->
                             ObservationPreviewCard(
                                 observation = obs,
+                                publishedByName = resolvePublishedByDisplayName(
+                                    observation = obs,
+                                    sessionState = sessionState
+                                ),
                                 onClick = { onObservationClick(obs.id) }
                             )
                         }
@@ -572,6 +581,7 @@ private fun LocationCard(summary: String) {
 @Composable
 private fun ObservationPreviewCard(
     observation: ObservationEntity,
+    publishedByName: String?,
     onClick: () -> Unit
 ) {
     val dateFormatter = rememberDateFormatter()
@@ -634,6 +644,15 @@ private fun ObservationPreviewCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = GeodouroTextSecondary
                 )
+                if (isPublished && !publishedByName.isNullOrBlank()) {
+                    Text(
+                        text = "Publicado por $publishedByName",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GeodouroTextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     ConfidenceBadge("${(observation.confidence * 100).toInt()}%")
                     StatusBadge(status, isPublished)
@@ -710,6 +729,22 @@ private fun buildObservationStatusLabel(observation: ObservationEntity): String 
     when {
         observation.isPublished -> "Publicada"
         observation.syncStatus == ObservationSyncStatus.SYNCED.name -> "Sincronizada"
-        observation.syncStatus == ObservationSyncStatus.FAILED.name -> "Falha de sincronizacao"
+        observation.syncStatus == ObservationSyncStatus.FAILED.name -> "Falha de sincronização"
         else -> "Pendente"
     }
+
+private fun resolvePublishedByDisplayName(
+    observation: ObservationEntity,
+    sessionState: SessionState
+): String? {
+    observation.publishedByDisplayName?.takeIf { it.isNotBlank() }?.let { return it }
+
+    return when (sessionState) {
+        is SessionState.Authenticated -> sessionState.displayName
+            .takeIf { observation.ownerUserId != null && observation.ownerUserId == sessionState.userId }
+        is SessionState.Guest -> sessionState.displayName
+            .takeIf { !observation.ownerGuestLabel.isNullOrBlank() && observation.ownerGuestLabel == sessionState.guestLabel }
+        SessionState.Loading,
+        SessionState.LoggedOut -> null
+    }
+}

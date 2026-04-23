@@ -1,21 +1,15 @@
 package com.example.geodouro_project.ui.screens
 
+import android.location.Geocoder
 import android.content.Context
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -23,38 +17,25 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -66,25 +47,37 @@ import com.example.geodouro_project.data.repository.PlantRepository
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.SessionState
 import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
-import com.example.geodouro_project.ui.theme.GeodouroBg
-import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
-import com.example.geodouro_project.ui.theme.GeodouroGreen
-import com.example.geodouro_project.ui.theme.GeodouroLightBg
-import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
-import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
-import com.example.geodouro_project.ui.theme.GeodouroWhite
-import com.example.geodouro_project.ui.theme.geodouroOutlinedTextFieldColors
-import com.example.geodouro_project.ui.theme.geodouroLoadingIndicatorColor
-import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
-import com.example.geodouro_project.ui.theme.geodouroSecondaryButtonColors
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.example.geodouro_project.ui.theme.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.*
 
+// -----------------------------------------------------------------------------
+// Design tokens (local to this file)
+// Design tokens (local to this file)
+private val GreenHero      = Color(0xFF2D6A4F)
+private val GreenLight     = Color(0xFF52B788)
+private val GreenPale      = Color(0xFFD8F3DC)
+private val GreenTag       = Color(0xFFEBF7EE)
+private val GreenMid       = Color(0xFF40916C)
+private val TextPrimary    = Color(0xFF1B2E24)
+private val TextSecondary  = Color(0xFF5A7265)
+private val TextMuted      = Color(0xFF8FA99A)
+private val ScreenBg       = Color(0xFFF4F7F2)
+private val CardBg         = Color(0xFFFFFFFF)
+private val BorderColor    = Color(0x1F2D6A4F)   // ~12% alpha green
+private val CardRadius     = RoundedCornerShape(20.dp)
+private val ChipRadius     = RoundedCornerShape(8.dp)
+private val ButtonRadius   = RoundedCornerShape(12.dp)
+
+// -----------------------------------------------------------------------------
+// ViewModel (unchanged logic)
+// ViewModel (unchanged logic)
 data class ObservationDetailUiState(
     val observation: ObservationEntity? = null,
     val isLoading: Boolean = true,
@@ -100,31 +93,25 @@ class ObservationDetailViewModel(
     private val _uiState = MutableStateFlow(ObservationDetailUiState())
     val uiState: StateFlow<ObservationDetailUiState> = _uiState.asStateFlow()
 
-    init {
-        refresh()
-    }
+    init { refresh() }
 
     fun refresh() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
+            val localObservation = repository.fetchLocalObservations().firstOrNull { it.id == observationId }
+            val remoteObservation = repository.fetchRemoteObservationDetail(observationId)
             _uiState.value = _uiState.value.copy(
-                observation = repository.fetchRemoteObservationDetail(observationId)
-                    ?: repository.fetchLocalObservations().firstOrNull { it.id == observationId },
+                observation = remoteObservation?.copy(
+                    notes = remoteObservation.notes ?: localObservation?.notes
+                ) ?: localObservation,
                 isLoading = false
             )
         }
     }
 
-    fun saveManualIdentification(
-        scientificName: String,
-        commonName: String,
-        family: String
-    ) {
+    fun saveManualIdentification(scientificName: String, commonName: String, family: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isSaving = true,
-                statusMessage = null
-            )
+            _uiState.value = _uiState.value.copy(isSaving = true, statusMessage = null)
             val updated = runCatching {
                 repository.updateObservationMetadata(
                     observationId = observationId,
@@ -133,16 +120,10 @@ class ObservationDetailViewModel(
                     family = family
                 )
             }.getOrDefault(false)
-
             if (updated) refresh()
-
             _uiState.value = _uiState.value.copy(
                 isSaving = false,
-                statusMessage = if (updated) {
-                    "Observacao atualizada localmente."
-                } else {
-                    "Nao foi possivel atualizar esta observacao."
-                }
+                statusMessage = if (updated) "Observação atualizada." else "Não foi possível atualizar."
             )
         }
     }
@@ -151,37 +132,78 @@ class ObservationDetailViewModel(
         fun factory(context: Context, observationId: String): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return ObservationDetailViewModel(
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    ObservationDetailViewModel(
                         repository = AppContainer.providePlantRepository(context),
                         observationId = observationId
                     ) as T
-                }
             }
     }
 }
 
-private fun buildObservationMetaForDetail(observation: ObservationEntity): String {
-    val date = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+// -----------------------------------------------------------------------------
+// Helpers
+// Helpers
+private fun formatObservationDate(observation: ObservationEntity): String =
+    SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", Locale.getDefault())
         .format(Date(observation.capturedAt))
-    val location = if (observation.latitude != null && observation.longitude != null) {
-        "GPS %.5f, %.5f".format(observation.latitude, observation.longitude)
+
+private fun formatSyncStatus(observation: ObservationEntity): String = when {
+    observation.isPublished -> "Publicada"
+    observation.syncStatus == com.example.geodouro_project.domain.model.ObservationSyncStatus.SYNCED.name -> "Sincronizada"
+    observation.syncStatus == com.example.geodouro_project.domain.model.ObservationSyncStatus.FAILED.name -> "Falha de sincronização"
+    else -> "Pendente"
+}
+
+private data class ObservationLocationContext(
+    val primaryLabel: String,
+    val coordinatesLabel: String?
+)
+
+@Composable
+private fun rememberObservationLocationContext(observation: ObservationEntity?): ObservationLocationContext {
+    val context = LocalContext.current
+    return produceState(
+        initialValue = buildFallbackLocationContext(observation),
+        key1 = observation?.id,
+        key2 = observation?.latitude,
+        key3 = observation?.longitude
+    ) { value = resolveObservationLocationContext(context, observation) }.value
+}
+
+private suspend fun resolveObservationLocationContext(
+    context: Context,
+    observation: ObservationEntity?
+): ObservationLocationContext = withContext(Dispatchers.IO) {
+    val fallback = buildFallbackLocationContext(observation)
+    val lat = observation?.latitude ?: return@withContext fallback
+    val lon = observation.longitude ?: return@withContext fallback
+    if (!Geocoder.isPresent()) return@withContext fallback
+    val geocoder = Geocoder(context, Locale.getDefault())
+    @Suppress("DEPRECATION")
+    val address = runCatching { geocoder.getFromLocation(lat, lon, 1)?.firstOrNull() }.getOrNull()
+    val label = buildList {
+        address?.thoroughfare?.takeIf { it.isNotBlank() }?.let(::add)
+        address?.subLocality?.takeIf { it.isNotBlank() }?.let(::add)
+        address?.locality?.takeIf { it.isNotBlank() }?.let(::add)
+        address?.adminArea?.takeIf { it.isNotBlank() }?.let(::add)
+    }.distinct().joinToString(", ")
+    if (label.isBlank()) fallback else fallback.copy(primaryLabel = label)
+}
+
+private fun buildFallbackLocationContext(observation: ObservationEntity?): ObservationLocationContext {
+    val lat = observation?.latitude
+    val lon = observation?.longitude
+    return if (lat != null && lon != null) {
+        ObservationLocationContext("Localização com GPS", "%.5f, %.5f".format(lat, lon))
     } else {
-        "Localizacao indisponivel"
-    }
-
-    return "$date\n$location"
-}
-
-private fun buildObservationStatusLabelForDetail(observation: ObservationEntity): String {
-    return when {
-        observation.isPublished -> "Publicada"
-        observation.syncStatus == com.example.geodouro_project.domain.model.ObservationSyncStatus.SYNCED.name -> "Sincronizada"
-        observation.syncStatus == com.example.geodouro_project.domain.model.ObservationSyncStatus.FAILED.name -> "Falha de sincronizacao"
-        else -> "Pendente de sincronizacao"
+        ObservationLocationContext("Localização indisponível", null)
     }
 }
 
+// -----------------------------------------------------------------------------
+// Main Screen
+// Screen
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun ObservationDetailScreen(
@@ -202,26 +224,22 @@ fun ObservationDetailScreen(
         refreshing = uiState.isLoading,
         onRefresh = { viewModel.refresh() }
     )
-    val observation = uiState.observation
-    val statusMessage = uiState.statusMessage
-    val canEditObservation = remember(observation, sessionState) {
-        val currentObservation = observation ?: return@remember false
-        if (currentObservation.isPublished) {
-            return@remember false
-        }
 
+    val observation = uiState.observation
+    val locationContext = rememberObservationLocationContext(observation)
+
+    val canEdit = remember(observation, sessionState) {
+        val obs = observation ?: return@remember false
+        if (obs.isPublished) return@remember false
         when (sessionState) {
-            is SessionState.Authenticated -> {
-                sessionState.userId != null && currentObservation.ownerUserId == sessionState.userId
-            }
-            is SessionState.Guest -> {
-                !currentObservation.ownerGuestLabel.isNullOrBlank() &&
-                    currentObservation.ownerGuestLabel == sessionState.guestLabel
-            }
-            SessionState.Loading,
-            SessionState.LoggedOut -> false
+            is SessionState.Authenticated ->
+                sessionState.userId != null && obs.ownerUserId == sessionState.userId
+            is SessionState.Guest ->
+                !obs.ownerGuestLabel.isNullOrBlank() && obs.ownerGuestLabel == sessionState.guestLabel
+            else -> false
         }
     }
+
     var isEditing by rememberSaveable(observation?.id) { mutableStateOf(false) }
     var scientificNameInput by rememberSaveable(observation?.id) {
         mutableStateOf(observation?.enrichedScientificName ?: observation?.predictedSpecies.orEmpty())
@@ -233,321 +251,152 @@ fun ObservationDetailScreen(
         mutableStateOf(observation?.enrichedFamily.orEmpty())
     }
 
-    LaunchedEffect(statusMessage, uiState.isSaving) {
-        if (!uiState.isSaving && statusMessage == "Observacao atualizada localmente.") {
-            isEditing = false
-        }
+    LaunchedEffect(uiState.statusMessage, uiState.isSaving) {
+        if (!uiState.isSaving && uiState.statusMessage == "Observação atualizada.") isEditing = false
     }
-
     LaunchedEffect(refreshTrigger, observationId) {
-        if (refreshTrigger > 0) {
-            viewModel.refresh()
-        }
+        if (refreshTrigger > 0) viewModel.refresh()
     }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 expandedHeight = 48.dp,
-                title = {
-                    GeoFloraHeaderLogo()
-                },
+                title = { GeoFloraHeaderLogo() },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Voltar",
-                            tint = GeodouroBrandGreen
+                            tint = GreenHero
                         )
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = GeodouroBg
+                    containerColor = CardBg
                 )
             )
         },
-        containerColor = GeodouroBg
+        containerColor = ScreenBg
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(GeodouroBg)
                 .pullRefresh(pullRefreshState)
         ) {
             when {
                 uiState.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("A carregar observacao...", color = GeodouroTextSecondary)
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            CircularProgressIndicator(color = GreenHero, strokeWidth = 2.dp)
+                            Text("A carregar observação...", color = TextSecondary, fontSize = 13.sp)
+                        }
                     }
                 }
-
-                uiState.observation == null -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("Observacao nao encontrada.", color = GeodouroTextSecondary)
+                observation == null -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Observação não encontrada.", color = TextSecondary)
                     }
                 }
-
                 else -> {
-                    val observation = uiState.observation ?: return@Scaffold
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
-                            elevation = CardDefaults.cardElevation(2.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(14.dp)
-                            ) {
-                                if (isEditing && !observation.isPublished) {
-                                    OutlinedTextField(
-                                        value = scientificNameInput,
-                                        onValueChange = { scientificNameInput = it },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        label = { Text("Nome cientifico") },
-                                        singleLine = true,
-                                        colors = geodouroOutlinedTextFieldColors()
-                                    )
-                                    OutlinedTextField(
-                                        value = commonNameInput,
-                                        onValueChange = { commonNameInput = it },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        label = { Text("Nome comum") },
-                                        singleLine = true,
-                                        colors = geodouroOutlinedTextFieldColors()
-                                    )
-                                    OutlinedTextField(
-                                        value = familyInput,
-                                        onValueChange = { familyInput = it },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        label = { Text("Familia") },
-                                        singleLine = true,
-                                        colors = geodouroOutlinedTextFieldColors()
-                                    )
-                                } else {
-                                    Text(
-                                        text = observation.enrichedScientificName ?: observation.predictedSpecies,
-                                        style = MaterialTheme.typography.headlineSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = GeodouroTextPrimary
-                                    )
-                                    Text(
-                                        text = observation.enrichedCommonName ?: "Nome comum indisponivel",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = GeodouroTextSecondary
-                                    )
-                                }
+                        // Hero card
+                        item {
+                            HeroCard(
+                                observation = observation,
+                                isEditing = isEditing,
+                                scientificNameInput = scientificNameInput,
+                                onScientificNameChange = { scientificNameInput = it },
+                                commonNameInput = commonNameInput,
+                                onCommonNameChange = { commonNameInput = it },
+                                locationContext = locationContext
+                            )
+                        }
 
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    items(observation.allImageUris()) { imageUri ->
-                                        Box(
-                                            modifier = Modifier
-                                                .size(180.dp)
-                                                .background(GeodouroLightBg, RoundedCornerShape(10.dp)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            AsyncImage(
-                                                model = imageUri,
-                                                contentDescription = observation.predictedSpecies,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        }
-                                    }
-                                }
+                        // Taxonomic context
+                        item {
+                            SectionLabel("Contexto taxonómico")
+                            Spacer(Modifier.height(6.dp))
+                            TaxonomicContextCard(
+                                observation = observation,
+                                locationContext = locationContext,
+                                onOpenWikipedia = observation.enrichedWikipediaUrl
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { url -> { uriHandler.openUri(url) } }
+                            )
+                        }
 
-                                Surface(
-                                    color = GeodouroLightBg,
-                                    shape = RoundedCornerShape(10.dp)
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Text(
-                                            text = buildObservationMetaForDetail(observation),
-                                            color = GeodouroTextPrimary,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                        Text(
-                                            text = buildObservationStatusLabelForDetail(observation),
-                                            color = GeodouroBrandGreen,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    }
-                                }
-
-                                if (canEditObservation) {
-                                    Surface(
-                                        color = GeodouroLightBg,
-                                        shape = RoundedCornerShape(10.dp)
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                                        ) {
-                                            Text(
-                                                text = "Correcao manual antes de publicar",
-                                                style = MaterialTheme.typography.titleSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = GeodouroTextPrimary
-                                            )
-                                            Text(
-                                                text = "Podes ajustar os dados taxonomicos desta observacao antes de a transformares em publicacao.",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = GeodouroTextSecondary
-                                            )
-
-                                            if (statusMessage != null) {
-                                                Text(
-                                                    text = statusMessage,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = GeodouroBrandGreen
-                                                )
-                                            }
-
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                            ) {
-                                                Button(
-                                                    onClick = {
-                                                        if (isEditing) {
-                                                            viewModel.saveManualIdentification(
-                                                                scientificName = scientificNameInput,
-                                                                commonName = commonNameInput,
-                                                                family = familyInput
-                                                            )
-                                                        } else {
-                                                            scientificNameInput = observation.enrichedScientificName
-                                                                ?: observation.predictedSpecies
-                                                            commonNameInput = observation.enrichedCommonName.orEmpty()
-                                                            familyInput = observation.enrichedFamily.orEmpty()
-                                                            isEditing = true
-                                                        }
-                                                    },
-                                                    enabled = !uiState.isSaving && (
-                                                        !isEditing || scientificNameInput.isNotBlank()
-                                                    ),
-                                                    modifier = Modifier.weight(1f),
-                                                    colors = geodouroPrimaryButtonColors()
-                                                ) {
-                                                    if (uiState.isSaving) {
-                                                        CircularProgressIndicator(
-                                                            modifier = Modifier.size(18.dp),
-                                                            strokeWidth = 2.dp,
-                                                            color = geodouroLoadingIndicatorColor()
-                                                        )
-                                                    } else {
-                                                        Icon(
-                                                            imageVector = Icons.Default.Edit,
-                                                            contentDescription = null,
-                                                            modifier = Modifier.size(18.dp)
-                                                        )
-                                                    }
-                                                    Spacer(modifier = Modifier.size(8.dp))
-                                                    Text(if (isEditing) "Guardar" else "Editar")
-                                                }
-
-                                                if (isEditing) {
-                                                    Button(
-                                                        onClick = {
-                                                            scientificNameInput = observation.enrichedScientificName
-                                                                ?: observation.predictedSpecies
-                                                            commonNameInput = observation.enrichedCommonName.orEmpty()
-                                                            familyInput = observation.enrichedFamily.orEmpty()
-                                                            isEditing = false
-                                                        },
-                                                        enabled = !uiState.isSaving,
-                                                        modifier = Modifier.weight(1f),
-                                                        colors = geodouroSecondaryButtonColors()
-                                                    ) {
-                                                        Text("Cancelar")
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                if (!hideSpeciesAction || !observation.enrichedWikipediaUrl.isNullOrBlank()) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        if (!hideSpeciesAction) {
-                                            Button(
-                                                onClick = {
-                                                    onOpenSpecies(
-                                                        (if (isEditing) scientificNameInput else observation.enrichedScientificName ?: observation.predictedSpecies).toSpeciesId()
-                                                    )
-                                                },
-                                                modifier = Modifier.weight(1f),
-                                                colors = geodouroPrimaryButtonColors()
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Image,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                                Spacer(modifier = Modifier.size(8.dp))
-                                                Text("Ver especie")
-                                            }
-                                        }
-
-                                        if (!observation.enrichedWikipediaUrl.isNullOrBlank()) {
-                                            Button(
-                                                onClick = { uriHandler.openUri(observation.enrichedWikipediaUrl) },
-                                                modifier = Modifier.weight(1f),
-                                                colors = geodouroSecondaryButtonColors()
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Link,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                                Spacer(modifier = Modifier.size(8.dp))
-                                                Text("Wikipedia")
-                                            }
-                                        }
-                                    }
-                                }
-
-                                if (observation.isPublished) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Public,
-                                            contentDescription = null,
-                                            tint = GeodouroGreen
-                                        )
-                                        Text(
-                                            text = "Esta observacao ja foi publicada na comunidade.",
-                                            color = GeodouroGreen,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    }
-                                }
+                        // Manual edit
+                        observation.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+                            item {
+                                SectionLabel("Descrição")
+                                Spacer(Modifier.height(6.dp))
+                                ObservationNotesCard(notes = notes)
                             }
                         }
-                    }
+                        if (canEdit) {
+                            item {
+                                SectionLabel("Identificação manual")
+                                Spacer(Modifier.height(6.dp))
+                                ManualEditCard(
+                                    observation = observation,
+                                    isEditing = isEditing,
+                                    isSaving = uiState.isSaving,
+                                    statusMessage = uiState.statusMessage,
+                                    scientificNameInput = scientificNameInput,
+                                    onScientificNameChange = { scientificNameInput = it },
+                                    commonNameInput = commonNameInput,
+                                    onCommonNameChange = { commonNameInput = it },
+                                    familyInput = familyInput,
+                                    onFamilyChange = { familyInput = it },
+                                    onEditToggle = {
+                                        if (isEditing) {
+                                            viewModel.saveManualIdentification(scientificNameInput, commonNameInput, familyInput)
+                                        } else {
+                                            scientificNameInput = observation.enrichedScientificName ?: observation.predictedSpecies
+                                            commonNameInput = observation.enrichedCommonName.orEmpty()
+                                            familyInput = observation.enrichedFamily.orEmpty()
+                                            isEditing = true
+                                        }
+                                    },
+                                    onCancel = {
+                                        scientificNameInput = observation.enrichedScientificName ?: observation.predictedSpecies
+                                        commonNameInput = observation.enrichedCommonName.orEmpty()
+                                        familyInput = observation.enrichedFamily.orEmpty()
+                                        isEditing = false
+                                    }
+                                )
+                            }
+                        }
+
+                        if (!hideSpeciesAction) {
+                            item {
+                                GeoButton(
+                                    label = "Ver espécie",
+                                    icon = Icons.Default.Image,
+                                    primary = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = {
+                                        onOpenSpecies(
+                                            (if (isEditing) scientificNameInput
+                                            else observation.enrichedScientificName ?: observation.predictedSpecies)
+                                                .toSpeciesId()
+                                        )
+                                    }
+                                )
+                            }
+                        }
+
+                        if (observation.isPublished) {
+                            item { PublishedBanner() }
+                        }
+
+                        item { Spacer(Modifier.height(8.dp)) }
                     }
                 }
             }
@@ -556,9 +405,548 @@ fun ObservationDetailScreen(
                 refreshing = uiState.isLoading,
                 state = pullRefreshState,
                 modifier = Modifier.align(Alignment.TopCenter),
-                backgroundColor = GeodouroBg,
-                contentColor = GeodouroBrandGreen
+                backgroundColor = CardBg,
+                contentColor = GreenHero
             )
         }
     }
+}
+
+@Composable
+private fun HeroCard(
+    observation: ObservationEntity,
+    isEditing: Boolean,
+    scientificNameInput: String,
+    onScientificNameChange: (String) -> Unit,
+    commonNameInput: String,
+    onCommonNameChange: (String) -> Unit,
+    locationContext: ObservationLocationContext
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = CardRadius,
+        colors = CardDefaults.cardColors(containerColor = CardBg),
+        elevation = CardDefaults.cardElevation(0.dp),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, BorderColor)
+    ) {
+        Column {
+            // Image header with gradient
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(190.dp)
+                    .background(
+                        Brush.linearGradient(listOf(GreenHero, GreenLight))
+                    )
+            ) {
+                val images = observation.allImageUris()
+                if (images.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.Image,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.4f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+                } else {
+                    LazyRow(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(images) { uri ->
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = observation.predictedSpecies,
+                                modifier = Modifier
+                                    .height(166.dp)
+                                    .aspectRatio(0.85f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .border(1.dp, Color.White.copy(0.25f), RoundedCornerShape(14.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+                }
+
+                // Status pill
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp),
+                    color = CardBg.copy(alpha = 0.92f),
+                    shape = RoundedCornerShape(20.dp),
+                    tonalElevation = 0.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(GreenLight, CircleShape)
+                        )
+                        Text(
+                            text = formatSyncStatus(observation),
+                            color = GreenHero,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // Species info
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                if (isEditing && !observation.isPublished) {
+                    OutlinedTextField(
+                        value = scientificNameInput,
+                        onValueChange = onScientificNameChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Nome científico") },
+                        singleLine = true,
+                        colors = geodouroOutlinedTextFieldColors()
+                    )
+                    OutlinedTextField(
+                        value = commonNameInput,
+                        onValueChange = onCommonNameChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Nome comum") },
+                        singleLine = true,
+                        colors = geodouroOutlinedTextFieldColors()
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            text = observation.enrichedScientificName ?: observation.predictedSpecies,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontStyle = FontStyle.Italic,
+                            color = TextPrimary,
+                            lineHeight = 26.sp
+                        )
+                        val commonName = observation.enrichedCommonName?.takeIf { it.isNotBlank() }
+                        val family = observation.enrichedFamily?.takeIf { it.isNotBlank() }
+                        val subtitle = listOfNotNull(commonName, family?.let { "Família $it" })
+                            .joinToString(" • ")
+                            .ifBlank { "Nome comum indisponível" }
+                        Text(
+                            text = subtitle,
+                            fontSize = 13.sp,
+                            color = TextSecondary,
+                            fontWeight = FontWeight.Normal
+                        )
+                    }
+                }
+
+                // Meta chips
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        MetaChip(
+                            icon = Icons.Default.LocationOn,
+                            label = locationContext.primaryLabel
+                        )
+                    }
+                    item {
+                        MetaChip(
+                            icon = Icons.Default.DateRange,
+                            label = formatObservationDate(observation)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaxonomicContextCard(
+    observation: ObservationEntity,
+    locationContext: ObservationLocationContext,
+    onOpenWikipedia: (() -> Unit)?
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = CardRadius,
+        colors = CardDefaults.cardColors(containerColor = CardBg),
+        elevation = CardDefaults.cardElevation(0.dp),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, BorderColor)
+    ) {
+        Column {
+            // Header
+            Row(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(GreenPale, RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = GreenHero, modifier = Modifier.size(16.dp))
+                }
+                Text("Informação da espécie", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+            }
+
+            HorizontalDivider(thickness = 0.5.dp, color = BorderColor)
+
+            // 2x2 grid via two rows
+            val speciesValue = observation.enrichedCommonName?.takeIf { it.isNotBlank() }
+                ?: observation.enrichedScientificName
+                ?: observation.predictedSpecies
+
+            Column {
+                Row(Modifier.fillMaxWidth()) {
+                    ContextCell(
+                        modifier = Modifier.weight(1f),
+                        label = "Espécie",
+                        value = speciesValue,
+                        borderRight = true,
+                        borderBottom = true
+                    )
+                    ContextCell(
+                        modifier = Modifier.weight(1f),
+                        label = "Família",
+                        value = observation.enrichedFamily ?: "Indisponível",
+                        borderRight = false,
+                        borderBottom = true
+                    )
+                }
+                Row(Modifier.fillMaxWidth()) {
+                    ContextCell(
+                        modifier = Modifier.weight(1f),
+                        label = "Localização",
+                        value = locationContext.primaryLabel,
+                        supporting = locationContext.coordinatesLabel,
+                        icon = Icons.Default.LocationOn,
+                        borderRight = true,
+                        borderBottom = false
+                    )
+                    ContextCellLink(
+                        modifier = Modifier.weight(1f),
+                        label = "Wikipedia",
+                        linkLabel = if (onOpenWikipedia != null) "Abrir referência" else "Sem referência",
+                        enabled = onOpenWikipedia != null,
+                        onClick = onOpenWikipedia,
+                        borderBottom = false
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContextCell(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String,
+    supporting: String? = null,
+    icon: ImageVector? = null,
+    borderRight: Boolean = false,
+    borderBottom: Boolean = false
+) {
+    Box(
+        modifier = modifier
+            .then(if (borderRight) Modifier.border(width = 0.5.dp, color = BorderColor, shape = RoundedCornerShape(0.dp)) else Modifier)
+    ) {
+        // Use manual padding + dividers rather than nested borders to avoid shape conflict
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Text(label.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.07.sp, color = TextMuted)
+            if (icon != null) {
+                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(icon, contentDescription = null, tint = GreenHero, modifier = Modifier.size(14.dp).padding(top = 2.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = TextPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        if (!supporting.isNullOrBlank()) Text(supporting, fontSize = 10.sp, color = TextMuted)
+                    }
+                }
+            } else {
+                Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = TextPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (!supporting.isNullOrBlank()) Text(supporting, fontSize = 10.sp, color = TextMuted)
+            }
+        }
+        if (borderRight) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .width(0.5.dp)
+                    .background(BorderColor)
+            )
+        }
+        if (borderBottom) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .height(0.5.dp)
+                    .background(BorderColor)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContextCellLink(
+    modifier: Modifier = Modifier,
+    label: String,
+    linkLabel: String,
+    enabled: Boolean,
+    onClick: (() -> Unit)?,
+    borderBottom: Boolean = false
+) {
+    Box(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+                .then(if (enabled && onClick != null) Modifier.clickable { onClick() } else Modifier),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Text(label.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.07.sp, color = TextMuted)
+            Text(
+                text = linkLabel,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (enabled) GreenHero else TextMuted,
+                textDecoration = if (enabled) TextDecoration.Underline else TextDecoration.None,
+                maxLines = 2
+            )
+        }
+        if (borderBottom) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .height(0.5.dp)
+                    .background(BorderColor)
+            )
+        }
+    }
+}
+
+// Manual edit card
+@Composable
+private fun ManualEditCard(
+    observation: ObservationEntity,
+    isEditing: Boolean,
+    isSaving: Boolean,
+    statusMessage: String?,
+    scientificNameInput: String,
+    onScientificNameChange: (String) -> Unit,
+    commonNameInput: String,
+    onCommonNameChange: (String) -> Unit,
+    familyInput: String,
+    onFamilyChange: (String) -> Unit,
+    onEditToggle: () -> Unit,
+    onCancel: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = CardRadius,
+        colors = CardDefaults.cardColors(containerColor = CardBg),
+        elevation = CardDefaults.cardElevation(0.dp),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, BorderColor)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .background(GreenPale, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null, tint = GreenHero, modifier = Modifier.size(14.dp))
+                }
+                Text("Correção antes de publicar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+            }
+
+            Text(
+                "Podes ajustar os dados taxonómicos desta observação antes de a transformares em publicação.",
+                fontSize = 12.sp,
+                color = TextSecondary,
+                lineHeight = 18.sp
+            )
+
+            if (isEditing) {
+                OutlinedTextField(
+                    value = scientificNameInput,
+                    onValueChange = onScientificNameChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Nome científico") },
+                    singleLine = true,
+                    colors = geodouroOutlinedTextFieldColors()
+                )
+                OutlinedTextField(
+                    value = commonNameInput,
+                    onValueChange = onCommonNameChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Nome comum") },
+                    singleLine = true,
+                    colors = geodouroOutlinedTextFieldColors()
+                )
+                OutlinedTextField(
+                    value = familyInput,
+                    onValueChange = onFamilyChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Família") },
+                    singleLine = true,
+                    colors = geodouroOutlinedTextFieldColors()
+                )
+            }
+
+            if (statusMessage != null) {
+                Text(statusMessage, fontSize = 12.sp, color = GreenMid, fontWeight = FontWeight.Medium)
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = onEditToggle,
+                    enabled = !isSaving && (!isEditing || scientificNameInput.isNotBlank()),
+                    modifier = Modifier.weight(1f),
+                    shape = ButtonRadius,
+                    colors = ButtonDefaults.buttonColors(containerColor = GreenHero, contentColor = Color.White)
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                    } else {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(15.dp))
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (isEditing) "Guardar" else "Editar", fontSize = 13.sp)
+                }
+                if (isEditing) {
+                    Button(
+                        onClick = onCancel,
+                        enabled = !isSaving,
+                        modifier = Modifier.weight(1f),
+                        shape = ButtonRadius,
+                        colors = ButtonDefaults.buttonColors(containerColor = GreenTag, contentColor = GreenHero)
+                    ) {
+                        Text("Cancelar", fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Published banner
+@Composable
+private fun PublishedBanner() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(GreenPale, RoundedCornerShape(14.dp))
+            .border(0.5.dp, GreenHero.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .background(GreenHero, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.Public, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+        }
+        Text(
+            text = "Esta observação já foi publicada na comunidade GeoFlora.",
+            fontSize = 12.sp,
+            color = GreenHero,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 17.sp,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+// Shared small components
+@Composable
+private fun ObservationNotesCard(notes: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = CardBg),
+        elevation = CardDefaults.cardElevation(0.dp),
+        shape = CardRadius,
+        border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor)
+    ) {
+        Text(
+            text = notes,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            fontSize = 13.sp,
+            lineHeight = 20.sp,
+            color = TextSecondary
+        )
+    }
+}
+
+// Shared small components
+@Composable
+private fun MetaChip(icon: ImageVector, label: String) {
+    Row(
+        modifier = Modifier
+            .background(GreenTag, ChipRadius)
+            .padding(horizontal = 9.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = GreenHero, modifier = Modifier.size(11.dp))
+        Text(label, fontSize = 11.sp, color = GreenHero, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun GeoButton(
+    label: String,
+    icon: ImageVector,
+    primary: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier,
+        shape = ButtonRadius,
+        colors = if (primary) {
+            ButtonDefaults.buttonColors(containerColor = GreenHero, contentColor = Color.White)
+        } else {
+            ButtonDefaults.buttonColors(containerColor = GreenTag, contentColor = GreenHero)
+        },
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 11.dp)
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(15.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text.uppercase(),
+        fontSize = 10.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.08.sp,
+        color = TextMuted,
+        modifier = Modifier.padding(horizontal = 2.dp)
+    )
 }

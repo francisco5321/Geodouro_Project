@@ -166,7 +166,8 @@ class PlantRepository(
     suspend fun saveObservation(
         localResult: LocalInferenceResult,
         enrichedData: EnrichedSpeciesData?,
-        imageUris: List<String> = listOf(localResult.imageUri)
+        imageUris: List<String> = listOf(localResult.imageUri),
+        notes: String? = null
     ): ObservationSaveResult {
         require(!isNonPlantPrediction(localResult.predictedSpecies)) {
             "Nao e possivel guardar uma observacao sem planta reconhecida"
@@ -181,6 +182,7 @@ class PlantRepository(
 
         val primaryImageUri = normalizedImageUris.firstOrNull().orEmpty()
         val ownerIdentity = currentIdentityProvider()
+        val normalizedNotes = notes?.trim()?.takeIf { it.isNotBlank() }
         val newObservation = ObservationEntity(
             id = UUID.randomUUID().toString(),
             ownerUserId = ownerIdentity?.userId,
@@ -197,6 +199,7 @@ class PlantRepository(
             enrichedFamily = enrichedData?.family,
             enrichedWikipediaUrl = enrichedData?.wikipediaUrl,
             enrichedPhotoUrl = enrichedData?.photoUrl,
+            notes = normalizedNotes,
             isPublished = false,
             syncStatus = ObservationSyncStatus.PENDING.name,
             lastSyncAttemptAt = null
@@ -969,6 +972,7 @@ class PlantRepository(
             enrichedFamily = family,
             enrichedWikipediaUrl = wikipediaUrl,
             enrichedPhotoUrl = photoUrl,
+            notes = notes,
             isPublished = isPublished,
             syncStatus = syncStatus,
             lastSyncAttemptAt = null
@@ -1063,7 +1067,7 @@ class PlantRepository(
         fallbackWikipediaUrl: String?
     ): ObservationEntity {
         val primaryImage = imageUrl.orEmpty()
-        return ObservationEntity(
+        val observation = ObservationEntity(
             id = deviceObservationId,
             ownerUserId = null,
             ownerGuestLabel = null,
@@ -1082,10 +1086,13 @@ class PlantRepository(
             enrichedFamily = fallbackFamily,
             enrichedWikipediaUrl = fallbackWikipediaUrl,
             enrichedPhotoUrl = imageUrl,
+            notes = null,
             isPublished = isPublished,
             syncStatus = syncStatus,
             lastSyncAttemptAt = null
         )
+        observation.publishedByDisplayName = userDisplayName
+        return observation
     }
 
     suspend fun inferMultipleImages(

@@ -117,6 +117,7 @@ class RemoteSpeciesService(
                     deviceObservationId = observation.deviceObservationId,
                     scientificName = observation.scientificName,
                     commonName = observation.commonName,
+                    userDisplayName = observation.userDisplayName,
                     capturedAt = observation.capturedAt ?: 0L,
                     confidence = observation.confidence ?: 0f,
                     syncStatus = observation.syncStatus,
@@ -179,6 +180,7 @@ data class RemoteSpeciesObservation(
     val deviceObservationId: String,
     val scientificName: String,
     val commonName: String?,
+    val userDisplayName: String?,
     val capturedAt: Long,
     val confidence: Float,
     val syncStatus: String,
@@ -245,6 +247,8 @@ private data class RemoteSpeciesObservationResponse(
     val scientificName: String,
     @SerializedName("commonName")
     val commonName: String?,
+    @SerializedName("userDisplayName")
+    val userDisplayName: String?,
     @SerializedName("capturedAt")
     val capturedAt: Long?,
     @SerializedName("confidence")
