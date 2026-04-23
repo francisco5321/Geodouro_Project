@@ -155,7 +155,14 @@ class PublicationService(
             SELECT p.publication_id,
                    p.observation_id,
                    COALESCE(o.device_observation_id, synthetic_device_observation_id(o.observation_id)) AS device_observation_id,
-                   COALESCE(NULLIF(u.username, ''), NULLIF(u.first_name, ''), u.guest_label, 'Utilizador') AS user_display_name,
+                   COALESCE(
+                       NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
+                       NULLIF(u.first_name, ''),
+                       NULLIF(u.last_name, ''),
+                       NULLIF(u.username, ''),
+                       u.guest_label,
+                       'Utilizador'
+                   ) AS user_display_name,
                    COALESCE(o.enriched_scientific_name, o.predicted_scientific_name) AS scientific_name,
                    COALESCE(o.enriched_common_name, ps.common_name) AS common_name,
                    COALESCE(pub_image.image_path, o.image_uri) AS image_path,
