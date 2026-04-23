@@ -12,10 +12,13 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +56,7 @@ import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
 import kotlinx.coroutines.launch
 import com.example.geodouro_project.ui.theme.Geodouro_ProjectTheme
+import com.example.geodouro_project.domain.model.LocalPredictionCandidate
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,10 +85,12 @@ fun AppNavigation() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "home"
     val snackbarHostState = remember { SnackbarHostState() }
-    var latestInferenceResult by remember { mutableStateOf<LocalInferenceResult?>(null) }
-    var latestMultiImageUris by remember { mutableStateOf<List<String>>(emptyList()) }
-    var latestCaptureLatitude by remember { mutableStateOf<Double?>(null) }
-    var latestCaptureLongitude by remember { mutableStateOf<Double?>(null) }
+    var latestInferenceResult by rememberSaveable(stateSaver = localInferenceResultStateSaver()) {
+        mutableStateOf<LocalInferenceResult?>(null)
+    }
+    var latestMultiImageUris by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var latestCaptureLatitude by rememberSaveable { mutableStateOf<Double?>(null) }
+    var latestCaptureLongitude by rememberSaveable { mutableStateOf<Double?>(null) }
     var clearIdentifyCapturesVersion by remember { mutableStateOf(0) }
     var networkRefreshVersion by remember { mutableStateOf(0) }
     var savedObservationRefreshVersion by remember { mutableStateOf(0) }
@@ -395,6 +401,55 @@ fun AppNavigation() {
         }
     }
 }
+
+private fun localInferenceResultStateSaver(): Saver<LocalInferenceResult?, Any> = listSaver(
+    save = { inference ->
+        if (inference == null) {
+            emptyList()
+        } else {
+            listOf(
+                inference.imageUri,
+                inference.capturedAt,
+                inference.latitude,
+                inference.longitude,
+                inference.predictedSpecies,
+                inference.confidence,
+                inference.candidatePredictions.flatMap { listOf(it.species, it.confidence) }
+            )
+        }
+    },
+    restore = { values ->
+        if (values.isEmpty()) {
+            null
+        } else {
+            val flattenedCandidates = values[6] as? List<*> ?: emptyList<Any?>()
+            val candidates = flattenedCandidates.chunked(2).mapNotNull { chunk ->
+                val species = chunk.getOrNull(0) as? String ?: return@mapNotNull null
+                val confidence = (chunk.getOrNull(1) as? Float)
+                    ?: (chunk.getOrNull(1) as? Double)?.toFloat()
+                    ?: return@mapNotNull null
+                LocalPredictionCandidate(
+                    species = species,
+                    confidence = confidence
+                )
+            }
+
+            LocalInferenceResult(
+                imageUri = values[0] as? String ?: "",
+                capturedAt = (values[1] as? Long)
+                    ?: (values[1] as? Int)?.toLong()
+                    ?: System.currentTimeMillis(),
+                latitude = values[2] as? Double,
+                longitude = values[3] as? Double,
+                predictedSpecies = values[4] as? String ?: "",
+                confidence = (values[5] as? Float)
+                    ?: (values[5] as? Double)?.toFloat()
+                    ?: 0f,
+                candidatePredictions = candidates
+            )
+        }
+    }
+)
 
 @androidx.compose.runtime.Composable
 private fun SessionLoadingScreen() {

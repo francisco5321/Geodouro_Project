@@ -23,6 +23,7 @@ import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,6 +41,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -328,21 +331,35 @@ fun ProfileScreen(
 
                         Spacer(modifier = Modifier.height(20.dp))
 
-                        OutlinedButton(
+                        Button(
                             onClick = onLogout,
                             modifier = Modifier.fillMaxWidth(),
-                            colors = geodouroOutlinedButtonColors(),
-                            border = androidx.compose.foundation.BorderStroke(
-                                width = 1.dp,
-                                color = geodouroOutlinedBorderColor(enabled = true)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = GeodouroWhite,
+                                contentColor = GeodouroBrandGreen
+                            ),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = ButtonDefaults.buttonElevation(
+                                defaultElevation = 2.dp,
+                                pressedElevation = 1.dp
                             )
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Logout,
+                                imageVector = if (sessionState is SessionState.Guest) {
+                                    Icons.AutoMirrored.Filled.Login
+                                } else {
+                                    Icons.AutoMirrored.Filled.Logout
+                                },
                                 contentDescription = null
                             )
                             Spacer(modifier = Modifier.size(8.dp))
-                            Text("Terminar sessao")
+                            Text(
+                                if (sessionState is SessionState.Guest) {
+                                    "Fazer login"
+                                } else {
+                                    "Terminar sessao"
+                                }
+                            )
                         }
                     }
                 }
