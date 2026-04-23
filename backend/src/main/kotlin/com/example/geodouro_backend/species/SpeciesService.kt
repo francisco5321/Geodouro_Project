@@ -242,7 +242,7 @@ class SpeciesService(
                    COALESCE(o.enriched_scientific_name, o.predicted_scientific_name, ps.scientific_name) AS scientific_name,
                    COALESCE(o.enriched_common_name, ps.common_name) AS common_name,
                    CASE
-                       WHEN p.publication_id IS NULL THEN NULL
+                       WHEN o.is_published = FALSE THEN NULL
                        ELSE COALESCE(
                            NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
                            NULLIF(u.first_name, ''),
@@ -260,7 +260,7 @@ class SpeciesService(
             FROM observation o
             JOIN plant_species ps ON ps.plant_species_id = o.plant_species_id
             LEFT JOIN publication p ON p.observation_id = o.observation_id
-            LEFT JOIN app_user u ON u.user_id = p.user_id
+            LEFT JOIN app_user u ON u.user_id = COALESCE(p.user_id, o.user_id)
             LEFT JOIN LATERAL (
                 SELECT image_path
                 FROM observation_image
