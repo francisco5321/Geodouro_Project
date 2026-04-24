@@ -102,14 +102,15 @@ class ObservationDetailViewModel(
             val remoteObservation = repository.fetchRemoteObservationDetail(observationId)
             _uiState.value = _uiState.value.copy(
                 observation = remoteObservation?.copy(
-                    notes = remoteObservation.notes ?: localObservation?.notes
+                    // Keep local notes when present, because local edits can be newer than remote.
+                    notes = localObservation?.notes ?: remoteObservation.notes
                 ) ?: localObservation,
                 isLoading = false
             )
         }
     }
 
-    fun saveManualIdentification(scientificName: String, commonName: String, family: String) {
+    fun saveManualIdentification(scientificName: String, commonName: String, family: String, notes: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, statusMessage = null)
             val updated = runCatching {
@@ -117,7 +118,8 @@ class ObservationDetailViewModel(
                     observationId = observationId,
                     scientificName = scientificName,
                     commonName = commonName,
-                    family = family
+                    family = family,
+                    notes = notes
                 )
             }.getOrDefault(false)
             if (updated) refresh()
@@ -241,14 +243,12 @@ fun ObservationDetailScreen(
     }
 
     var isEditing by rememberSaveable(observation?.id) { mutableStateOf(false) }
-    var scientificNameInput by rememberSaveable(observation?.id) {
-        mutableStateOf(observation?.enrichedScientificName ?: observation?.predictedSpecies.orEmpty())
+    var notesInput by rememberSaveable(observation?.id) {
+        mutableStateOf(observation?.notes.orEmpty())
     }
-    var commonNameInput by rememberSaveable(observation?.id) {
-        mutableStateOf(observation?.enrichedCommonName.orEmpty())
-    }
-    var familyInput by rememberSaveable(observation?.id) {
-        mutableStateOf(observation?.enrichedFamily.orEmpty())
+
+    val resetManualInputs = {
+        notesInput = observation?.notes.orEmpty()
     }
 
     LaunchedEffect(uiState.statusMessage, uiState.isSaving) {
@@ -309,11 +309,6 @@ fun ObservationDetailScreen(
                         item {
                             HeroCard(
                                 observation = observation,
-                                isEditing = isEditing,
-                                scientificNameInput = scientificNameInput,
-                                onScientificNameChange = { scientificNameInput = it },
-                                commonNameInput = commonNameInput,
-                                onCommonNameChange = { commonNameInput = it },
                                 locationContext = locationContext
                             )
                         }
@@ -341,33 +336,29 @@ fun ObservationDetailScreen(
                         }
                         if (canEdit) {
                             item {
-                                SectionLabel("Identificação manual")
+                                SectionLabel("Editar observação")
                                 Spacer(Modifier.height(6.dp))
                                 ManualEditCard(
-                                    observation = observation,
                                     isEditing = isEditing,
                                     isSaving = uiState.isSaving,
                                     statusMessage = uiState.statusMessage,
-                                    scientificNameInput = scientificNameInput,
-                                    onScientificNameChange = { scientificNameInput = it },
-                                    commonNameInput = commonNameInput,
-                                    onCommonNameChange = { commonNameInput = it },
-                                    familyInput = familyInput,
-                                    onFamilyChange = { familyInput = it },
+                                    notesInput = notesInput,
+                                    onNotesChange = { notesInput = it },
                                     onEditToggle = {
                                         if (isEditing) {
-                                            viewModel.saveManualIdentification(scientificNameInput, commonNameInput, familyInput)
+                                            viewModel.saveManualIdentification(
+                                                observation.enrichedScientificName ?: observation.predictedSpecies,
+                                                observation.enrichedCommonName.orEmpty(),
+                                                observation.enrichedFamily.orEmpty(),
+                                                notesInput
+                                            )
                                         } else {
-                                            scientificNameInput = observation.enrichedScientificName ?: observation.predictedSpecies
-                                            commonNameInput = observation.enrichedCommonName.orEmpty()
-                                            familyInput = observation.enrichedFamily.orEmpty()
+                                            resetManualInputs()
                                             isEditing = true
                                         }
                                     },
                                     onCancel = {
-                                        scientificNameInput = observation.enrichedScientificName ?: observation.predictedSpecies
-                                        commonNameInput = observation.enrichedCommonName.orEmpty()
-                                        familyInput = observation.enrichedFamily.orEmpty()
+                                        resetManualInputs()
                                         isEditing = false
                                     }
                                 )
@@ -383,8 +374,7 @@ fun ObservationDetailScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     onClick = {
                                         onOpenSpecies(
-                                            (if (isEditing) scientificNameInput
-                                            else observation.enrichedScientificName ?: observation.predictedSpecies)
+                                            (observation.enrichedScientificName ?: observation.predictedSpecies)
                                                 .toSpeciesId()
                                         )
                                     }
@@ -415,11 +405,6 @@ fun ObservationDetailScreen(
 @Composable
 private fun HeroCard(
     observation: ObservationEntity,
-    isEditing: Boolean,
-    scientificNameInput: String,
-    onScientificNameChange: (String) -> Unit,
-    commonNameInput: String,
-    onCommonNameChange: (String) -> Unit,
     locationContext: ObservationLocationContext
 ) {
     Card(
@@ -504,45 +489,26 @@ private fun HeroCard(
                 modifier = Modifier.padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                if (isEditing && !observation.isPublished) {
-                    OutlinedTextField(
-                        value = scientificNameInput,
-                        onValueChange = onScientificNameChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Nome científico") },
-                        singleLine = true,
-                        colors = geodouroOutlinedTextFieldColors()
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        text = observation.enrichedScientificName ?: observation.predictedSpecies,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontStyle = FontStyle.Italic,
+                        color = TextPrimary,
+                        lineHeight = 26.sp
                     )
-                    OutlinedTextField(
-                        value = commonNameInput,
-                        onValueChange = onCommonNameChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Nome comum") },
-                        singleLine = true,
-                        colors = geodouroOutlinedTextFieldColors()
+                    val commonName = observation.enrichedCommonName?.takeIf { it.isNotBlank() }
+                    val family = observation.enrichedFamily?.takeIf { it.isNotBlank() }
+                    val subtitle = listOfNotNull(commonName, family?.let { "Família $it" })
+                        .joinToString(" • ")
+                        .ifBlank { "Nome comum indisponível" }
+                    Text(
+                        text = subtitle,
+                        fontSize = 13.sp,
+                        color = TextSecondary,
+                        fontWeight = FontWeight.Normal
                     )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(
-                            text = observation.enrichedScientificName ?: observation.predictedSpecies,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontStyle = FontStyle.Italic,
-                            color = TextPrimary,
-                            lineHeight = 26.sp
-                        )
-                        val commonName = observation.enrichedCommonName?.takeIf { it.isNotBlank() }
-                        val family = observation.enrichedFamily?.takeIf { it.isNotBlank() }
-                        val subtitle = listOfNotNull(commonName, family?.let { "Família $it" })
-                            .joinToString(" • ")
-                            .ifBlank { "Nome comum indisponível" }
-                        Text(
-                            text = subtitle,
-                            fontSize = 13.sp,
-                            color = TextSecondary,
-                            fontWeight = FontWeight.Normal
-                        )
-                    }
                 }
 
                 // Meta chips
@@ -742,16 +708,11 @@ private fun ContextCellLink(
 // Manual edit card
 @Composable
 private fun ManualEditCard(
-    observation: ObservationEntity,
     isEditing: Boolean,
     isSaving: Boolean,
     statusMessage: String?,
-    scientificNameInput: String,
-    onScientificNameChange: (String) -> Unit,
-    commonNameInput: String,
-    onCommonNameChange: (String) -> Unit,
-    familyInput: String,
-    onFamilyChange: (String) -> Unit,
+    notesInput: String,
+    onNotesChange: (String) -> Unit,
     onEditToggle: () -> Unit,
     onCancel: () -> Unit
 ) {
@@ -775,39 +736,32 @@ private fun ManualEditCard(
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null, tint = GreenHero, modifier = Modifier.size(14.dp))
                 }
-                Text("Correção antes de publicar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Correção antes de publicar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                    Text(
+                        "Atualiza apenas a descrição desta observação.",
+                        fontSize = 11.sp,
+                        color = TextSecondary,
+                        lineHeight = 15.sp
+                    )
+                }
             }
 
-            Text(
-                "Podes ajustar os dados taxonómicos desta observação antes de a transformares em publicação.",
-                fontSize = 12.sp,
-                color = TextSecondary,
-                lineHeight = 18.sp
-            )
-
             if (isEditing) {
-                OutlinedTextField(
-                    value = scientificNameInput,
-                    onValueChange = onScientificNameChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Nome científico") },
-                    singleLine = true,
-                    colors = geodouroOutlinedTextFieldColors()
+                Text(
+                    text = "Descrição",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.08.sp,
+                    color = TextMuted
                 )
                 OutlinedTextField(
-                    value = commonNameInput,
-                    onValueChange = onCommonNameChange,
+                    value = notesInput,
+                    onValueChange = onNotesChange,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Nome comum") },
-                    singleLine = true,
-                    colors = geodouroOutlinedTextFieldColors()
-                )
-                OutlinedTextField(
-                    value = familyInput,
-                    onValueChange = onFamilyChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Família") },
-                    singleLine = true,
+                    label = { Text("Descrição") },
+                    minLines = 3,
+                    maxLines = 5,
                     colors = geodouroOutlinedTextFieldColors()
                 )
             }
@@ -817,9 +771,20 @@ private fun ManualEditCard(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (isEditing) {
+                    Button(
+                        onClick = onCancel,
+                        enabled = !isSaving,
+                        modifier = Modifier.weight(1f),
+                        shape = ButtonRadius,
+                        colors = ButtonDefaults.buttonColors(containerColor = GreenTag, contentColor = GreenHero)
+                    ) {
+                        Text("Cancelar", fontSize = 13.sp)
+                    }
+                }
                 Button(
                     onClick = onEditToggle,
-                    enabled = !isSaving && (!isEditing || scientificNameInput.isNotBlank()),
+                    enabled = !isSaving,
                     modifier = Modifier.weight(1f),
                     shape = ButtonRadius,
                     colors = ButtonDefaults.buttonColors(containerColor = GreenHero, contentColor = Color.White)
@@ -831,17 +796,6 @@ private fun ManualEditCard(
                     }
                     Spacer(Modifier.width(6.dp))
                     Text(if (isEditing) "Guardar" else "Editar", fontSize = 13.sp)
-                }
-                if (isEditing) {
-                    Button(
-                        onClick = onCancel,
-                        enabled = !isSaving,
-                        modifier = Modifier.weight(1f),
-                        shape = ButtonRadius,
-                        colors = ButtonDefaults.buttonColors(containerColor = GreenTag, contentColor = GreenHero)
-                    ) {
-                        Text("Cancelar", fontSize = 13.sp)
-                    }
                 }
             }
         }

@@ -37,7 +37,8 @@ data class UpsertObservationRequest(
 data class UpdateObservationMetadataRequest(
     val scientificName: String?,
     val commonName: String?,
-    val family: String?
+    val family: String?,
+    val notes: String? = null
 )
 
 data class ObservationResponse(

@@ -108,6 +108,7 @@ class ObservationService(
         val scientificName = request.scientificName?.trim().orEmpty().ifBlank { current.scientificName }
         val commonName = request.commonName?.trim()?.takeIf { it.isNotBlank() }
         val family = request.family?.trim()?.takeIf { it.isNotBlank() } ?: current.family ?: "Unknown"
+        val notes = request.notes?.trim()?.takeIf { it.isNotBlank() } ?: current.notes
         val plantSpeciesId = upsertPlantSpecies(scientificName, commonName, family)
 
         jdbcTemplate.update(
@@ -118,6 +119,7 @@ class ObservationService(
                 .addValue("scientificName", scientificName)
                 .addValue("commonName", commonName)
                 .addValue("family", family)
+                .addValue("notes", notes)
         )
 
         return getObservationDetail(deviceObservationId)
@@ -403,6 +405,7 @@ class ObservationService(
                 enriched_scientific_name = :scientificName,
                 enriched_common_name = :commonName,
                 enriched_family = :family,
+                notes = :notes,
                 updated_at = NOW()
             WHERE device_observation_id = :deviceObservationId
         """.trimIndent()

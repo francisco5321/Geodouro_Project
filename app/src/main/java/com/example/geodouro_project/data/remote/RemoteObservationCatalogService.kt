@@ -70,7 +70,8 @@ class RemoteObservationCatalogService(
         deviceObservationId: String,
         scientificName: String,
         commonName: String,
-        family: String
+        family: String,
+        notes: String
     ): Boolean {
         if (!isConfigured()) return false
         val identity = currentIdentityProvider() ?: fallbackIdentity()
@@ -78,7 +79,8 @@ class RemoteObservationCatalogService(
             mapOf(
                 "scientificName" to scientificName,
                 "commonName" to commonName,
-                "family" to family
+                "family" to family,
+                "notes" to notes
             )
         ).toRequestBody(JSON_MEDIA_TYPE)
         val requestBuilder = Request.Builder()

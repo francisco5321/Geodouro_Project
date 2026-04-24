@@ -389,7 +389,8 @@ class PlantRepository(
         observationId: String,
         scientificName: String,
         commonName: String,
-        family: String
+        family: String,
+        notes: String
     ): Boolean {
         return withContext(Dispatchers.IO) {
             val ownerIdentity = currentIdentityProvider() ?: return@withContext false
@@ -406,12 +407,14 @@ class PlantRepository(
                 val normalizedScientificName = scientificName.trim().ifBlank { null }
                 val normalizedCommonName = commonName.trim().ifBlank { null }
                 val normalizedFamily = family.trim().ifBlank { null }
+                val normalizedNotes = notes.trim().takeIf { it.isNotBlank() } ?: observation.notes
 
                 observationDao.updateObservationMetadata(
                     id = observationId,
                     scientificName = normalizedScientificName,
                     commonName = normalizedCommonName,
-                    family = normalizedFamily
+                    family = normalizedFamily,
+                    notes = normalizedNotes
                 )
                 return@withContext true
             }
@@ -428,12 +431,32 @@ class PlantRepository(
                 return@withContext false
             }
 
-            remoteObservationCatalogService.updateObservationMetadata(
+            val updated = remoteObservationCatalogService.updateObservationMetadata(
                 deviceObservationId = observationId,
                 scientificName = scientificName,
                 commonName = commonName,
-                family = family
+                family = family,
+                notes = notes
             )
+
+            if (updated) {
+                val normalizedScientificName = scientificName.trim().ifBlank { remoteObservation.scientificName }
+                val normalizedCommonName = commonName.trim().ifBlank { remoteObservation.commonName.orEmpty() }
+                val normalizedFamily = family.trim().ifBlank { remoteObservation.family.orEmpty() }
+                val normalizedNotes = notes.trim().takeIf { it.isNotBlank() }
+
+                observationDao.upsert(
+                    remoteObservation.toObservationEntity(ownerIdentity).copy(
+                        enrichedScientificName = normalizedScientificName,
+                        enrichedCommonName = normalizedCommonName.ifBlank { null },
+                        enrichedFamily = normalizedFamily.ifBlank { null },
+                        notes = normalizedNotes,
+                        syncStatus = ObservationSyncStatus.SYNCED.name
+                    )
+                )
+            }
+
+            updated
         }
     }
 

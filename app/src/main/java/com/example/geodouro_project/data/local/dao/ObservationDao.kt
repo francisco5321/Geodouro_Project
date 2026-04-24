@@ -68,7 +68,8 @@ interface ObservationDao {
         UPDATE observation
         SET enrichedScientificName = :scientificName,
             enrichedCommonName = :commonName,
-            enrichedFamily = :family
+            enrichedFamily = :family,
+            notes = :notes
         WHERE id = :id
         """
     )
@@ -76,7 +77,8 @@ interface ObservationDao {
         id: String,
         scientificName: String?,
         commonName: String?,
-        family: String?
+        family: String?,
+        notes: String?
     )
 
     @Query("SELECT * FROM observation ORDER BY capturedAt DESC")
