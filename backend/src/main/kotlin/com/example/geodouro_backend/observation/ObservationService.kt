@@ -78,7 +78,11 @@ class ObservationService(
                 "Observation not found for deviceObservationId=$deviceObservationId"
             )
 
-        if (!detail.isPublished && detail.userId != authenticatedUserId) {
+        val canAccess = detail.isPublished ||
+            detail.syncStatus.equals("SYNCED", ignoreCase = true) ||
+            detail.userId == authenticatedUserId
+
+        if (!canAccess) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para consultar esta observacao")
         }
 

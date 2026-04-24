@@ -1,0 +1,9 @@
+.venv/
+data/raw/
+data/manifests/
+data/annotations/
+data/yolo/
+artifacts/
+scripts/__pycache__/
+annotation_batches/
+label_studio_exports/

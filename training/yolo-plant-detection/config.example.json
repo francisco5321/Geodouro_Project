@@ -1,0 +1,83 @@
+{
+  "database": {
+    "mode": "ssh",
+    "host": "127.0.0.1",
+    "port": 5432,
+    "name": "geodouro",
+    "user": "postgres",
+    "password": "postgres"
+  },
+  "ssh": {
+    "host": "sudoe@ubuntu-server",
+    "port": 22,
+    "identity_file": "",
+    "remote_images_path": "/opt/geodouro/uploads",
+    "remote_db_name": "geodouro",
+    "remote_db_user": "postgres",
+    "remote_db_password": "postgres"
+  },
+  "legacy_sources": {
+    "enabled": true,
+    "root_dirs": [
+      "D:/Universidade/3 ANO/2 SEMESTRE/Estagio/teste modelos/MobileNetV3-Small/training"
+    ],
+    "split_csvs": [
+      "D:/Universidade/3 ANO/2 SEMESTRE/Estagio/teste modelos/MobileNetV3-Small/training/splits/train.csv",
+      "D:/Universidade/3 ANO/2 SEMESTRE/Estagio/teste modelos/MobileNetV3-Small/training/splits/val.csv",
+      "D:/Universidade/3 ANO/2 SEMESTRE/Estagio/teste modelos/MobileNetV3-Small/training/splits/test.csv"
+    ],
+    "species_map_path": "D:/Universidade/3 ANO/2 SEMESTRE/Estagio/teste modelos/MobileNetV3-Small/training/Species_names.json",
+    "split_dirs": [
+      "D:/Universidade/3 ANO/2 SEMESTRE/Estagio/teste modelos/MobileNetV3-Small/training/images_train",
+      "D:/Universidade/3 ANO/2 SEMESTRE/Estagio/teste modelos/MobileNetV3-Small/training/images_val",
+      "D:/Universidade/3 ANO/2 SEMESTRE/Estagio/teste modelos/MobileNetV3-Small/training/images_test"
+    ]
+  },
+  "dataset": {
+    "raw_dir": "data/raw",
+    "manifests_dir": "data/manifests",
+    "annotations_dir": "data/annotations",
+    "annotation_batches_dir": "data/annotation_batches",
+    "yolo_dir": "data/yolo",
+    "manifest_name": "detection_manifest.csv",
+    "remote_manifest_name": "detection_manifest_remote.csv",
+    "merged_manifest_name": "detection_manifest_merged.csv",
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "seed": 42,
+    "copy_files": true
+  },
+  "training": {
+    "model": "yolov8n.pt",
+    "imgsz": 640,
+    "epochs": 60,
+    "batch": 16,
+    "patience": 15,
+    "device": "cpu",
+    "workers": 4,
+    "conf_threshold": 0.35
+  },
+  "annotation_batch": {
+    "name": "batch_001",
+    "target_size": 500,
+    "include_all_remote": true,
+    "selection_strategy": "diverse",
+    "exclude_existing_batches": false,
+    "copy_files": true,
+    "seed": 42
+  },
+  "preannotation": {
+    "batch_name": "batch_001",
+    "overwrite_existing_labels": false,
+    "max_images": 150,
+    "processing_max_dimension": 1024,
+    "min_mask_area_ratio": 0.015,
+    "min_box_area_ratio": 0.02,
+    "center_weight": 0.35,
+    "save_previews": true
+  },
+  "outputs": {
+    "artifacts_dir": "artifacts/yolo_plant_detector",
+    "run_name": "yolo_plant_detector_v1"
+  }
+}
