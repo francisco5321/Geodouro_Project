@@ -35,7 +35,8 @@ data class LocalInferenceResult(
     val longitude: Double?,
     val predictedSpecies: String,
     val confidence: Float,
-    val candidatePredictions: List<LocalPredictionCandidate> = emptyList()
+    val candidatePredictions: List<LocalPredictionCandidate> = emptyList(),
+    val rejectionReason: String? = null
 )
 
 data class EnrichmentResult(

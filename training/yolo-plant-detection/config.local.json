@@ -38,14 +38,19 @@
     "manifests_dir": "data/manifests",
     "annotations_dir": "data/annotations",
     "annotation_batches_dir": "data/annotation_batches",
-    "yolo_dir": "data/yolo",
+    "yolo_dir": "data/yolo_reviewed",
     "manifest_name": "detection_manifest.csv",
     "remote_manifest_name": "detection_manifest_remote.csv",
     "merged_manifest_name": "detection_manifest_merged.csv",
+    "build_mode": "annotated_only",
+    "annotation_batch_names": [
+      "batch_001",
+      "batch_002"
+    ],
     "val_ratio": 0.15,
     "test_ratio": 0.15,
     "seed": 42,
-    "copy_files": true
+    "copy_files": false
   },
   "training": {
     "model": "yolov8n.pt",

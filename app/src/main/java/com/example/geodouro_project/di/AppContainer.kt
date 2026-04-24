@@ -1,8 +1,10 @@
 package com.example.geodouro_project.di
 
 import android.content.Context
+import com.example.geodouro_project.ai.PlantInferenceEngine
 import com.example.geodouro_project.BuildConfig
 import com.example.geodouro_project.ai.MobileNetV3Classifier
+import com.example.geodouro_project.ai.YoloPlantDetector
 import com.example.geodouro_project.core.network.ConnectivityChecker
 import com.example.geodouro_project.data.local.AuthSessionStorage
 import com.example.geodouro_project.data.local.GeodouroDatabase
@@ -41,6 +43,10 @@ object AppContainer {
     @Volatile
     private var classifierInstance: MobileNetV3Classifier? = null
     @Volatile
+    private var detectorInstance: YoloPlantDetector? = null
+    @Volatile
+    private var inferenceEngineInstance: PlantInferenceEngine? = null
+    @Volatile
     private var sharedHttpClient: OkHttpClient? = null
 
     fun provideAuthRepository(context: Context): AuthRepository {
@@ -75,6 +81,22 @@ object AppContainer {
         return classifierInstance ?: synchronized(this) {
             classifierInstance ?: MobileNetV3Classifier(context.applicationContext)
                 .also { classifierInstance = it }
+        }
+    }
+
+    fun provideYoloPlantDetector(context: Context): YoloPlantDetector {
+        return detectorInstance ?: synchronized(this) {
+            detectorInstance ?: YoloPlantDetector(context.applicationContext)
+                .also { detectorInstance = it }
+        }
+    }
+
+    fun providePlantInferenceEngine(context: Context): PlantInferenceEngine {
+        return inferenceEngineInstance ?: synchronized(this) {
+            inferenceEngineInstance ?: PlantInferenceEngine(
+                classifier = provideMobileNetV3Classifier(context.applicationContext),
+                detector = provideYoloPlantDetector(context.applicationContext)
+            ).also { inferenceEngineInstance = it }
         }
     }
 
@@ -178,6 +200,7 @@ object AppContainer {
             remotePublicationService = remotePublicationService,
             remoteSpeciesService = remoteSpeciesService,
             remoteObservationCatalogService = remoteObservationCatalogService,
+            inferenceEngine = providePlantInferenceEngine(appContext),
             classifier = provideMobileNetV3Classifier(appContext),
             currentIdentityProvider = authRepository::currentRemoteIdentity
         )

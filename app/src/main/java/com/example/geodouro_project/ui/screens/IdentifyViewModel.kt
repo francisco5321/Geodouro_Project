@@ -5,7 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.geodouro_project.ai.MobileNetV3Classifier
+import com.example.geodouro_project.ai.PlantInferenceEngine
 import com.example.geodouro_project.core.location.LocationResolver
 import com.example.geodouro_project.core.storage.PersistentImageStorage
 import com.example.geodouro_project.di.AppContainer
@@ -39,7 +39,7 @@ sealed interface IdentifyNavigationEvent {
 }
 
 class IdentifyViewModel(
-    private val classifier: MobileNetV3Classifier,
+    private val inferenceEngine: PlantInferenceEngine,
     private val locationResolver: LocationResolver,
     private val imageStorage: PersistentImageStorage
 ) : ViewModel() {
@@ -47,9 +47,8 @@ class IdentifyViewModel(
 
     private val _uiState = MutableStateFlow(
         IdentifyUiState(
-            modelReady = classifier.isModelAvailable(),
-            modelStatusLabel = classifier.getModelLoadDiagnostic()
-                ?: "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} pronto"
+            modelReady = inferenceEngine.isModelAvailable(),
+            modelStatusLabel = inferenceEngine.getModelStatusLabel()
         )
     )
     val uiState: StateFlow<IdentifyUiState> = _uiState.asStateFlow()
@@ -211,16 +210,11 @@ class IdentifyViewModel(
                 val bitmap = withContext(Dispatchers.IO) {
                     imageStorage.decodeSampledBitmap(imageUri)
                 } ?: throw IllegalStateException("Nao foi possivel ler a imagem selecionada")
-                val prediction = classifier.classify(bitmap)
+                val prediction = inferenceEngine.classify(bitmap)
 
                 if (!prediction.fromModel) {
-                    val diagnostic = classifier.getModelLoadDiagnostic()
                     emitMessage(
-                        if (diagnostic.isNullOrBlank()) {
-                            "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} ainda indisponivel. Resultado de fallback aplicado."
-                        } else {
-                            "Modelo ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} indisponivel: $diagnostic"
-                        }
+                        "Pipeline de inferencia indisponivel. Resultado de fallback aplicado."
                     )
                 }
 
@@ -237,7 +231,8 @@ class IdentifyViewModel(
                                     species = candidate.label,
                                     confidence = candidate.confidence
                                 )
-                            }
+                            },
+                            rejectionReason = prediction.rejectionReason?.name
                         )
                     )
                 )
@@ -276,7 +271,7 @@ class IdentifyViewModel(
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     val appContext = context.applicationContext
                     return IdentifyViewModel(
-                        classifier = AppContainer.provideMobileNetV3Classifier(appContext),
+                        inferenceEngine = AppContainer.providePlantInferenceEngine(appContext),
                         locationResolver = LocationResolver(appContext),
                         imageStorage = PersistentImageStorage(appContext)
                     ) as T

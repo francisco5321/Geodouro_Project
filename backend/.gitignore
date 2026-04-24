@@ -3,6 +3,6 @@
 .idea/
 out/
 .env
-
+yolo_finetune_geodouro/
 backend-uploads/
 

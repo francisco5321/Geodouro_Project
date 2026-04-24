@@ -17,11 +17,17 @@ data class InferenceCandidate(
     val confidence: Float
 )
 
+enum class RejectionReason {
+    UNKNOWN_PLANT,
+    NON_PLANT
+}
+
 data class InferencePrediction(
     val label: String,
     val confidence: Float,
     val fromModel: Boolean,
-    val candidates: List<InferenceCandidate> = emptyList()
+    val candidates: List<InferenceCandidate> = emptyList(),
+    val rejectionReason: RejectionReason? = null
 )
 
 data class InferenceAnalysis(
@@ -78,6 +84,30 @@ class MobileNetV3Classifier(
         return bestPrediction.confidence < LOW_CONFIDENCE_PLANT_THRESHOLD && margin < MIN_CONFIDENCE_MARGIN
     }
 
+    private fun getRejectionReason(rankedCandidates: List<InferenceCandidate>): RejectionReason {
+        val bestPrediction = rankedCandidates.firstOrNull() ?: return RejectionReason.UNKNOWN_PLANT
+        val secondPrediction = rankedCandidates.getOrNull(1)
+        val margin = bestPrediction.confidence - (secondPrediction?.confidence ?: 0f)
+        val normalizedLabel = normalizeLabel(bestPrediction.label)
+
+        // É um label conhecido que não é uma planta
+        if (normalizedLabel in KNOWN_NON_PLANT_LABELS) {
+            return RejectionReason.NON_PLANT
+        }
+
+        // Confiança muito baixa para uma planta = planta desconhecida
+        if (bestPrediction.confidence < MIN_PLANT_CONFIDENCE) {
+            return RejectionReason.UNKNOWN_PLANT
+        }
+
+        // Baixa confiança sem margem clara = planta desconhecida
+        if (bestPrediction.confidence < LOW_CONFIDENCE_PLANT_THRESHOLD && margin < MIN_CONFIDENCE_MARGIN) {
+            return RejectionReason.UNKNOWN_PLANT
+        }
+
+        return RejectionReason.UNKNOWN_PLANT
+    }
+
     private fun rejectionConfidence(bestPrediction: InferenceCandidate): Float {
         val inverted = 1f - bestPrediction.confidence
         return inverted.coerceIn(MIN_NON_PLANT_CONFIDENCE, MAX_NON_PLANT_CONFIDENCE)
@@ -104,11 +134,17 @@ class MobileNetV3Classifier(
         val bestPrediction = rankedCandidates.firstOrNull() ?: return fallbackPrediction()
 
         if (shouldRejectAsNonPlant(rankedCandidates)) {
+            val rejectionReason = getRejectionReason(rankedCandidates)
+            val label = when (rejectionReason) {
+                RejectionReason.NON_PLANT -> NON_PLANT_LABEL
+                RejectionReason.UNKNOWN_PLANT -> UNKNOWN_PLANT_LABEL
+            }
             return InferencePrediction(
-                label = NON_PLANT_LABEL,
+                label = label,
                 confidence = rejectionConfidence(bestPrediction),
                 fromModel = true,
-                candidates = emptyList()
+                candidates = emptyList(),
+                rejectionReason = rejectionReason
             )
         }
 
@@ -311,6 +347,7 @@ class MobileNetV3Classifier(
         const val MODEL_DISPLAY_NAME = "MobileNetV3-Small (PyTorch)"
         const val FALLBACK_LABEL = "Modelo PyTorch ainda indisponivel"
         const val NON_PLANT_LABEL = "Nao e uma planta"
+        const val UNKNOWN_PLANT_LABEL = "Nao conhecemos essa planta"
         const val MIN_DISPLAY_CONFIDENCE = 0.15f
 
         private const val MAX_DISPLAY_CANDIDATES = 5

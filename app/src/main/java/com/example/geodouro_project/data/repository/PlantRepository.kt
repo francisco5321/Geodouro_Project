@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.CancellationSignal
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.example.geodouro_project.ai.PlantInferenceEngine
 import com.example.geodouro_project.ai.MobileNetV3Classifier
 import com.example.geodouro_project.core.network.ConnectivityChecker
 import com.example.geodouro_project.data.local.dao.ObservationDao
@@ -69,6 +70,7 @@ class PlantRepository(
     private val remotePublicationService: RemotePublicationService,
     private val remoteSpeciesService: RemoteSpeciesService,
     private val remoteObservationCatalogService: RemoteObservationCatalogService,
+    private val inferenceEngine: PlantInferenceEngine,
     private val classifier: MobileNetV3Classifier,
     private val currentIdentityProvider: () -> RemoteUserIdentity?
 ) {
@@ -180,8 +182,8 @@ class PlantRepository(
         imageUris: List<String> = listOf(localResult.imageUri),
         notes: String? = null
     ): ObservationSaveResult {
-        require(!isNonPlantPrediction(localResult.predictedSpecies)) {
-            "Nao e possivel guardar uma observacao sem planta reconhecida"
+        require(!isRejectedPrediction(localResult.predictedSpecies, localResult.rejectionReason)) {
+            "Nao e possivel guardar uma observacao sem planta reconhecida ou com planta desconhecida"
         }
 
         val resolvedLocation = resolveBestEffortLocation(localResult.latitude, localResult.longitude)
@@ -862,6 +864,12 @@ class PlantRepository(
         return species.trim().equals(MobileNetV3Classifier.NON_PLANT_LABEL, ignoreCase = true)
     }
 
+    private fun isRejectedPrediction(species: String, rejectionReason: String?): Boolean {
+        return isNonPlantPrediction(species) || 
+               species.trim().equals(MobileNetV3Classifier.UNKNOWN_PLANT_LABEL, ignoreCase = true) ||
+               rejectionReason?.equals("UNKNOWN_PLANT", ignoreCase = true) == true
+    }
+
     private data class RankedCandidate(
         val candidate: LocalPredictionCandidate,
         val similarity: Float,
@@ -1156,7 +1164,7 @@ class PlantRepository(
                         candidatePredictions = emptyList()
                     )
 
-                val analysis = classifier.analyze(bitmap)
+                val analysis = inferenceEngine.analyze(bitmap)
                 val prediction = analysis.prediction
 
                 ImageInferenceResult(

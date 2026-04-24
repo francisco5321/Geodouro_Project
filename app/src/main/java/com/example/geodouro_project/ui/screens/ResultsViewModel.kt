@@ -101,12 +101,19 @@ class ResultsViewModel(
             lastCaptureLatitude = localInferenceResult.latitude
             lastCaptureLongitude = localInferenceResult.longitude
 
-            if (isNonPlantPrediction(localInferenceResult.predictedSpecies)) {
+            val isUnknownPlant = isUnknownPlantPrediction(localInferenceResult.predictedSpecies, localInferenceResult.rejectionReason)
+            val isNonPlant = isNonPlantPrediction(localInferenceResult.predictedSpecies)
+
+            if (isNonPlant || isUnknownPlant) {
                 lastInferenceResult = localInferenceResult
                 lastEnrichedData = null
+                val sourceLabel = when {
+                    isUnknownPlant -> "Planta desconhecida. Nao encontrada nas bases de dados disponiveis."
+                    else -> "Nao foi detetada nenhuma planta na imagem."
+                }
                 _uiState.value = ResultsUiState.Success(
                     result = buildUiModel(localInferenceResult, null),
-                    sourceLabel = "Nao foi detetada nenhuma planta na imagem."
+                    sourceLabel = sourceLabel
                 )
                 return@launch
             }
@@ -264,7 +271,8 @@ class ResultsViewModel(
                     return@launch
                 }
 
-                if (isNonPlantPrediction(inferenceToPersist.predictedSpecies)) {
+                if (isNonPlantPrediction(inferenceToPersist.predictedSpecies) || 
+                    isUnknownPlantPrediction(inferenceToPersist.predictedSpecies, inferenceToPersist.rejectionReason)) {
                     _uiState.value = ResultsUiState.Error(
                         "A imagem analisada nao contem uma planta reconhecivel, por isso nao sera guardada."
                     )
@@ -324,25 +332,34 @@ class ResultsViewModel(
         localInferenceResult: LocalInferenceResult,
         enrichedData: EnrichedSpeciesData?
     ): ResultUiModel {
-        val isPlantDetected = !isNonPlantPrediction(localInferenceResult.predictedSpecies)
+        val isPlantDetected = !isNonPlantPrediction(localInferenceResult.predictedSpecies) && 
+                              !isUnknownPlantPrediction(localInferenceResult.predictedSpecies, localInferenceResult.rejectionReason)
+        val isUnknownPlant = isUnknownPlantPrediction(localInferenceResult.predictedSpecies, localInferenceResult.rejectionReason)
+        
         val scientificName = if (isPlantDetected) {
             enrichedData?.scientificName ?: localInferenceResult.predictedSpecies
+        } else if (isUnknownPlant) {
+            MobileNetV3Classifier.UNKNOWN_PLANT_LABEL
         } else {
             MobileNetV3Classifier.NON_PLANT_LABEL
         }
 
+        val commonName = when {
+            isPlantDetected -> enrichedData?.commonName ?: "Nome comum indisponivel"
+            isUnknownPlant -> "Pretende enviar à administração para melhor análise?"
+            else -> "Objeto nao identificado como planta"
+        }
+
+        val family = when {
+            isPlantDetected -> enrichedData?.family ?: "Familia indisponivel"
+            isUnknownPlant -> "Familia desconhecida"
+            else -> "Sem familia botanica"
+        }
+
         return ResultUiModel(
             scientificName = scientificName,
-            commonName = if (isPlantDetected) {
-                enrichedData?.commonName ?: "Nome comum indisponivel"
-            } else {
-                "Objeto nao identificado como planta"
-            },
-            family = if (isPlantDetected) {
-                enrichedData?.family ?: "Familia indisponivel"
-            } else {
-                "Sem familia botanica"
-            },
+            commonName = commonName,
+            family = family,
             confidence = localInferenceResult.confidence,
             capturedImageUri = localInferenceResult.imageUri,
             wikipediaUrl = if (isPlantDetected) enrichedData?.wikipediaUrl else null,
@@ -398,6 +415,11 @@ class ResultsViewModel(
 
     private fun isNonPlantPrediction(speciesName: String): Boolean {
         return speciesName.trim().equals(MobileNetV3Classifier.NON_PLANT_LABEL, ignoreCase = true)
+    }
+
+    private fun isUnknownPlantPrediction(speciesName: String, rejectionReason: String?): Boolean {
+        return speciesName.trim().equals(MobileNetV3Classifier.UNKNOWN_PLANT_LABEL, ignoreCase = true) ||
+               rejectionReason?.equals("UNKNOWN_PLANT", ignoreCase = true) == true
     }
 
     private fun enrichmentOriginLabel(origin: EnrichmentOrigin, rerankApplied: Boolean): String {
