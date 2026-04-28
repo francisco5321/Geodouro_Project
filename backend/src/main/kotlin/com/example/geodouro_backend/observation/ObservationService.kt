@@ -56,12 +56,24 @@ class ObservationService(
         guestLabel: String?,
         authenticatedUserId: Int? = null
     ): List<ObservationDetailResponse> {
-        val resolvedUserId = authenticatedUserId ?: resolveLookupUserId(userId, guestLabel)
-        return jdbcTemplate.query(
-            LIST_OBSERVATIONS_SQL,
-            MapSqlParameterSource("userId", resolvedUserId),
-            observationDetailSummaryRowMapper
-        ).map(::withObservationImages)
+        val resolvedUserId = authenticatedUserId ?: if (userId != null || !guestLabel.isNullOrBlank()) {
+            resolveLookupUserId(userId, guestLabel)
+        } else {
+            null
+        }
+
+        val sql = if (resolvedUserId == null) {
+            LIST_PUBLIC_OBSERVATIONS_SQL
+        } else {
+            LIST_USER_OBSERVATIONS_SQL
+        }
+
+        val params = MapSqlParameterSource()
+        if (resolvedUserId != null) {
+            params.addValue("userId", resolvedUserId)
+        }
+
+        return jdbcTemplate.query(sql, params, observationDetailSummaryRowMapper).map(::withObservationImages)
     }
 
     fun getObservationDetail(
@@ -421,8 +433,14 @@ class ObservationService(
             ) oi ON TRUE
         """
 
-        private const val LIST_OBSERVATIONS_SQL = OBSERVATION_DETAIL_SELECT + """
+        private const val LIST_USER_OBSERVATIONS_SQL = OBSERVATION_DETAIL_SELECT + """
             WHERE o.user_id = :userId
+            ORDER BY o.captured_at DESC NULLS LAST, o.observation_id DESC
+        """
+
+        private const val LIST_PUBLIC_OBSERVATIONS_SQL = OBSERVATION_DETAIL_SELECT + """
+            WHERE o.is_published = TRUE
+               OR o.sync_status = 'SYNCED'
             ORDER BY o.captured_at DESC NULLS LAST, o.observation_id DESC
         """
 
@@ -519,4 +537,3 @@ class ObservationService(
         """.trimIndent()
     }
 }
-
