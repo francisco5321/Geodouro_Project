@@ -126,6 +126,9 @@ CREATE TABLE IF NOT EXISTS publication_image (
     FOREIGN KEY (publication_id) REFERENCES publication(publication_id) ON DELETE CASCADE
 );
 
+ALTER TABLE observation
+    ADD COLUMN IF NOT EXISTS requires_manual_identification BOOLEAN NOT NULL DEFAULT FALSE;
+
 CREATE INDEX IF NOT EXISTS idx_app_user_email ON app_user(email);
 CREATE INDEX IF NOT EXISTS idx_app_user_username ON app_user(username);
 CREATE INDEX IF NOT EXISTS idx_observation_user_id ON observation(user_id);
@@ -157,6 +160,3 @@ RETURN (
     substring(md5('geodouro-observation:' || observation_id::text), 17, 4) || '-' ||
     substring(md5('geodouro-observation:' || observation_id::text), 21, 12)
 )::uuid;
-
-ALTER TABLE observation
-    ADD COLUMN IF NOT EXISTS requires_manual_identification BOOLEAN NOT NULL DEFAULT FALSE;
