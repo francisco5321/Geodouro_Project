@@ -667,9 +667,7 @@ private suspend fun resolveCommunityLocationLabel(
     @Suppress("DEPRECATION")
     val address = runCatching { geocoder.getFromLocation(latitude, longitude, 1)?.firstOrNull() }.getOrNull()
     val label = buildList {
-        address?.thoroughfare?.takeIf { it.isNotBlank() }?.let(::add)
-        address?.subLocality?.takeIf { it.isNotBlank() }?.let(::add)
-        address?.locality?.takeIf { it.isNotBlank() }?.let(::add)
+        address?.subAdminArea?.takeIf { it.isNotBlank() }?.let(::add)
         address?.adminArea?.takeIf { it.isNotBlank() }?.let(::add)
     }.distinct().joinToString(", ")
 
