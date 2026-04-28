@@ -180,9 +180,13 @@ class PlantRepository(
         localResult: LocalInferenceResult,
         enrichedData: EnrichedSpeciesData?,
         imageUris: List<String> = listOf(localResult.imageUri),
-        notes: String? = null
+        notes: String? = null,
+        allowManualReview: Boolean = false
     ): ObservationSaveResult {
-        require(!isRejectedPrediction(localResult.predictedSpecies, localResult.rejectionReason)) {
+        require(
+            !isNonPlantPrediction(localResult.predictedSpecies) &&
+                (allowManualReview || !isRejectedPrediction(localResult.predictedSpecies, localResult.rejectionReason))
+        ) {
             "Nao e possivel guardar uma observacao sem planta reconhecida ou com planta desconhecida"
         }
 

@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import android.webkit.MimeTypeMap
+import com.example.geodouro_project.ai.MobileNetV3Classifier
 import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.remote.model.RemoteObservationPayload
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
@@ -50,6 +51,10 @@ class RemoteObservationSyncService(
             deviceObservationId = observation.id,
             userId = identity.userId,
             guestLabel = identity.guestLabel,
+            requiresManualIdentification = observation.predictedSpecies.trim().equals(
+                MobileNetV3Classifier.UNKNOWN_PLANT_LABEL,
+                ignoreCase = true
+            ),
             imageUri = imageUris.firstOrNull() ?: observation.imageUri,
             imageUris = imageUris,
             capturedAt = observation.capturedAt,

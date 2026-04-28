@@ -21,7 +21,7 @@ class ObservationStorageService(
     }
 
     fun storeObservationImages(
-        plantSpeciesId: Int,
+        plantSpeciesId: Int?,
         deviceObservationId: UUID,
         images: List<MultipartFile>
     ): List<String> {
@@ -30,7 +30,11 @@ class ObservationStorageService(
             return emptyList()
         }
 
-        val speciesDirectory = rootPath.resolve(plantSpeciesId.toString())
+        val speciesDirectory = if (plantSpeciesId != null) {
+            rootPath.resolve(plantSpeciesId.toString())
+        } else {
+            rootPath.resolve("manual-review")
+        }
         Files.createDirectories(speciesDirectory)
 
         return validImages.mapIndexed { index, image ->

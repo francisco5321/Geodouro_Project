@@ -239,6 +239,7 @@ fun ResultsScreen(
                         notes = observationNotes,
                         onNotesChange = { observationNotes = it },
                         onConfirm = { viewModel.confirmObservation(observationNotes) },
+                        onSubmitUnknownPlant = { viewModel.confirmObservation(observationNotes, allowManualReview = true) },
                         onRetakePhotos = onBackClick
                     )
                 }
@@ -252,6 +253,7 @@ fun ResultsScreen(
                         notes = observationNotes,
                         onNotesChange = { observationNotes = it },
                         onConfirm = { viewModel.confirmObservation(observationNotes) },
+                        onSubmitUnknownPlant = { viewModel.confirmObservation(observationNotes, allowManualReview = true) },
                         onRetakePhotos = onBackClick
                     )
                 }
@@ -314,6 +316,7 @@ fun ResultCard(
     notes: String,
     onNotesChange: (String) -> Unit,
     onConfirm: () -> Unit,
+    onSubmitUnknownPlant: () -> Unit,
     onRetakePhotos: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
@@ -412,7 +415,7 @@ fun ResultCard(
                 longitude = result.longitude
             )
 
-            if (result.isPlantDetected) {
+            if (result.isPlantDetected || result.isUnknownPlant) {
                 Spacer(modifier = Modifier.height(12.dp))
                 ObservationNotesField(
                     value = notes,
@@ -442,7 +445,11 @@ fun ResultCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             Button(
-                onClick = if (result.isPlantDetected) onConfirm else onRetakePhotos,
+                onClick = when {
+                    result.isPlantDetected -> onConfirm
+                    result.isUnknownPlant -> onSubmitUnknownPlant
+                    else -> onRetakePhotos
+                },
                 enabled = !isConfirming,
                 modifier = Modifier.fillMaxWidth(),
                 colors = geodouroPrimaryButtonColors(),
@@ -452,6 +459,7 @@ fun ResultCard(
                     text = when {
                         isConfirming -> "A guardar..."
                         result.isPlantDetected -> "Confirmar e guardar"
+                        result.isUnknownPlant -> "Enviar para administracao"
                         else -> "Tirar novas fotos"
                     }
                 )
@@ -652,6 +660,7 @@ fun MultiImageResultCard(
     notes: String,
     onNotesChange: (String) -> Unit,
     onConfirm: () -> Unit,
+    onSubmitUnknownPlant: () -> Unit,
     onRetakePhotos: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
@@ -817,7 +826,7 @@ fun MultiImageResultCard(
                 longitude = result.longitude
             )
 
-            if (result.isPlantDetected) {
+            if (result.isPlantDetected || result.isUnknownPlant) {
                 Spacer(modifier = Modifier.height(12.dp))
                 ObservationNotesField(
                     value = notes,
@@ -847,7 +856,11 @@ fun MultiImageResultCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             Button(
-                onClick = if (result.isPlantDetected) onConfirm else onRetakePhotos,
+                onClick = when {
+                    result.isPlantDetected -> onConfirm
+                    result.isUnknownPlant -> onSubmitUnknownPlant
+                    else -> onRetakePhotos
+                },
                 enabled = !isConfirming,
                 modifier = Modifier.fillMaxWidth(),
                 colors = geodouroPrimaryButtonColors(),
@@ -857,6 +870,7 @@ fun MultiImageResultCard(
                     text = when {
                         isConfirming -> "A guardar..."
                         result.isPlantDetected -> "Confirmar e guardar"
+                        result.isUnknownPlant -> "Enviar para administracao"
                         else -> "Tirar novas fotos"
                     }
                 )

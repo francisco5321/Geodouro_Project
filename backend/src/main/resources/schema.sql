@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS observation (
     device_observation_id UUID UNIQUE,
     user_id INTEGER NOT NULL,
     plant_species_id INTEGER,
+    requires_manual_identification BOOLEAN NOT NULL DEFAULT FALSE,
     image_uri TEXT,
     captured_at BIGINT,
     predicted_scientific_name TEXT,
@@ -129,6 +130,7 @@ CREATE INDEX IF NOT EXISTS idx_app_user_email ON app_user(email);
 CREATE INDEX IF NOT EXISTS idx_app_user_username ON app_user(username);
 CREATE INDEX IF NOT EXISTS idx_observation_user_id ON observation(user_id);
 CREATE INDEX IF NOT EXISTS idx_observation_plant_species_id ON observation(plant_species_id);
+CREATE INDEX IF NOT EXISTS idx_observation_requires_manual_identification ON observation(requires_manual_identification);
 CREATE INDEX IF NOT EXISTS idx_observation_is_published ON observation(is_published);
 CREATE INDEX IF NOT EXISTS idx_observation_sync_status ON observation(sync_status);
 CREATE INDEX IF NOT EXISTS idx_observation_last_sync_attempt_at ON observation(last_sync_attempt_at);
@@ -155,3 +157,6 @@ RETURN (
     substring(md5('geodouro-observation:' || observation_id::text), 17, 4) || '-' ||
     substring(md5('geodouro-observation:' || observation_id::text), 21, 12)
 )::uuid;
+
+ALTER TABLE observation
+    ADD COLUMN IF NOT EXISTS requires_manual_identification BOOLEAN NOT NULL DEFAULT FALSE;

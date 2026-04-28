@@ -34,7 +34,8 @@ data class ResultUiModel(
     val alternativePredictions: List<LocalPredictionCandidate>,
     val latitude: Double?,
     val longitude: Double?,
-    val isPlantDetected: Boolean
+    val isPlantDetected: Boolean,
+    val isUnknownPlant: Boolean
 )
 
 data class MultiImageResultUiModel(
@@ -52,7 +53,8 @@ data class MultiImageResultUiModel(
     val processingTimeMs: Long,
     val latitude: Double?,
     val longitude: Double?,
-    val isPlantDetected: Boolean
+    val isPlantDetected: Boolean,
+    val isUnknownPlant: Boolean
 )
 
 sealed class ResultsUiState {
@@ -180,11 +182,17 @@ class ResultsViewModel(
 
             lastMultiImageResult = aggregationResult
 
-            if (isNonPlantPrediction(aggregationResult.finalPredictedSpecies)) {
+            if (isNonPlantPrediction(aggregationResult.finalPredictedSpecies) ||
+                isUnknownPlantPrediction(aggregationResult.finalPredictedSpecies, null)
+            ) {
                 lastEnrichedData = null
                 _uiState.value = ResultsUiState.MultiImageSuccess(
                     result = buildMultiImageUiModel(aggregationResult, null),
-                    sourceLabel = "Nenhuma das imagens apresentou uma planta reconhecivel."
+                    sourceLabel = if (isUnknownPlantPrediction(aggregationResult.finalPredictedSpecies, null)) {
+                        "Foi detetada uma planta, mas ainda nao a conseguimos identificar automaticamente."
+                    } else {
+                        "Nenhuma das imagens apresentou uma planta reconhecivel."
+                    }
                 )
                 return@launch
             }
@@ -208,7 +216,7 @@ class ResultsViewModel(
         }
     }
 
-    fun confirmObservation(notes: String = "") {
+    fun confirmObservation(notes: String = "", allowManualReview: Boolean = false) {
         if (confirmationInProgress) {
             return
         }
@@ -271,10 +279,18 @@ class ResultsViewModel(
                     return@launch
                 }
 
-                if (isNonPlantPrediction(inferenceToPersist.predictedSpecies) || 
-                    isUnknownPlantPrediction(inferenceToPersist.predictedSpecies, inferenceToPersist.rejectionReason)) {
+                val isUnknownPlant = isUnknownPlantPrediction(
+                    inferenceToPersist.predictedSpecies,
+                    inferenceToPersist.rejectionReason
+                )
+                if (isNonPlantPrediction(inferenceToPersist.predictedSpecies) ||
+                    (isUnknownPlant && !allowManualReview)) {
                     _uiState.value = ResultsUiState.Error(
-                        "A imagem analisada nao contem uma planta reconhecivel, por isso nao sera guardada."
+                        if (isUnknownPlant) {
+                            "Esta planta ainda nao foi identificada. Usa o envio para a administracao."
+                        } else {
+                            "A imagem analisada nao contem uma planta reconhecivel, por isso nao sera guardada."
+                        }
                     )
                     return@launch
                 }
@@ -297,17 +313,30 @@ class ResultsViewModel(
                     localResult = inferenceToPersist,
                     enrichedData = lastEnrichedData,
                     imageUris = imageUrisToPersist,
-                    notes = notes
+                    notes = notes,
+                    allowManualReview = allowManualReview
                 )
 
                 Log.d(TAG, "saveObservation result observationId=${saveResult.observationId} syncStatus=${saveResult.syncStatus}")
                 val message = when (saveResult.syncStatus) {
-                    ObservationSyncStatus.SYNCED -> "Observacao guardada e sincronizada."
+                    ObservationSyncStatus.SYNCED -> if (allowManualReview) {
+                        "Observacao enviada para a administracao e sincronizada."
+                    } else {
+                        "Observacao guardada e sincronizada."
+                    }
                     ObservationSyncStatus.PENDING -> {
-                        "Observacao guardada localmente. A sincronizacao fica pendente ate haver ligacao ao backend."
+                        if (allowManualReview) {
+                            "Observacao enviada localmente. Ficara pendente ate haver ligacao ao backend."
+                        } else {
+                            "Observacao guardada localmente. A sincronizacao fica pendente ate haver ligacao ao backend."
+                        }
                     }
                     ObservationSyncStatus.FAILED -> {
-                        "Observacao guardada localmente. Nao foi possivel contactar o backend, por isso tentaremos sincronizar novamente mais tarde."
+                        if (allowManualReview) {
+                            "Observacao guardada localmente para revisao manual. Nao foi possivel contactar o backend por agora."
+                        } else {
+                            "Observacao guardada localmente. Nao foi possivel contactar o backend, por isso tentaremos sincronizar novamente mais tarde."
+                        }
                     }
                 }
 
@@ -373,7 +402,8 @@ class ResultsViewModel(
             },
             latitude = localInferenceResult.latitude,
             longitude = localInferenceResult.longitude,
-            isPlantDetected = isPlantDetected
+            isPlantDetected = isPlantDetected,
+            isUnknownPlant = isUnknownPlant
         )
     }
 
@@ -381,20 +411,27 @@ class ResultsViewModel(
         multiImageResult: MultiImageAggregationResult,
         enrichedData: EnrichedSpeciesData?
     ): MultiImageResultUiModel {
-        val isPlantDetected = !isNonPlantPrediction(multiImageResult.finalPredictedSpecies)
+        val isUnknownPlant = isUnknownPlantPrediction(multiImageResult.finalPredictedSpecies, null)
+        val isPlantDetected = !isNonPlantPrediction(multiImageResult.finalPredictedSpecies) && !isUnknownPlant
         return MultiImageResultUiModel(
             finalSpecies = if (isPlantDetected) {
                 enrichedData?.scientificName ?: multiImageResult.finalPredictedSpecies
+            } else if (isUnknownPlant) {
+                MobileNetV3Classifier.UNKNOWN_PLANT_LABEL
             } else {
                 MobileNetV3Classifier.NON_PLANT_LABEL
             },
             commonName = if (isPlantDetected) {
                 enrichedData?.commonName ?: "Nome comum indisponivel"
+            } else if (isUnknownPlant) {
+                "Pretende enviar a observacao para a administracao?"
             } else {
                 "Nenhuma planta reconhecida nas imagens"
             },
             family = if (isPlantDetected) {
                 enrichedData?.family ?: "Familia indisponivel"
+            } else if (isUnknownPlant) {
+                "Familia desconhecida"
             } else {
                 "Sem familia botanica"
             },
@@ -409,7 +446,8 @@ class ResultsViewModel(
             processingTimeMs = multiImageResult.processingTimeMs,
             latitude = lastCaptureLatitude,
             longitude = lastCaptureLongitude,
-            isPlantDetected = isPlantDetected
+            isPlantDetected = isPlantDetected,
+            isUnknownPlant = isUnknownPlant
         )
     }
 

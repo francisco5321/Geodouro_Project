@@ -4,6 +4,7 @@ data class RemoteObservationPayload(
     val deviceObservationId: String,
     val userId: Int?,
     val guestLabel: String?,
+    val requiresManualIdentification: Boolean,
     val imageUri: String,
     val imageUris: List<String>,
     val capturedAt: Long,

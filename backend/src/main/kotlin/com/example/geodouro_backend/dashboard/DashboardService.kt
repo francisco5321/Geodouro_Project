@@ -11,6 +11,11 @@ class DashboardService(
         return DashboardStatsResponse(
             speciesCount = count("plant_species"),
             observationCount = count("observation"),
+            manualReviewCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM observation WHERE requires_manual_identification = TRUE",
+                emptyMap<String, Any>(),
+                Int::class.java
+            ) ?: 0,
             publicationCount = count("publication"),
             userCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM app_user WHERE is_authenticated = TRUE",

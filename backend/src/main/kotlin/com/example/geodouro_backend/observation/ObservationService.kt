@@ -56,16 +56,17 @@ class ObservationService(
         guestLabel: String?,
         authenticatedUserId: Int? = null
     ): List<ObservationDetailResponse> {
-        val resolvedUserId = authenticatedUserId ?: if (userId != null || !guestLabel.isNullOrBlank()) {
-            resolveLookupUserId(userId, guestLabel)
-        } else {
-            null
+        val requesterIsAdmin = isAdmin(authenticatedUserId)
+        val resolvedUserId = when {
+            userId != null || !guestLabel.isNullOrBlank() -> resolveLookupUserId(userId, guestLabel)
+            authenticatedUserId != null && !requesterIsAdmin -> authenticatedUserId
+            else -> null
         }
 
-        val sql = if (resolvedUserId == null) {
-            LIST_PUBLIC_OBSERVATIONS_SQL
-        } else {
-            LIST_USER_OBSERVATIONS_SQL
+        val sql = when {
+            resolvedUserId != null -> LIST_USER_OBSERVATIONS_SQL
+            requesterIsAdmin -> LIST_ALL_OBSERVATIONS_SQL
+            else -> LIST_PUBLIC_OBSERVATIONS_SQL
         }
 
         val params = MapSqlParameterSource()
@@ -80,6 +81,7 @@ class ObservationService(
         deviceObservationId: UUID,
         authenticatedUserId: Int? = null
     ): ObservationDetailResponse {
+        val requesterIsAdmin = isAdmin(authenticatedUserId)
         val detail = jdbcTemplate.query(
             OBSERVATION_DETAIL_SQL,
             MapSqlParameterSource("deviceObservationId", deviceObservationId),
@@ -91,8 +93,9 @@ class ObservationService(
             )
 
         val canAccess = detail.isPublished ||
-            detail.syncStatus.equals("SYNCED", ignoreCase = true) ||
-            detail.userId == authenticatedUserId
+            (!detail.requiresManualIdentification && detail.syncStatus.equals("SYNCED", ignoreCase = true)) ||
+            detail.userId == authenticatedUserId ||
+            requesterIsAdmin
 
         if (!canAccess) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para consultar esta observacao")
@@ -109,12 +112,20 @@ class ObservationService(
         if (authenticatedUserId == null) {
             throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao obrigatoria para editar observacoes")
         }
-        val current = getObservationDetail(deviceObservationId)
-        if (current.userId != authenticatedUserId) {
+        val requesterIsAdmin = isAdmin(authenticatedUserId)
+        val current = getObservationDetail(deviceObservationId, authenticatedUserId)
+        if (!requesterIsAdmin && current.userId != authenticatedUserId) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para editar esta observacao")
         }
         if (current.isPublished) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot update a published observation")
+        }
+
+        if (current.requiresManualIdentification && request.scientificName.isNullOrBlank()) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Esta observacao precisa de uma especie antes de sair da fila de revisao manual"
+            )
         }
 
         val scientificName = request.scientificName?.trim().orEmpty().ifBlank { current.scientificName }
@@ -134,6 +145,7 @@ class ObservationService(
                 .addValue("notes", notes)
         )
 
+        refreshPlantSpeciesImageCount(plantSpeciesId)
         return getObservationDetail(deviceObservationId)
     }
 
@@ -188,6 +200,7 @@ class ObservationService(
 
         val deviceObservationId = request.deviceObservationId ?: UUID.randomUUID()
         val userId = authenticatedUserId ?: resolveUserId(request)
+        val requiresManualIdentification = request.requiresManualIdentification
         val plantSpeciesId = resolvedPlantSpeciesId ?: resolvePlantSpeciesId(request)
         val syncStatus = normalizeSyncStatus(request.syncStatus)
         val observedAt = request.observedAt ?: java.time.Instant.now()
@@ -198,6 +211,7 @@ class ObservationService(
             .addValue("deviceObservationId", deviceObservationId)
             .addValue("userId", userId)
             .addValue("plantSpeciesId", plantSpeciesId)
+            .addValue("requiresManualIdentification", requiresManualIdentification)
             .addValue("imageUri", primaryImagePath)
             .addValue("capturedAt", request.capturedAt)
             .addValue("predictedScientificName", request.predictedScientificName.trim())
@@ -223,7 +237,9 @@ class ObservationService(
                 "Nao tens permissao para substituir esta observacao"
             )
         replaceObservationImages(response.observationId, storedImagePaths)
-        refreshPlantSpeciesImageCount(plantSpeciesId)
+        if (plantSpeciesId != null) {
+            refreshPlantSpeciesImageCount(plantSpeciesId)
+        }
         return response
     }
 
@@ -266,7 +282,11 @@ class ObservationService(
         ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not create guest user")
     }
 
-    private fun resolvePlantSpeciesId(request: UpsertObservationRequest): Int {
+    private fun resolvePlantSpeciesId(request: UpsertObservationRequest): Int? {
+        if (request.requiresManualIdentification) {
+            return null
+        }
+
         request.plantSpeciesId?.let { providedPlantSpeciesId ->
             val exists = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM plant_species WHERE plant_species_id = :plantSpeciesId",
@@ -337,6 +357,20 @@ class ObservationService(
         return imageUris.orEmpty().map { it.trim() }.filter { it.isNotBlank() }.filterNot { it.startsWith("content://") }.distinct()
     }
 
+    private fun isAdmin(authenticatedUserId: Int?): Boolean {
+        if (authenticatedUserId == null) {
+            return false
+        }
+
+        val role = jdbcTemplate.query(
+            "SELECT COALESCE(role, 'user') AS role FROM app_user WHERE user_id = :userId",
+            MapSqlParameterSource("userId", authenticatedUserId)
+        ) { rs, _ -> rs.getString("role") }
+            .firstOrNull()
+
+        return role?.equals("admin", ignoreCase = true) == true
+    }
+
     private fun splitScientificName(scientificName: String): Pair<String, String> {
         val normalized = scientificName.trim().replace(Regex("\\s+"), " ")
         val parts = normalized.split(' ')
@@ -368,6 +402,7 @@ class ObservationService(
             deviceObservationId = rs.getObject("device_observation_id", UUID::class.java),
             userId = rs.getInt("user_id"),
             predictedScientificName = rs.getString("predicted_scientific_name"),
+            requiresManualIdentification = rs.getBoolean("requires_manual_identification"),
             confidence = rs.getObject("confidence")?.toString()?.toFloat(),
             syncStatus = rs.getString("sync_status"),
             isPublished = rs.getBoolean("is_published"),
@@ -382,6 +417,8 @@ class ObservationService(
             deviceObservationId = rs.getObject("device_observation_id", UUID::class.java),
             userId = rs.getInt("user_id"),
             plantSpeciesId = rs.getObject("plant_species_id", java.lang.Integer::class.java)?.toInt(),
+            predictedScientificName = rs.getString("predicted_scientific_name"),
+            requiresManualIdentification = rs.getBoolean("requires_manual_identification"),
             scientificName = rs.getString("scientific_name"),
             commonName = rs.getString("common_name"),
             family = rs.getString("family"),
@@ -408,6 +445,8 @@ class ObservationService(
                    COALESCE(o.device_observation_id, synthetic_device_observation_id(o.observation_id)) AS device_observation_id,
                    o.user_id,
                    o.plant_species_id,
+                   o.predicted_scientific_name,
+                   o.requires_manual_identification,
                    COALESCE(o.enriched_scientific_name, o.predicted_scientific_name, ps.scientific_name) AS scientific_name,
                    COALESCE(o.enriched_common_name, ps.common_name) AS common_name,
                    COALESCE(o.enriched_family, ps.family) AS family,
@@ -433,14 +472,21 @@ class ObservationService(
             ) oi ON TRUE
         """
 
+        private const val LIST_ALL_OBSERVATIONS_SQL = OBSERVATION_DETAIL_SELECT + """
+            ORDER BY o.captured_at DESC NULLS LAST, o.observation_id DESC
+        """
+
         private const val LIST_USER_OBSERVATIONS_SQL = OBSERVATION_DETAIL_SELECT + """
             WHERE o.user_id = :userId
             ORDER BY o.captured_at DESC NULLS LAST, o.observation_id DESC
         """
 
         private const val LIST_PUBLIC_OBSERVATIONS_SQL = OBSERVATION_DETAIL_SELECT + """
-            WHERE o.is_published = TRUE
-               OR o.sync_status = 'SYNCED'
+            WHERE o.requires_manual_identification = FALSE
+              AND (
+                  o.is_published = TRUE
+                  OR o.sync_status = 'SYNCED'
+              )
             ORDER BY o.captured_at DESC NULLS LAST, o.observation_id DESC
         """
 
@@ -472,6 +518,7 @@ class ObservationService(
         private val UPDATE_OBSERVATION_METADATA_SQL = """
             UPDATE observation
             SET plant_species_id = :plantSpeciesId,
+                requires_manual_identification = FALSE,
                 enriched_scientific_name = :scientificName,
                 enriched_common_name = :commonName,
                 enriched_family = :family,
@@ -499,12 +546,12 @@ class ObservationService(
 
         private val UPSERT_OBSERVATION_SQL = """
             INSERT INTO observation (
-                device_observation_id, user_id, plant_species_id, image_uri, captured_at,
+                device_observation_id, user_id, plant_species_id, requires_manual_identification, image_uri, captured_at,
                 predicted_scientific_name, confidence, enriched_scientific_name, enriched_common_name,
                 enriched_family, enriched_wikipedia_url, enriched_photo_url, latitude, longitude,
                 observed_at, is_published, is_synced, sync_status, last_sync_attempt_at, notes
             ) VALUES (
-                :deviceObservationId, :userId, :plantSpeciesId, :imageUri, :capturedAt,
+                :deviceObservationId, :userId, :plantSpeciesId, :requiresManualIdentification, :imageUri, :capturedAt,
                 :predictedScientificName, :confidence, :enrichedScientificName, :enrichedCommonName,
                 :enrichedFamily, :enrichedWikipediaUrl, :enrichedPhotoUrl, :latitude, :longitude,
                 :observedAt, :isPublished, :isSynced, :syncStatus, :lastSyncAttemptAt, :notes
@@ -513,6 +560,7 @@ class ObservationService(
             DO UPDATE SET
                 user_id = EXCLUDED.user_id,
                 plant_species_id = EXCLUDED.plant_species_id,
+                requires_manual_identification = EXCLUDED.requires_manual_identification,
                 image_uri = EXCLUDED.image_uri,
                 captured_at = EXCLUDED.captured_at,
                 predicted_scientific_name = EXCLUDED.predicted_scientific_name,
@@ -533,7 +581,7 @@ class ObservationService(
                 updated_at = NOW()
             WHERE observation.user_id = EXCLUDED.user_id
             RETURNING observation_id, device_observation_id, user_id, predicted_scientific_name,
-                      confidence, sync_status, is_published, observed_at, image_uri
+                      requires_manual_identification, confidence, sync_status, is_published, observed_at, image_uri
         """.trimIndent()
     }
 }
