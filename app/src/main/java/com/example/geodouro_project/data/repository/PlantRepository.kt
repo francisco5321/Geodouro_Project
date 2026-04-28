@@ -15,8 +15,12 @@ import com.example.geodouro_project.ai.MobileNetV3Classifier
 import com.example.geodouro_project.core.network.ConnectivityChecker
 import com.example.geodouro_project.data.local.dao.ObservationDao
 import com.example.geodouro_project.data.local.dao.TaxonCacheDao
+import com.example.geodouro_project.data.local.dao.CachedCommunityPublicationDao
+import com.example.geodouro_project.data.local.dao.CachedSpeciesCatalogDao
 import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.local.entity.TaxonCacheEntity
+import com.example.geodouro_project.data.local.entity.CachedCommunityPublicationEntity
+import com.example.geodouro_project.data.local.entity.CachedSpeciesCatalogEntity
 import com.example.geodouro_project.data.remote.RemoteObservationSyncService
 import com.example.geodouro_project.data.remote.RemoteObservationCatalogService
 import com.example.geodouro_project.data.remote.RemoteCommunityPublication
@@ -63,6 +67,8 @@ class PlantRepository(
     private val appContext: Context,
     private val taxonCacheDao: TaxonCacheDao,
     private val observationDao: ObservationDao,
+    private val cachedSpeciesCatalogDao: CachedSpeciesCatalogDao,
+    private val cachedCommunityPublicationDao: CachedCommunityPublicationDao,
     private val apiService: INaturalistApiService,
     private val connectivityChecker: ConnectivityChecker,
     private val imageHttpClient: OkHttpClient,
@@ -334,7 +340,12 @@ class PlantRepository(
             }
 
             val ownerIdentity = currentIdentityProvider()
-            remoteObservationCatalogService.fetchObservations().map { it.toObservationEntity(ownerIdentity) }
+            val remoteObservations = remoteObservationCatalogService.fetchObservations()
+                .map { it.toObservationEntity(ownerIdentity) }
+            if (remoteObservations.isNotEmpty()) {
+                observationDao.upsertAll(remoteObservations)
+            }
+            remoteObservations
         }
     }
 
@@ -350,7 +361,9 @@ class PlantRepository(
             }
 
             val ownerIdentity = currentIdentityProvider()
-            remoteObservationCatalogService.fetchObservationDetail(observationId)?.toObservationEntity(ownerIdentity)
+            remoteObservationCatalogService.fetchObservationDetail(observationId)
+                ?.toObservationEntity(ownerIdentity)
+                ?.also { observationDao.upsert(it) }
         }
     }
 
@@ -514,20 +527,18 @@ class PlantRepository(
             }
 
             if (remotePublications.isNotEmpty()) {
+                val cachedPublications = remotePublications.map { it.toCachedEntity() }
+                cachedCommunityPublicationDao.replaceAll(cachedPublications)
                 return@withContext remotePublications.map { it.toDomain() }
             }
 
+            val cachedPublications = cachedCommunityPublicationDao.getAll()
+            if (cachedPublications.isNotEmpty()) {
+                return@withContext cachedPublications.map { it.toDomain() }
+            }
+
             observationDao.getPublished().map { observation ->
-                CommunityPublication(
-                    id = observation.id,
-                    scientificName = observation.enrichedScientificName ?: observation.predictedSpecies,
-                    commonName = observation.enrichedCommonName,
-                    userDisplayName = "Utilizador",
-                    latitude = observation.latitude,
-                    longitude = observation.longitude,
-                    publishedAt = Instant.ofEpochMilli(observation.capturedAt).toString(),
-                    imageUrl = observation.imageUri
-                )
+                observation.toLocalCommunityPublication()
             }
         }
     }
@@ -538,13 +549,22 @@ class PlantRepository(
                 return@withContext emptyList()
             }
 
-            remoteSpeciesService.fetchSpecies().map { species -> species.toCatalogItem() }
+            val remoteSpecies = remoteSpeciesService.fetchSpecies().map { species -> species.toCatalogItem() }
+            if (remoteSpecies.isNotEmpty()) {
+                cachedSpeciesCatalogDao.replaceAll(remoteSpecies.map { it.toCachedEntity() })
+            }
+            remoteSpecies
         }
     }
 
     suspend fun fetchSpeciesCatalogRemoteFirst(): List<PlantSpeciesCatalogItem> {
         val remote = fetchRemoteSpecies()
-        return if (remote.isNotEmpty()) remote else fetchLocalObservations().toCatalogItems()
+        if (remote.isNotEmpty()) {
+            return remote
+        }
+
+        val cachedSpecies = cachedSpeciesCatalogDao.getAll().map { it.toDomain() }
+        return if (cachedSpecies.isNotEmpty()) cachedSpecies else fetchLocalObservations().toCatalogItems()
     }
 
     suspend fun fetchRemoteSpeciesDetail(speciesId: String): PlantSpeciesDetailData? {
@@ -569,6 +589,7 @@ class PlantRepository(
 
     suspend fun fetchSpeciesDetailRemoteFirst(speciesId: String): PlantSpeciesDetailData? {
         return fetchRemoteSpeciesDetail(speciesId)
+            ?: cachedSpeciesCatalogDao.getById(speciesId)?.toDomain()?.toFallbackDetailData()
             ?: fetchLocalObservations()
                 .filter { observation ->
                     val scientificName = observation.enrichedScientificName
@@ -971,6 +992,21 @@ class PlantRepository(
         )
     }
 
+    private fun RemoteCommunityPublication.toCachedEntity(): CachedCommunityPublicationEntity {
+        return CachedCommunityPublicationEntity(
+            id = deviceObservationId,
+            publicationId = publicationId,
+            scientificName = scientificName,
+            commonName = commonName,
+            userDisplayName = userDisplayName,
+            latitude = latitude,
+            longitude = longitude,
+            publishedAt = publishedAt,
+            imageUrl = imageUrl,
+            cachedAt = System.currentTimeMillis()
+        )
+    }
+
     private fun RemotePlantSpecies.toCatalogItem(): PlantSpeciesCatalogItem {
         return PlantSpeciesCatalogItem(
             id = id,
@@ -982,6 +1018,21 @@ class PlantRepository(
             thumbnailUri = thumbnailUrl,
             wikipediaUrl = wikipediaUrl,
             updatedAtEpochMs = updatedAtEpochMs
+        )
+    }
+
+    private fun PlantSpeciesCatalogItem.toCachedEntity(): CachedSpeciesCatalogEntity {
+        return CachedSpeciesCatalogEntity(
+            id = id,
+            scientificName = scientificName,
+            commonName = commonName,
+            family = family,
+            genus = genus,
+            imageCount = imageCount,
+            thumbnailUri = thumbnailUri,
+            wikipediaUrl = wikipediaUrl,
+            updatedAtEpochMs = updatedAtEpochMs,
+            cachedAt = System.currentTimeMillis()
         )
     }
 
@@ -1023,6 +1074,52 @@ class PlantRepository(
         )
     }
 
+    private fun PlantSpeciesCatalogItem.toFallbackDetailData(): PlantSpeciesDetailData {
+        return PlantSpeciesDetailData(
+            id = id,
+            scientificName = scientificName,
+            commonName = commonName,
+            family = family,
+            genus = genus,
+            imageCount = imageCount,
+            observationCount = 0,
+            syncedCount = 0,
+            publishedCount = 0,
+            wikipediaUrl = wikipediaUrl,
+            heroImageUri = thumbnailUri,
+            galleryImageUris = listOfNotNull(thumbnailUri),
+            locationSummary = "Sem detalhe remoto adicional disponivel para esta especie.",
+            observations = emptyList()
+        )
+    }
+
+    private fun CachedSpeciesCatalogEntity.toDomain(): PlantSpeciesCatalogItem {
+        return PlantSpeciesCatalogItem(
+            id = id,
+            scientificName = scientificName,
+            commonName = commonName,
+            family = family,
+            genus = genus,
+            imageCount = imageCount,
+            thumbnailUri = thumbnailUri,
+            wikipediaUrl = wikipediaUrl,
+            updatedAtEpochMs = updatedAtEpochMs
+        )
+    }
+
+    private fun CachedCommunityPublicationEntity.toDomain(): CommunityPublication {
+        return CommunityPublication(
+            id = id,
+            scientificName = scientificName,
+            commonName = commonName,
+            userDisplayName = userDisplayName,
+            latitude = latitude,
+            longitude = longitude,
+            publishedAt = publishedAt,
+            imageUrl = imageUrl
+        )
+    }
+
     private fun RemoteObservationDetail.toObservationEntity(ownerIdentity: RemoteUserIdentity?): ObservationEntity {
         val primaryImage = imageUrls.firstOrNull() ?: photoUrl.orEmpty()
         return ObservationEntity(
@@ -1048,6 +1145,19 @@ class PlantRepository(
             isPublished = isPublished,
             syncStatus = syncStatus,
             lastSyncAttemptAt = null
+        )
+    }
+
+    private fun ObservationEntity.toLocalCommunityPublication(): CommunityPublication {
+        return CommunityPublication(
+            id = id,
+            scientificName = enrichedScientificName ?: predictedSpecies,
+            commonName = enrichedCommonName,
+            userDisplayName = publishedByDisplayName?.takeIf { it.isNotBlank() } ?: "Utilizador",
+            latitude = latitude,
+            longitude = longitude,
+            publishedAt = Instant.ofEpochMilli(capturedAt).toString(),
+            imageUrl = imageUri
         )
     }
 

@@ -12,6 +12,9 @@ interface ObservationDao {
     @Upsert
     suspend fun upsert(entity: ObservationEntity)
 
+    @Upsert
+    suspend fun upsertAll(entities: List<ObservationEntity>)
+
     @Query("SELECT * FROM observation WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): ObservationEntity?
 

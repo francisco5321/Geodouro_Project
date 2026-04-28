@@ -193,6 +193,8 @@ object AppContainer {
             appContext = appContext,
             taxonCacheDao = database.taxonCacheDao(),
             observationDao = database.observationDao(),
+            cachedSpeciesCatalogDao = database.cachedSpeciesCatalogDao(),
+            cachedCommunityPublicationDao = database.cachedCommunityPublicationDao(),
             apiService = apiService,
             connectivityChecker = ConnectivityChecker(appContext),
             imageHttpClient = okHttpClient,

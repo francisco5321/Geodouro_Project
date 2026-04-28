@@ -6,14 +6,23 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.geodouro_project.data.local.dao.CachedCommunityPublicationDao
+import com.example.geodouro_project.data.local.dao.CachedSpeciesCatalogDao
 import com.example.geodouro_project.data.local.dao.ObservationDao
 import com.example.geodouro_project.data.local.dao.TaxonCacheDao
+import com.example.geodouro_project.data.local.entity.CachedCommunityPublicationEntity
+import com.example.geodouro_project.data.local.entity.CachedSpeciesCatalogEntity
 import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.local.entity.TaxonCacheEntity
 
 @Database(
-    entities = [TaxonCacheEntity::class, ObservationEntity::class],
-    version = 6,
+    entities = [
+        TaxonCacheEntity::class,
+        ObservationEntity::class,
+        CachedSpeciesCatalogEntity::class,
+        CachedCommunityPublicationEntity::class
+    ],
+    version = 7,
     exportSchema = false
 )
 abstract class GeodouroDatabase : RoomDatabase() {
@@ -21,6 +30,10 @@ abstract class GeodouroDatabase : RoomDatabase() {
     abstract fun taxonCacheDao(): TaxonCacheDao
 
     abstract fun observationDao(): ObservationDao
+
+    abstract fun cachedSpeciesCatalogDao(): CachedSpeciesCatalogDao
+
+    abstract fun cachedCommunityPublicationDao(): CachedCommunityPublicationDao
 
     companion object {
         @Volatile
@@ -33,7 +46,14 @@ abstract class GeodouroDatabase : RoomDatabase() {
                     GeodouroDatabase::class.java,
                     "geodouro.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(
+                        MIGRATION_1_2,
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5,
+                        MIGRATION_5_6,
+                        MIGRATION_6_7
+                    )
                     .build()
                     .also { INSTANCE = it }
             }
@@ -72,6 +92,43 @@ abstract class GeodouroDatabase : RoomDatabase() {
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE observation ADD COLUMN notes TEXT")
+            }
+        }
+
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS cached_species_catalog (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        scientificName TEXT NOT NULL,
+                        commonName TEXT,
+                        family TEXT NOT NULL,
+                        genus TEXT NOT NULL,
+                        imageCount INTEGER NOT NULL,
+                        thumbnailUri TEXT,
+                        wikipediaUrl TEXT,
+                        updatedAtEpochMs INTEGER NOT NULL,
+                        cachedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS cached_community_publication (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        publicationId INTEGER NOT NULL,
+                        scientificName TEXT NOT NULL,
+                        commonName TEXT,
+                        userDisplayName TEXT NOT NULL,
+                        latitude REAL,
+                        longitude REAL,
+                        publishedAt TEXT NOT NULL,
+                        imageUrl TEXT,
+                        cachedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
             }
         }
     }
