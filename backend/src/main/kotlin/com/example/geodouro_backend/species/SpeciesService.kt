@@ -168,6 +168,11 @@ class SpeciesService(
                 ORDER BY oi.observation_image_id ASC
                 LIMIT 1
             ) obs_image ON TRUE
+            WHERE EXISTS (
+                SELECT 1
+                FROM observation o
+                WHERE o.plant_species_id = ps.plant_species_id
+            )
         """
 
         private const val LIST_SPECIES_SQL = SPECIES_BASE_SELECT + """
@@ -225,6 +230,11 @@ class SpeciesService(
                 WHERE o.plant_species_id = ps.plant_species_id
             ) observation_stats ON TRUE
             WHERE lower(replace(trim(ps.scientific_name), ' ', '_')) = :speciesId
+              AND EXISTS (
+                  SELECT 1
+                  FROM observation o
+                  WHERE o.plant_species_id = ps.plant_species_id
+              )
         """
 
         private const val SPECIES_GALLERY_SQL = """
