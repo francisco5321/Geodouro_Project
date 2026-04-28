@@ -16,7 +16,9 @@ class RoutePlanRepository(
         remoteRoutePlanService.fetchRoutePlans(
             userId = session.userId,
             authToken = session.authToken
-        ).map { it.toDomain() }
+        )
+            .map { it.toDomain() }
+            .filter { it.stopCount > 0 }
     }
 
     suspend fun fetchRoutePlanDetail(
