@@ -16,13 +16,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -31,6 +33,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,6 +41,10 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -54,10 +61,13 @@ import com.example.geodouro_project.domain.model.SessionState
 import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
+import com.example.geodouro_project.ui.theme.GeodouroGrey
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
+import com.example.geodouro_project.ui.theme.geodouroOutlinedTextFieldColors
+import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -91,7 +101,7 @@ class RoutePlanListViewModel(
                         routePlanRepository.fetchRoutePlans(sessionState)
                     }.getOrElse { error ->
                         _uiState.value = RoutePlanListUiState.Error(
-                            error.message ?: "Não foi possível carregar os percursos."
+                            error.message ?: "Nao foi possivel carregar os percursos."
                         )
                         return@launch
                     }
@@ -109,7 +119,7 @@ class RoutePlanListViewModel(
 
                 SessionState.Loading,
                 SessionState.LoggedOut -> {
-                    _uiState.value = RoutePlanListUiState.Error("Sessão indisponível.")
+                    _uiState.value = RoutePlanListUiState.Error("Sessao indisponivel.")
                 }
             }
         }
@@ -144,10 +154,24 @@ fun RoutePlanListScreen(
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoading = uiState is RoutePlanListUiState.Loading
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     val pullRefreshState = rememberPullRefreshState(
         refreshing = isLoading,
         onRefresh = { viewModel.refresh() }
     )
+    val filteredRoutePlans = remember(uiState, searchQuery) {
+        val routePlans = (uiState as? RoutePlanListUiState.Success)?.routePlans.orEmpty()
+        val query = searchQuery.trim().lowercase(Locale.ROOT)
+        if (query.isBlank()) {
+            routePlans
+        } else {
+            routePlans.filter { routePlan ->
+                routePlan.name.lowercase(Locale.ROOT).contains(query) ||
+                    routePlan.description.orEmpty().lowercase(Locale.ROOT).contains(query) ||
+                    routePlan.startLabel.orEmpty().lowercase(Locale.ROOT).contains(query)
+            }
+        }
+    }
 
     LaunchedEffect(refreshTrigger) {
         if (refreshTrigger > 0) {
@@ -190,51 +214,89 @@ fun RoutePlanListScreen(
                 .background(GeodouroBg)
                 .pullRefresh(pullRefreshState)
         ) {
-            when (val state = uiState) {
-                RoutePlanListUiState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
+            Column(modifier = Modifier.fillMaxSize()) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = geodouroOutlinedTextFieldColors(),
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = null, tint = GeodouroGrey)
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotBlank()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    Icons.Default.Clear,
+                                    contentDescription = "Limpar pesquisa",
+                                    tint = GeodouroGrey
+                                )
+                            }
+                        }
+                    },
+                    placeholder = {
+                        Text("Pesquisar por percurso, descricao ou partida...")
                     }
-                }
+                )
 
-                RoutePlanListUiState.Empty -> {
-                    RoutePlanEmptyState(
-                        title = "Ainda não existem percursos planeados.",
-                        message = "Os percursos criados na web vão aparecer aqui quando estiverem associados a esta conta.",
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                when (val state = uiState) {
+                    RoutePlanListUiState.Loading -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
 
-                is RoutePlanListUiState.Error -> {
-                    RoutePlanEmptyState(
-                        title = "Não foi possível carregar os percursos.",
-                        message = state.message,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                    RoutePlanListUiState.Empty -> {
+                        RoutePlanEmptyState(
+                            title = "Ainda nao existem percursos planeados.",
+                            message = "Os percursos criados na web vao aparecer aqui quando estiverem associados a esta conta.",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
 
-                RoutePlanListUiState.GuestRestricted -> {
-                    RoutePlanEmptyState(
-                        title = "Percursos disponíveis apenas com sessão autenticada.",
-                        message = "Entra com a tua conta para veres os percursos planeados criados na web.",
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                    is RoutePlanListUiState.Error -> {
+                        RoutePlanEmptyState(
+                            title = "Nao foi possivel carregar os percursos.",
+                            message = state.message,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
 
-                is RoutePlanListUiState.Success -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(state.routePlans, key = { it.routePlanId }) { routePlan ->
-                            RoutePlanSummaryCard(
-                                routePlan = routePlan,
-                                onClick = { onRoutePlanClick(routePlan.routePlanId) }
+                    RoutePlanListUiState.GuestRestricted -> {
+                        RoutePlanEmptyState(
+                            title = "Percursos disponiveis apenas com sessao autenticada.",
+                            message = "Entra com a tua conta para veres os percursos planeados criados na web.",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    is RoutePlanListUiState.Success -> {
+                        if (filteredRoutePlans.isEmpty()) {
+                            RoutePlanEmptyState(
+                                title = "Nenhum percurso encontrado.",
+                                message = "Tenta pesquisar por outro nome, descricao ou local de partida.",
+                                modifier = Modifier.fillMaxSize()
                             )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(filteredRoutePlans, key = { it.routePlanId }) { routePlan ->
+                                    RoutePlanSummaryCard(
+                                        routePlan = routePlan,
+                                        onClick = { onRoutePlanClick(routePlan.routePlanId) }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -300,7 +362,7 @@ private fun RoutePlanSummaryCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RoutePlanMetaChip("${routePlan.stopCount} paragens")
                 RoutePlanMetaChip(
-                    routePlan.startLabel?.takeIf { it.isNotBlank() } ?: "Início na primeira paragem"
+                    routePlan.startLabel?.takeIf { it.isNotBlank() } ?: "Inicio na primeira paragem"
                 )
             }
         }
