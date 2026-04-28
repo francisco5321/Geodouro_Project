@@ -117,8 +117,12 @@ class AuthRepository(
             validatedState
         }.getOrElse {
             lastValidatedToken = null
-            sessionStorage.clearSession()
-            SessionState.LoggedOut
+            if (it is IllegalArgumentException) {
+                sessionStorage.clearSession()
+                SessionState.LoggedOut
+            } else {
+                authenticatedState
+            }
         }
     }
 
