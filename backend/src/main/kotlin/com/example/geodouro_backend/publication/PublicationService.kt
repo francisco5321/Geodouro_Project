@@ -86,6 +86,105 @@ class PublicationService(
         )
     }
 
+    fun getPublicationById(publicationId: Int): PublicationResponse {
+        return jdbcTemplate.query(
+            PUBLICATION_BY_ID_SQL,
+            MapSqlParameterSource("publicationId", publicationId),
+            publicationRowMapper
+        ).firstOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Publication not found for publicationId=$publicationId")
+    }
+
+    fun updatePublication(publicationId: Int, request: SavePublicationRequest, authenticatedUserId: Int?): PublicationResponse {
+        requireManageAccess(publicationId, authenticatedUserId)
+        val status = request.status?.trim()?.lowercase()
+        if (status != null && status !in setOf("draft", "published")) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado editorial invalido")
+        }
+
+        jdbcTemplate.update(
+            """
+            UPDATE publication
+            SET title = :title,
+                description = :description,
+                status = COALESCE(:status, status),
+                published_at = CASE WHEN :status = 'published' THEN CURRENT_TIMESTAMP ELSE published_at END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE publication_id = :publicationId
+            """.trimIndent(),
+            MapSqlParameterSource()
+                .addValue("publicationId", publicationId)
+                .addValue("title", request.title?.trim()?.takeIf { it.isNotBlank() })
+                .addValue("description", request.description?.trim()?.takeIf { it.isNotBlank() })
+                .addValue("status", status)
+        )
+        syncObservationPublicationState(publicationId)
+        return getPublicationById(publicationId)
+    }
+
+    fun deletePublication(publicationId: Int, authenticatedUserId: Int?) {
+        requireManageAccess(publicationId, authenticatedUserId)
+        val observationId = jdbcTemplate.queryForObject(
+            "SELECT observation_id FROM publication WHERE publication_id = :publicationId",
+            MapSqlParameterSource("publicationId", publicationId),
+            Int::class.java
+        )
+        jdbcTemplate.update(
+            "DELETE FROM publication_image WHERE publication_id = :publicationId",
+            MapSqlParameterSource("publicationId", publicationId)
+        )
+        jdbcTemplate.update(
+            "DELETE FROM publication WHERE publication_id = :publicationId",
+            MapSqlParameterSource("publicationId", publicationId)
+        )
+        if (observationId != null) {
+            jdbcTemplate.update(
+                "UPDATE observation SET is_published = FALSE, updated_at = NOW() WHERE observation_id = :observationId",
+                MapSqlParameterSource("observationId", observationId)
+            )
+        }
+    }
+
+    private fun requireManageAccess(publicationId: Int, authenticatedUserId: Int?) {
+        if (authenticatedUserId == null) {
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao obrigatoria")
+        }
+        val canManage = jdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM publication p
+            JOIN app_user requester ON requester.user_id = :requesterId
+            WHERE p.publication_id = :publicationId
+              AND (p.user_id = :requesterId OR COALESCE(requester.role, 'user') = 'admin')
+            """.trimIndent(),
+            MapSqlParameterSource()
+                .addValue("publicationId", publicationId)
+                .addValue("requesterId", authenticatedUserId),
+            Int::class.java
+        ) ?: 0
+        if (canManage <= 0) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para gerir esta publicacao")
+        }
+    }
+
+    private fun syncObservationPublicationState(publicationId: Int) {
+        jdbcTemplate.update(
+            """
+            UPDATE observation o
+            SET is_published = EXISTS (
+                SELECT 1
+                FROM publication p
+                WHERE p.observation_id = o.observation_id
+                  AND p.status = 'published'
+            ),
+            updated_at = NOW()
+            WHERE o.observation_id = (
+                SELECT observation_id FROM publication WHERE publication_id = :publicationId
+            )
+            """.trimIndent(),
+            MapSqlParameterSource("publicationId", publicationId)
+        )
+    }
+
     private data class ObservationForPublication(
         val observationId: Int,
         val userId: Int,
@@ -108,7 +207,11 @@ class PublicationService(
                 publicationId = rs.getInt("publication_id"),
                 observationId = rs.getInt("observation_id"),
                 deviceObservationId = UUID.fromString(rs.getString("device_observation_id")),
+                userId = rs.getInt("user_id"),
+                plantSpeciesId = rs.getObject("plant_species_id", java.lang.Integer::class.java)?.toInt(),
                 userDisplayName = rs.getString("user_display_name") ?: "Utilizador",
+                title = rs.getString("title"),
+                description = rs.getString("description"),
                 scientificName = rs.getString("scientific_name"),
                 commonName = rs.getString("common_name"),
                 imagePath = rs.getString("image_path"),
@@ -154,7 +257,11 @@ class PublicationService(
         private const val PUBLICATION_SELECT_SQL = """
             SELECT p.publication_id,
                    p.observation_id,
+                   p.user_id,
+                   p.plant_species_id,
                    COALESCE(o.device_observation_id, synthetic_device_observation_id(o.observation_id)) AS device_observation_id,
+                   p.title,
+                   p.description,
                    COALESCE(
                        NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
                        NULLIF(u.first_name, ''),
@@ -190,6 +297,11 @@ class PublicationService(
             WHERE o.device_observation_id = :deviceObservationId
                OR synthetic_device_observation_id(o.observation_id) = :deviceObservationId
             ORDER BY p.published_at DESC
+        """
+
+        private const val PUBLICATION_BY_ID_SQL = PUBLICATION_SELECT_SQL + """
+            WHERE p.publication_id = :publicationId
+            LIMIT 1
         """
     }
 }

@@ -125,6 +125,44 @@ class ObservationService(
         return getObservationDetail(deviceObservationId)
     }
 
+    fun deleteObservation(observationId: Int, authenticatedUserId: Int?) {
+        if (authenticatedUserId == null) {
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao obrigatoria para remover observacoes")
+        }
+
+        val row = jdbcTemplate.query(
+            """
+            SELECT o.user_id, COALESCE(u.role, 'user') AS requester_role
+            FROM observation o
+            CROSS JOIN app_user u
+            WHERE o.observation_id = :observationId
+              AND u.user_id = :requesterId
+            """.trimIndent(),
+            MapSqlParameterSource()
+                .addValue("observationId", observationId)
+                .addValue("requesterId", authenticatedUserId)
+        ) { rs, _ -> rs.getInt("user_id") to rs.getString("requester_role") }.firstOrNull()
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Observacao nao encontrada")
+
+        val (ownerId, requesterRole) = row
+        if (ownerId != authenticatedUserId && requesterRole != "admin") {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para remover esta observacao")
+        }
+
+        jdbcTemplate.update(
+            "DELETE FROM publication WHERE observation_id = :observationId",
+            MapSqlParameterSource("observationId", observationId)
+        )
+        jdbcTemplate.update(
+            "DELETE FROM observation_image WHERE observation_id = :observationId",
+            MapSqlParameterSource("observationId", observationId)
+        )
+        jdbcTemplate.update(
+            "DELETE FROM observation WHERE observation_id = :observationId",
+            MapSqlParameterSource("observationId", observationId)
+        )
+    }
+
     private fun upsertObservationInternal(
         request: UpsertObservationRequest,
         storedImagePaths: List<String>,
@@ -217,6 +255,18 @@ class ObservationService(
     }
 
     private fun resolvePlantSpeciesId(request: UpsertObservationRequest): Int {
+        request.plantSpeciesId?.let { providedPlantSpeciesId ->
+            val exists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM plant_species WHERE plant_species_id = :plantSpeciesId",
+                MapSqlParameterSource("plantSpeciesId", providedPlantSpeciesId),
+                Int::class.java
+            ) ?: 0
+            if (exists <= 0) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Especie nao encontrada")
+            }
+            return providedPlantSpeciesId
+        }
+
         val scientificName = request.enrichedScientificName?.trim()?.takeIf { it.isNotBlank() }
             ?: request.predictedScientificName.trim()
         val commonName = request.enrichedCommonName?.trim()?.takeIf { it.isNotBlank() }
@@ -319,6 +369,7 @@ class ObservationService(
             observationId = rs.getInt("observation_id"),
             deviceObservationId = rs.getObject("device_observation_id", UUID::class.java),
             userId = rs.getInt("user_id"),
+            plantSpeciesId = rs.getObject("plant_species_id", java.lang.Integer::class.java)?.toInt(),
             scientificName = rs.getString("scientific_name"),
             commonName = rs.getString("common_name"),
             family = rs.getString("family"),
@@ -344,6 +395,7 @@ class ObservationService(
             SELECT o.observation_id,
                    COALESCE(o.device_observation_id, synthetic_device_observation_id(o.observation_id)) AS device_observation_id,
                    o.user_id,
+                   o.plant_species_id,
                    COALESCE(o.enriched_scientific_name, o.predicted_scientific_name, ps.scientific_name) AS scientific_name,
                    COALESCE(o.enriched_common_name, ps.common_name) AS common_name,
                    COALESCE(o.enriched_family, ps.family) AS family,
@@ -467,5 +519,4 @@ class ObservationService(
         """.trimIndent()
     }
 }
-
 

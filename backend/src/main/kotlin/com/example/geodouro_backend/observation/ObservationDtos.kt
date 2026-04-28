@@ -10,6 +10,7 @@ import java.util.UUID
 data class UpsertObservationRequest(
     val deviceObservationId: UUID? = null,
     val userId: Int? = null,
+    val plantSpeciesId: Int? = null,
     @field:Size(max = 255)
     val guestLabel: String? = null,
     val imageUri: String? = null,
@@ -57,6 +58,7 @@ data class ObservationDetailResponse(
     val observationId: Int,
     val deviceObservationId: UUID,
     val userId: Int,
+    val plantSpeciesId: Int?,
     val scientificName: String,
     val commonName: String?,
     val family: String?,

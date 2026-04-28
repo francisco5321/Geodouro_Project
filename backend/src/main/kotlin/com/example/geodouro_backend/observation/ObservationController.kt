@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -96,6 +97,16 @@ class ObservationController(
         val authenticatedUserId = authTokenService.resolveUserId(authorizationHeader)
         logger.info("PATCH /api/observations/{} authenticatedUserId={}", deviceObservationId, authenticatedUserId)
         return observationService.updateObservationMetadata(deviceObservationId, request, authenticatedUserId)
+    }
+
+    @DeleteMapping("/{observationId}")
+    fun deleteObservation(
+        @PathVariable observationId: Int,
+        @RequestHeader(name = "Authorization", required = false) authorizationHeader: String?
+    ) {
+        val authenticatedUserId = authTokenService.resolveUserId(authorizationHeader)
+        logger.info("DELETE /api/observations/{} authenticatedUserId={}", observationId, authenticatedUserId)
+        observationService.deleteObservation(observationId, authenticatedUserId)
     }
 
     companion object {
