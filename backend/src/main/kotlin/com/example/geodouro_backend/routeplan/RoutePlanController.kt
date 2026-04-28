@@ -128,7 +128,7 @@ class RoutePlanController(
     private fun resolveUserId(authorizationHeader: String?, fallbackUserId: Int?): Int {
         return authTokenService.resolveUserId(authorizationHeader)
             ?: fallbackUserId
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao necessaria")
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticação necessária")
     }
 
     companion object {

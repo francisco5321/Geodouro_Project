@@ -84,7 +84,7 @@ class VisitTargetService(
         )
 
         if (affected == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nao encontrado")
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita não encontrado") //3
         }
     }
 
@@ -99,9 +99,9 @@ class VisitTargetService(
                     .addValue("userId", userId)
                     .addValue("savedVisitTargetId", savedVisitTargetId),
                 visitTargetRowMapper
-            ) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nao encontrado")
+            ) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita não encontrado") //5
         } catch (_: EmptyResultDataAccessException) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nao encontrado")
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita não encontrado") //4
         }
     }
 
@@ -110,7 +110,7 @@ class VisitTargetService(
             "species", "plant_species", "plant-species" -> "species"
             "publication" -> "publication"
             "observation" -> "observation"
-            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo invalido")
+            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo inválido") //2
         }
     }
 
@@ -125,7 +125,7 @@ class VisitTargetService(
                   AND latitude IS NOT NULL
                   AND longitude IS NOT NULL
             """.trimIndent() to "targetId"
-            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo invalido")
+            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo inválido")
         }
 
         val count = jdbcTemplate.queryForObject(
@@ -144,7 +144,7 @@ class VisitTargetService(
             "species" -> "plant_species_id"
             "publication" -> "publication_id"
             "observation" -> "observation_id"
-            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo invalido")
+            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo inválido")
         }
 
         return try {
@@ -187,7 +187,7 @@ class VisitTargetService(
         ) ?: 0
 
         if (count == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nao encontrado")
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita não encontrado")
         }
     }
 
@@ -225,7 +225,7 @@ class VisitTargetService(
             "species" -> "plant_species_id"
             "publication" -> "publication_id"
             "observation" -> "observation_id"
-            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo invalido")
+            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo inválido")
         }
 
         return jdbcTemplate.queryForObject(
@@ -238,28 +238,28 @@ class VisitTargetService(
                 .addValue("userId", userId)
                 .addValue("targetId", targetId),
             Int::class.java
-        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Nao foi possivel guardar o alvo")
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Não foi possível guardar o alvo")
     }
 
     private fun addedMessage(targetType: String): String = when (targetType) {
-        "species" -> "Especie adicionada a Quero visitar."
-        "publication" -> "Publicacao adicionada a Quero visitar."
-        "observation" -> "Observacao adicionada a Quero visitar."
+        "species" -> "Espécie adicionada a Quero visitar."
+        "publication" -> "Publicação adicionada a Quero visitar."
+        "observation" -> "Observação adicionada a Quero visitar."
         else -> "Alvo adicionado a Quero visitar."
     }
 
     private fun removedMessage(targetType: String): String = when (targetType) {
-        "species" -> "Especie removida da tua lista de visita."
-        "publication" -> "Publicacao removida da tua lista de visita."
-        "observation" -> "Observacao removida da tua lista de visita."
+        "species" -> "Espécie removida da tua lista de visita."
+        "publication" -> "Publicação removida da tua lista de visita."
+        "observation" -> "Observação removida da tua lista de visita."
         else -> "Alvo removido da tua lista de visita."
     }
 
     private fun notFoundMessage(targetType: String): String = when (targetType) {
-        "species" -> "Especie nao encontrada."
-        "publication" -> "Publicacao nao encontrada."
-        "observation" -> "Observacao nao encontrada."
-        else -> "Alvo nao encontrado."
+        "species" -> "Espécie não encontrada."
+        "publication" -> "Publicação não encontrada."
+        "observation" -> "Observação não encontrada."
+        else -> "Alvo não encontrado."
     }
 
     companion object {
@@ -296,19 +296,19 @@ class VisitTargetService(
                            NULLIF(obs_target.enriched_common_name, ''),
                            NULLIF(species_target.common_name, ''),
                            NULLIF(species_target.scientific_name, ''),
-                           'Observacao botanica'
+                           'Observação botânica'
                        )
                        WHEN svt.publication_id IS NOT NULL THEN COALESCE(
                            NULLIF(publication_target.title, ''),
                            NULLIF(species_target.common_name, ''),
                            NULLIF(publication_observation.enriched_common_name, ''),
                            NULLIF(species_target.scientific_name, ''),
-                           'Publicacao botanica'
+                           'Publicação botânica'
                        )
                        WHEN svt.plant_species_id IS NOT NULL THEN COALESCE(
                            NULLIF(species_target.common_name, ''),
                            NULLIF(species_target.scientific_name, ''),
-                           'Especie selecionada'
+                           'Espécie selecionada'
                        )
                        ELSE 'Alvo de visita'
                    END AS title,
@@ -317,17 +317,17 @@ class VisitTargetService(
                            NULLIF(obs_target.enriched_scientific_name, ''),
                            NULLIF(obs_target.predicted_scientific_name, ''),
                            NULLIF(species_target.scientific_name, ''),
-                           'Observacao com coordenadas'
+                           'Observação com coordenadas'
                        )
                        WHEN svt.publication_id IS NOT NULL THEN COALESCE(
                            NULLIF(species_target.scientific_name, ''),
                            NULLIF(publication_observation.enriched_scientific_name, ''),
                            NULLIF(publication_observation.predicted_scientific_name, ''),
-                           'Publicacao associada a observacao'
+                           'Publicação associada a observação'
                        )
                        WHEN svt.plant_species_id IS NOT NULL THEN COALESCE(
                            NULLIF(species_target.scientific_name, ''),
-                           'Sem classificacao cientifica'
+                           'Sem classificação científ ica'
                        )
                        ELSE NULLIF(svt.notes, '')
                    END AS subtitle,

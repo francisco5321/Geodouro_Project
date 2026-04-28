@@ -187,7 +187,7 @@ class PlantRepository(
             !isNonPlantPrediction(localResult.predictedSpecies) &&
                 (allowManualReview || !isRejectedPrediction(localResult.predictedSpecies, localResult.rejectionReason))
         ) {
-            "Nao e possivel guardar uma observacao sem planta reconhecida ou com planta desconhecida"
+            "Não e possível guardar uma observação sem planta reconhecida ou com planta desconhecida"
         }
 
         val resolvedLocation = resolveBestEffortLocation(localResult.latitude, localResult.longitude)
@@ -1018,7 +1018,7 @@ class PlantRepository(
             wikipediaUrl = wikipediaUrl,
             heroImageUri = thumbnailUrl,
             galleryImageUris = listOfNotNull(thumbnailUrl),
-            locationSummary = "Sem detalhe remoto adicional disponivel para esta especie.",
+            locationSummary = "Sem detalhe remoto adicional disponível para esta espécie.",
             observations = emptyList()
         )
     }
@@ -1107,18 +1107,18 @@ class PlantRepository(
     private fun buildLocalLocationSummary(observations: List<ObservationEntity>): String {
         val withLocation = observations.filter { it.latitude != null && it.longitude != null }
         if (withLocation.isEmpty()) {
-            return "Sem localizacoes registadas para esta especie."
+            return "Sem localizações registadas para esta espécie."
         }
 
         val first = withLocation.first()
         val last = withLocation.last()
         return if (withLocation.size == 1) {
-            "1 observacao com localizacao registada em GPS %.5f, %.5f".format(
+            "1 observação com localização registada em GPS %.5f, %.5f".format(
                 first.latitude,
                 first.longitude
             )
         } else {
-            "Localizacoes registadas em ${withLocation.size} observacoes. Intervalo aproximado: %.5f, %.5f ate %.5f, %.5f".format(
+            "Localizações registadas em ${withLocation.size} observações. Intervalo aproximado: %.5f, %.5f até %.5f, %.5f".format(
                 first.latitude,
                 first.longitude,
                 last.latitude,
@@ -1173,7 +1173,7 @@ class PlantRepository(
     ): MultiImageAggregationResult = withContext(Dispatchers.Default) {
         if (imageUris.isEmpty() || imageUris.size < config.minImagesRequired) {
             throw IllegalArgumentException(
-                "Numero de imagens invalido: ${imageUris.size}. " +
+                "Número de imagens inválido: ${imageUris.size}. " +
                     "Requerido: ${config.minImagesRequired}-${config.maxImagesRequired}"
             )
         }

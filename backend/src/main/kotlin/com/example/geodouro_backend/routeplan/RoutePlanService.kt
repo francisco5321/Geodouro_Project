@@ -60,7 +60,7 @@ class RoutePlanService(
             """.trimIndent(),
             routePlanParams(userId, request),
             Int::class.java
-        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Nao foi possivel criar o percurso")
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Não foi possível criar o percurso")
 
         return RoutePlanMutationResponse(true, "Percurso criado com sucesso.", routePlanId)
     }
@@ -99,7 +99,7 @@ class RoutePlanService(
                 .addValue("userId", userId)
         )
         if (affected == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Percurso nao encontrado")
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Percurso não encontrado")
         }
     }
 
@@ -132,16 +132,16 @@ class RoutePlanService(
         if (existingPointId != null) {
             deleteRoutePlanPoint(existingPointId, userId)
             resequenceRoutePlan(routePlanId)
-            return RoutePlanStopMutationResponse(true, false, "Observacao removida do percurso.", null, savedVisitTargetId)
+            return RoutePlanStopMutationResponse(true, false, "Observação removida do percurso.", null, savedVisitTargetId)
         }
         val pointId = insertRoutePlanPoint(routePlanId, savedVisitTargetId)
-        return RoutePlanStopMutationResponse(true, true, "Observacao adicionada ao percurso.", pointId, savedVisitTargetId)
+        return RoutePlanStopMutationResponse(true, true, "Observação adicionada ao percurso.", pointId, savedVisitTargetId)
     }
 
     @Transactional
     fun removeRoutePlanPoint(routePlanPointId: Int, userId: Int): Int {
         val routePlanId = findRoutePlanIdForPoint(routePlanPointId, userId)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Ponto do percurso nao encontrado")
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Ponto do percurso não encontrado")
         deleteRoutePlanPoint(routePlanPointId, userId)
         resequenceRoutePlan(routePlanId)
         return routePlanId
@@ -180,7 +180,7 @@ class RoutePlanService(
             MapSqlParameterSource().addValue("routePlanId", routePlanId).addValue("userId", userId),
             Int::class.java
         ) ?: 0
-        if (count == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Percurso nao encontrado")
+        if (count == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Percurso não encontrado") //2
     }
 
     private fun ensureOwnedVisitTarget(savedVisitTargetId: Int, userId: Int) {
@@ -189,7 +189,7 @@ class RoutePlanService(
             MapSqlParameterSource().addValue("savedVisitTargetId", savedVisitTargetId).addValue("userId", userId),
             Int::class.java
         ) ?: 0
-        if (count == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nao encontrado")
+        if (count == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita não encontrado")
     }
 
     private fun ensureSpeciesExists(plantSpeciesId: Int) {
@@ -198,7 +198,7 @@ class RoutePlanService(
             MapSqlParameterSource("plantSpeciesId", plantSpeciesId),
             Int::class.java
         ) ?: 0
-        if (count == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Especie nao encontrada")
+        if (count == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Espécie não encontrada")
     }
 
     private fun ensureObservationWithCoordinatesExists(observationId: Int) {
@@ -213,7 +213,7 @@ class RoutePlanService(
             MapSqlParameterSource("observationId", observationId),
             Int::class.java
         ) ?: 0
-        if (count == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Observacao nao encontrada")
+        if (count == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Observação não encontrada")
     }
 
     private fun findOrCreateVisitTarget(userId: Int, columnName: String, targetId: Int): Int {
@@ -242,7 +242,7 @@ class RoutePlanService(
             """.trimIndent(),
             MapSqlParameterSource().addValue("userId", userId).addValue("targetId", targetId),
             Int::class.java
-        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Nao foi possivel guardar o alvo")
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Não foi possível guardar o alvo")
     }
 
     private fun findRoutePlanPointId(routePlanId: Int, savedVisitTargetId: Int): Int? {
@@ -275,7 +275,7 @@ class RoutePlanService(
                 .addValue("savedVisitTargetId", savedVisitTargetId)
                 .addValue("visitOrder", nextVisitOrder(routePlanId)),
             Int::class.java
-        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Nao foi possivel adicionar o ponto")
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Não foi possível adicionar o ponto")
     }
 
     private fun nextVisitOrder(routePlanId: Int): Int {
@@ -315,7 +315,7 @@ class RoutePlanService(
             """.trimIndent(),
             MapSqlParameterSource().addValue("routePlanPointId", routePlanPointId).addValue("userId", userId)
         )
-        if (affected == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Ponto do percurso nao encontrado")
+        if (affected == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Ponto do percurso não encontrado") //2
     }
 
     private fun resequenceRoutePlan(routePlanId: Int) {
@@ -467,7 +467,7 @@ class RoutePlanService(
                            NULLIF(species_target.common_name, ''),
                            NULLIF(publication_observation.enriched_common_name, ''),
                            NULLIF(species_target.scientific_name, ''),
-                           'Publicacao botanica'
+                           'Publicação botânica'
                        )
                        WHEN COALESCE(
                            svt.plant_species_id,
@@ -491,7 +491,7 @@ class RoutePlanService(
                            NULLIF(species_target.scientific_name, ''),
                            NULLIF(publication_observation.enriched_scientific_name, ''),
                            NULLIF(publication_observation.predicted_scientific_name, ''),
-                           'Publicacao associada a observacao'
+                           'Publicação associada a observação'
                        )
                        WHEN COALESCE(
                            svt.plant_species_id,
@@ -499,7 +499,7 @@ class RoutePlanService(
                            publication_target.plant_species_id
                        ) IS NOT NULL THEN COALESCE(
                            NULLIF(species_target.scientific_name, ''),
-                           'Sem classificacao cientifica'
+                           'Sem classificação científ ica'
                        )
                        ELSE COALESCE(
                            NULLIF(svt.notes, ''),

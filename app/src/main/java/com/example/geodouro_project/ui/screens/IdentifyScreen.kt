@@ -274,7 +274,7 @@ fun IdentifyScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = if (uiState.isProcessing) "A identificar..." else "Identificar especie",
+                        text = if (uiState.isProcessing) "A identificar..." else "Identificar espécie",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = GeodouroTextPrimary,

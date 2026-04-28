@@ -474,7 +474,7 @@ private fun SessionLoadingScreen() {
                     ) {
                         CircularProgressIndicator()
                         Text(
-                            text = "A restaurar sessao...",
+                            text = "A restaurar sessão...",
                             modifier = Modifier.padding(top = 12.dp),
                             color = GeodouroTextSecondary
                         )

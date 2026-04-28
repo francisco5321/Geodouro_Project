@@ -1,22 +1,22 @@
 # YOLO Plant Detection Training
 
-Esta pasta prepara a transicao de "classificacao direta da imagem inteira" para um pipeline em dois passos:
+Esta pasta prepara a transição de "classificação direta da imagem inteira" para um pipeline em dois passos:
 
-1. `YOLO` deteta se existe planta na imagem e onde ela esta.
+1. `YOLO` deteta se existe planta na imagem e onde ela está.
 2. `MobileNetV3-Small` classifica apenas o recorte detetado.
 
 ## O que falta para treinar YOLO corretamente
 
-Para detecao, nao basta ter imagens com o nome da especie. Sao precisas **anotacoes de bounding boxes**.
+Para deteção, não basta ter imagens com o nome da espécie. São precisas **anotações de bounding boxes**.
 
 Isto significa que, para cada imagem:
 
 - se existir planta, precisamos de pelo menos uma caixa `plant`
-- se nao existir planta, a imagem deve entrar como **negativa** com ficheiro de labels vazio
+- se não existir planta, a imagem deve entrar como **negativa** com ficheiro de labels vazio
 
-Sem estas anotacoes, o YOLO nao aprende onde esta a planta e nao resolve bem o problema atual de falsos positivos.
+Sem estas anotações, o YOLO não aprende onde está a planta e não resolve bem o problema atual de falsos positivos.
 
-## O que esta pronto nesta pasta
+## O que está pronto nesta pasta
 
 - exportar um manifesto de imagens a partir da BD
 - misturar imagens antigas do treino anterior
@@ -74,7 +74,7 @@ Edita `config.local.json` com:
 python scripts/export_detection_manifest.py --config config.local.json
 ```
 
-Se o acesso SSH ainda nao estiver funcional, o script continua com as fontes locais antigas e avisa que a parte remota falhou.
+Se o acesso SSH ainda não estiver funcional, o script continua com as fontes locais antigas e avisa que a parte remota falhou.
 
 Isto pode combinar:
 
@@ -120,7 +120,7 @@ python scripts/prepare_annotation_batch.py --config config.local.json
 Isto cria:
 
 - uma pasta com imagens prontas para anotar
-- um `metadata.csv` com origem e especie
+- um `metadata.csv` com origem e espécie
 - ficheiros `.txt` vazios como placeholder
 
 Por default, o lote inclui todas as imagens da BD remota e completa o resto com uma amostra diversa das imagens legacy.
@@ -145,7 +145,7 @@ Exemplo `imagem_001.txt`:
 
 Se a imagem for negativa, deixa o ficheiro `.txt` vazio.
 
-### Pre-anotacao automatica experimental
+### Pré-anotação automática experimental
 
 Tambem podes gerar caixas iniciais automaticamente:
 
@@ -164,7 +164,7 @@ Isto:
 Importante:
 
 - isto serve para **acelerar revisao humana**
-- nao substitui anotacao manual
+- não substitui anotação manual
 - tens sempre de rever as caixas antes de treinar
 
 ## Passo 6. Construir dataset YOLO
@@ -190,7 +190,7 @@ artifacts/yolo_plant_detector/
 - incluir bastantes imagens negativas sem planta
 - incluir plantas pequenas, desfocadas, parciais e em fundos complexos
 - medir `precision`, `recall` e `mAP50`
-- validar num conjunto manual de imagens "sem planta" que o detector nao dispara facilmente
+- validar num conjunto manual de imagens "sem planta" que o detector não dispara facilmente
 
 ## Integracao Android depois do treino
 
@@ -198,12 +198,12 @@ Quando o detector estiver validado, o pipeline da app passa a ser:
 
 1. carregar imagem
 2. correr detector
-3. se nao houver caixa com score suficiente: devolver "Nao e uma planta"
+3. se não houver caixa com score suficiente: devolver "Não é uma planta"
 4. se houver caixa: recortar melhor bbox
 5. classificar recorte no MobileNetV3-Small
-6. opcionalmente usar a confianca do detector como gate adicional
+6. opcionalmente usar a confiança do detector como gate adicional
 
 ## Nota importante
 
-O passo mais caro aqui nao e o treino em si. E a **anotacao**.
-Sem dataset anotado com caixas, nao vale a pena comecar a treinar YOLO ainda.
+O passo mais caro aqui não é o treino em si. É a **anotação**.
+Sem dataset anotado com caixas, não vale a pena começar a treinar YOLO ainda.

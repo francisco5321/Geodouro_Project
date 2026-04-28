@@ -37,7 +37,7 @@ def resolve_image_path(raw_dir: Path, stored_path: str, extra_roots: list[Path])
         if candidate.exists():
             return candidate
 
-    raise FileNotFoundError(f"Imagem nao encontrada para path '{stored_path}'.")
+    raise FileNotFoundError(f"Imagem não encontrada para path '{stored_path}'.")
 
 
 def copy_or_link(source: Path, target: Path, copy_files: bool) -> None:
@@ -157,7 +157,7 @@ def choose_hard_case_rows(df: pd.DataFrame, target_size: int, include_all_remote
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Prepara um lote inicial de anotacao YOLO.")
+    parser = argparse.ArgumentParser(description="Prepara um lote inicial de anotação YOLO.")
     parser.add_argument("--config", type=Path, default=Path("config.local.json"))
     args = parser.parse_args()
 
@@ -168,7 +168,7 @@ def main() -> None:
     manifests_dir = Path(dataset_cfg["manifests_dir"])
     manifest_path = manifests_dir / dataset_cfg["manifest_name"]
     if not manifest_path.exists():
-        raise FileNotFoundError(f"Manifesto nao encontrado: {manifest_path}")
+        raise FileNotFoundError(f"Manifesto não encontrado: {manifest_path}")
 
     raw_dir = Path(dataset_cfg["raw_dir"])
     extra_roots = [Path(path) for path in config.get("legacy_sources", {}).get("root_dirs", [])]
@@ -242,9 +242,9 @@ def main() -> None:
     }
     (batch_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"Lote de anotacao criado em: {batch_dir.resolve()}")
+    print(f"Lote de anotação criado em: {batch_dir.resolve()}")
     print(f"Imagens: {len(exported_df)}")
-    print(f"Especies: {exported_df['scientific_name'].nunique()}")
+    print(f"Espécies: {exported_df['scientific_name'].nunique()}")
     print(f"Origens: {exported_df['source_kind'].value_counts().to_dict()}")
 
 

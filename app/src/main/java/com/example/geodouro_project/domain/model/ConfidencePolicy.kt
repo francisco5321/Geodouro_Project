@@ -1,7 +1,7 @@
 package com.example.geodouro_project.domain.model
 
 /**
- * Estados de confianca para decisoes de classificacao.
+ * Estados de confiança para decisões de classificação.
  */
 sealed class ConfidenceState {
     object CONFIDENT : ConfidenceState()
@@ -11,7 +11,7 @@ sealed class ConfidenceState {
 }
 
 /**
- * Avalia a confianca de um resultado de classificacao
+ * Avalia a confiança de um resultado de classificação
  * e decide quando pedir confirmacao ou fallback.
  */
 class ConfidencePolicy {
@@ -24,7 +24,7 @@ class ConfidencePolicy {
     }
 
     /**
-     * Avalia o estado de confianca com base na previsao principal e alternativa.
+     * Avalia o estado de confiança com base na previsão principal e alternativa.
      */
     fun evaluate(
         confidence: Float,

@@ -216,7 +216,7 @@ class MobileNetV3Classifier(
         val modelPath = try {
             copyAssetToFilesDir(resolvedModelFileName)
         } catch (exception: Exception) {
-            modelLoadDiagnostic = "Asset do modelo nao encontrado em assets/$resolvedModelFileName"
+            modelLoadDiagnostic = "Asset do modelo não encontrado em assets/$resolvedModelFileName"
             return null
         }
 
@@ -238,7 +238,7 @@ class MobileNetV3Classifier(
                 errorMessage.contains("constants.pkl", ignoreCase = true)
 
         if (probablyNotTorchScript) {
-            return "Arquivo invalido para PyTorch Android. Exporte para TorchScript (.pt ou .ptl)."
+            return "Arquivo inválido para PyTorch Android. Exporte para TorchScript (.pt ou .ptl)."
         }
 
         if (errorMessage.isNotBlank()) {
@@ -346,8 +346,8 @@ class MobileNetV3Classifier(
         const val DEFAULT_INPUT_SIZE = 224
         const val MODEL_DISPLAY_NAME = "MobileNetV3-Small (PyTorch)"
         const val FALLBACK_LABEL = "Modelo PyTorch ainda indisponivel"
-        const val NON_PLANT_LABEL = "Nao e uma planta"
-        const val UNKNOWN_PLANT_LABEL = "Nao conhecemos essa planta"
+        const val NON_PLANT_LABEL = "Não é uma planta"
+        const val UNKNOWN_PLANT_LABEL = "Não conhecemos essa planta"
         const val MIN_DISPLAY_CONFIDENCE = 0.15f
 
         private const val MAX_DISPLAY_CANDIDATES = 5

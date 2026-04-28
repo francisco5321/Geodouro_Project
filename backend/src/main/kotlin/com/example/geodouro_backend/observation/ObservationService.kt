@@ -98,7 +98,7 @@ class ObservationService(
             requesterIsAdmin
 
         if (!canAccess) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para consultar esta observacao")
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Não tens permissão para consultar esta observação")
         }
 
         return detail
@@ -110,12 +110,12 @@ class ObservationService(
         authenticatedUserId: Int? = null
     ): ObservationDetailResponse {
         if (authenticatedUserId == null) {
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao obrigatoria para editar observacoes")
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticação obrigatória para editar observações")
         }
         val requesterIsAdmin = isAdmin(authenticatedUserId)
         val current = getObservationDetail(deviceObservationId, authenticatedUserId)
         if (!requesterIsAdmin && current.userId != authenticatedUserId) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para editar esta observacao")
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Não tens permissão para editar esta observação")
         }
         if (current.isPublished) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot update a published observation")
@@ -124,7 +124,7 @@ class ObservationService(
         if (current.requiresManualIdentification && request.scientificName.isNullOrBlank()) {
             throw ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
-                "Esta observacao precisa de uma especie antes de sair da fila de revisao manual"
+                "Esta observação precisa de uma espécie antes de sair da fila de revisão manual"
             )
         }
 
@@ -151,7 +151,7 @@ class ObservationService(
 
     fun deleteObservation(observationId: Int, authenticatedUserId: Int?) {
         if (authenticatedUserId == null) {
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao obrigatoria para remover observacoes")
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticação obrigatória para remover observações")
         }
 
         val row = jdbcTemplate.query(
@@ -166,11 +166,11 @@ class ObservationService(
                 .addValue("observationId", observationId)
                 .addValue("requesterId", authenticatedUserId)
         ) { rs, _ -> rs.getInt("user_id") to rs.getString("requester_role") }.firstOrNull()
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Observacao nao encontrada")
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Observação não encontrada")
 
         val (ownerId, requesterRole) = row
         if (ownerId != authenticatedUserId && requesterRole != "admin") {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para remover esta observacao")
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Não tens permissão para remover esta observação")
         }
 
         jdbcTemplate.update(
@@ -195,7 +195,7 @@ class ObservationService(
     ): ObservationResponse {
         validateCoordinates(request.latitude, request.longitude)
         if (authenticatedUserId == null && request.userId != null) {
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao obrigatoria para guardar observacoes de utilizadores autenticados")
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticação obrigatória para guardar observações de utilizadores autenticados")
         }
 
         val deviceObservationId = request.deviceObservationId ?: UUID.randomUUID()
@@ -234,7 +234,7 @@ class ObservationService(
             .firstOrNull()
             ?: throw ResponseStatusException(
                 HttpStatus.FORBIDDEN,
-                "Nao tens permissao para substituir esta observacao"
+                "Não tens permissão para substituir esta observação"
             )
         replaceObservationImages(response.observationId, storedImagePaths)
         if (plantSpeciesId != null) {
@@ -294,7 +294,7 @@ class ObservationService(
                 Int::class.java
             ) ?: 0
             if (exists <= 0) {
-                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Especie nao encontrada")
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Espécie não encontrada")
             }
             return providedPlantSpeciesId
         }

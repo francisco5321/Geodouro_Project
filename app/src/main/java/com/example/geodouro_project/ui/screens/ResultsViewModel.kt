@@ -110,8 +110,8 @@ class ResultsViewModel(
                 lastInferenceResult = localInferenceResult
                 lastEnrichedData = null
                 val sourceLabel = when {
-                    isUnknownPlant -> "Planta desconhecida. Nao encontrada nas bases de dados disponiveis."
-                    else -> "Nao foi detetada nenhuma planta na imagem."
+                    isUnknownPlant -> "Planta desconhecida. Não encontrada nas bases de dados disponíveis."
+                    else -> "Não foi detetada nenhuma planta na imagem."
                 }
                 _uiState.value = ResultsUiState.Success(
                     result = buildUiModel(localInferenceResult, null),
@@ -133,7 +133,7 @@ class ResultsViewModel(
                 lastEnrichedData = null
                 _uiState.value = ResultsUiState.Success(
                     result = buildUiModel(rerankedInference, null),
-                    sourceLabel = "Nao foi detetada nenhuma planta na imagem."
+                    sourceLabel = "Não foi detetada nenhuma planta na imagem."
                 )
                 return@launch
             }
@@ -189,7 +189,7 @@ class ResultsViewModel(
                 _uiState.value = ResultsUiState.MultiImageSuccess(
                     result = buildMultiImageUiModel(aggregationResult, null),
                     sourceLabel = if (isUnknownPlantPrediction(aggregationResult.finalPredictedSpecies, null)) {
-                        "Foi detetada uma planta, mas ainda nao a conseguimos identificar automaticamente."
+                        "Foi detetada uma planta, mas ainda não a conseguimos identificar automaticamente."
                     } else {
                         "Nenhuma das imagens apresentou uma planta reconhecivel."
                     }
@@ -287,9 +287,9 @@ class ResultsViewModel(
                     (isUnknownPlant && !allowManualReview)) {
                     _uiState.value = ResultsUiState.Error(
                         if (isUnknownPlant) {
-                            "Esta planta ainda nao foi identificada. Usa o envio para a administracao."
+                            "Esta planta ainda não foi identificada. Usa o envio para a administração."
                         } else {
-                            "A imagem analisada nao contem uma planta reconhecivel, por isso nao sera guardada."
+                            "A imagem analisada não contem uma planta reconhecivel, por isso não sera guardada."
                         }
                     )
                     return@launch
@@ -320,22 +320,22 @@ class ResultsViewModel(
                 Log.d(TAG, "saveObservation result observationId=${saveResult.observationId} syncStatus=${saveResult.syncStatus}")
                 val message = when (saveResult.syncStatus) {
                     ObservationSyncStatus.SYNCED -> if (allowManualReview) {
-                        "Observacao enviada para a administracao e sincronizada."
+                        "Observação enviada para a administração e sincronizada."
                     } else {
-                        "Observacao guardada e sincronizada."
+                        "Observação guardada e sincronizada."
                     }
                     ObservationSyncStatus.PENDING -> {
                         if (allowManualReview) {
-                            "Observacao enviada localmente. Ficara pendente ate haver ligacao ao backend."
+                            "Observação enviada localmente. Ficará pendente até haver ligação ao backend."
                         } else {
-                            "Observacao guardada localmente. A sincronizacao fica pendente ate haver ligacao ao backend."
+                            "Observação guardada localmente. A sincronização fica pendente até haver ligação ao backend."
                         }
                     }
                     ObservationSyncStatus.FAILED -> {
                         if (allowManualReview) {
-                            "Observacao guardada localmente para revisao manual. Nao foi possivel contactar o backend por agora."
+                            "Observação guardada localmente para revisão manual. Não foi possível contactar o backend por agora."
                         } else {
-                            "Observacao guardada localmente. Nao foi possivel contactar o backend, por isso tentaremos sincronizar novamente mais tarde."
+                            "Observação guardada localmente. Não foi possível contactar o backend, por isso tentaremos sincronizar novamente mais tarde."
                         }
                     }
                 }
@@ -349,7 +349,7 @@ class ResultsViewModel(
             } catch (e: Exception) {
                 Log.e(TAG, "Error while confirming observation", e)
                 _uiState.value = ResultsUiState.Error(
-                    "Erro ao guardar observacao: ${e.message ?: "Desconhecido"}"
+                    "Erro ao guardar observação: ${e.message ?: "Desconhecido"}"
                 )
             } finally {
                 confirmationInProgress = false
@@ -376,13 +376,13 @@ class ResultsViewModel(
         val commonName = when {
             isPlantDetected -> enrichedData?.commonName ?: "Nome comum indisponivel"
             isUnknownPlant -> "Pretende enviar à administração para melhor análise?"
-            else -> "Objeto nao identificado como planta"
+            else -> "Objeto não identificado como planta"
         }
 
         val family = when {
-            isPlantDetected -> enrichedData?.family ?: "Familia indisponivel"
-            isUnknownPlant -> "Familia desconhecida"
-            else -> "Sem familia botanica"
+            isPlantDetected -> enrichedData?.family ?: "Família indisponível"
+            isUnknownPlant -> "Família desconhecida"
+            else -> "Sem família botânica"
         }
 
         return ResultUiModel(
@@ -422,18 +422,18 @@ class ResultsViewModel(
                 MobileNetV3Classifier.NON_PLANT_LABEL
             },
             commonName = if (isPlantDetected) {
-                enrichedData?.commonName ?: "Nome comum indisponivel"
+                enrichedData?.commonName ?: "Nome comum indisponível"
             } else if (isUnknownPlant) {
-                "Pretende enviar a observacao para a administracao?"
+                "Pretende enviar a observação para a administração?"
             } else {
                 "Nenhuma planta reconhecida nas imagens"
             },
             family = if (isPlantDetected) {
-                enrichedData?.family ?: "Familia indisponivel"
+                enrichedData?.family ?: "Família indisponível"
             } else if (isUnknownPlant) {
-                "Familia desconhecida"
+                "Família desconhecida"
             } else {
-                "Sem familia botanica"
+                "Sem família botânica"
             },
             aggregatedConfidence = multiImageResult.aggregatedConfidence,
             imagesCount = multiImageResult.totalImagesAnalyzed,
@@ -464,11 +464,11 @@ class ResultsViewModel(
         val baseLabel = when (origin) {
             EnrichmentOrigin.CACHE -> "Dados enriquecidos via cache local."
             EnrichmentOrigin.NETWORK -> "Dados enriquecidos via iNaturalist online."
-            EnrichmentOrigin.LOCAL_ONLY -> "Sem dados remotos para esta especie. A mostrar apenas inferencia local."
+            EnrichmentOrigin.LOCAL_ONLY -> "Sem dados remotos para esta espécie. A mostrar apenas inferência local."
         }
 
         return if (rerankApplied) {
-            "$baseLabel Revalidado por similaridade visual devido a baixa confianca."
+            "$baseLabel Revalidado por similaridade visual devido a baixa confiança."
         } else {
             baseLabel
         }

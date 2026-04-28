@@ -36,12 +36,12 @@ def main() -> None:
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     if not manifest_path.exists():
-        raise FileNotFoundError(f"Manifesto nao encontrado: {manifest_path}")
+        raise FileNotFoundError(f"Manifesto não encontrado: {manifest_path}")
 
     df = pd.read_csv(manifest_path)
     remote_df = df[df.get("source_kind", "") == "remote_db"].copy()
     if remote_df.empty:
-        print("Nao existem imagens remotas no manifesto.")
+        print("Não existem imagens remotas no manifesto.")
         return
 
     relative_paths = sorted(

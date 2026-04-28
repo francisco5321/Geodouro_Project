@@ -79,16 +79,16 @@ class IdentifyViewModel(
                 it.copy(
                     latitude = null,
                     longitude = null,
-                    locationLabel = "Sem permissao de localizacao",
+                    locationLabel = "Sem permissão de localização",
                     shouldRequestLocationPermission = false
                 )
             }
-            emitMessage("Permissao de localizacao negada.")
+            emitMessage("Permissão de localização negada.")
         }
     }
 
     fun onCameraPermissionDenied() {
-        emitMessage("Permissao de camera negada.")
+        emitMessage("Permissão de câmara negada.")
     }
 
     fun refreshLocation() {
@@ -97,7 +97,7 @@ class IdentifyViewModel(
                 it.copy(
                     latitude = null,
                     longitude = null,
-                    locationLabel = "Sem permissao de localizacao"
+                    locationLabel = "Sem permissão de localização"
                 )
             }
             return
@@ -209,12 +209,12 @@ class IdentifyViewModel(
                 val imageUri = latestState.capturedImageUris.first()
                 val bitmap = withContext(Dispatchers.IO) {
                     imageStorage.decodeSampledBitmap(imageUri)
-                } ?: throw IllegalStateException("Nao foi possivel ler a imagem selecionada")
+                } ?: throw IllegalStateException("Não foi possível ler a imagem selecionada")
                 val prediction = inferenceEngine.classify(bitmap)
 
                 if (!prediction.fromModel) {
                     emitMessage(
-                        "Pipeline de inferencia indisponivel. Resultado de fallback aplicado."
+                        "Pipeline de inferência indisponível. Resultado de fallback aplicado."
                     )
                 }
 

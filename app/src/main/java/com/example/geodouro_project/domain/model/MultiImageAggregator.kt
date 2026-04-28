@@ -11,7 +11,7 @@ class MultiImageAggregator(
         processingTimeMs: Long = 0
     ): MultiImageAggregationResult {
         require(imageResults.isNotEmpty()) {
-            "Lista de imagens nao pode estar vazia"
+            "Lista de imagens não pode estar vazia"
         }
 
         val successfulResults = imageResults.filter {

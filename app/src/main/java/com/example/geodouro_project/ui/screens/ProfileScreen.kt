@@ -156,9 +156,9 @@ class ProfileViewModel(
             _uiState.value = _uiState.value.copy(
                 publishingIds = _uiState.value.publishingIds - observationId,
                 statusMessage = if (published) {
-                    "Observacao publicada com sucesso."
+                    "Observação publicada com sucesso."
                 } else {
-                    "Nao foi possivel publicar. Confirma que a observacao ja foi sincronizada."
+                    "Não foi possível publicar. Confirma que a observação já foi sincronizada."
                 }
             )
             if (published) {
@@ -324,7 +324,7 @@ fun ProfileScreen(
                             )
                             StatItem(
                                 value = uiState.speciesCount.toString(),
-                                label = "Especies",
+                                label = "Espécies",
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -357,7 +357,7 @@ fun ProfileScreen(
                                 if (sessionState is SessionState.Guest) {
                                     "Fazer login"
                                 } else {
-                                    "Terminar sessao"
+                                    "Terminar sessão"
                                 }
                             )
                         }
@@ -382,7 +382,7 @@ fun ProfileScreen(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = "Em modo convidado podes guardar observacoes, mas nao podes transformá-las em publicacoes.",
+                            text = "Em modo convidado podes guardar observacoes, mas não podes transformá-las em publicacoes.",
                             modifier = Modifier.padding(12.dp),
                             color = GeodouroTextPrimary,
                             style = MaterialTheme.typography.bodyMedium
@@ -505,7 +505,7 @@ private fun EmptyProfileState() {
         shape = RoundedCornerShape(8.dp)
     ) {
         Text(
-            text = "Ainda nao tens observacoes guardadas.",
+            text = "Ainda não tens observações guardadas.",
             modifier = Modifier.padding(16.dp),
             color = GeodouroTextSecondary,
             style = MaterialTheme.typography.bodyMedium
@@ -522,7 +522,7 @@ private fun EmptyFilteredProfileState() {
         shape = RoundedCornerShape(8.dp)
     ) {
         Text(
-            text = "Nenhuma observacao corresponde aos filtros atuais.",
+            text = "Nenhuma observação corresponde aos filtros atuais.",
             modifier = Modifier.padding(16.dp),
             color = GeodouroTextSecondary,
             style = MaterialTheme.typography.bodyMedium
@@ -576,7 +576,7 @@ private fun ObservationProfileCard(
             )
 
             Text(
-                text = observation.enrichedCommonName ?: "Nome comum indisponivel",
+                text = observation.enrichedCommonName ?: "Nome comum indisponível",
                 style = MaterialTheme.typography.bodyMedium,
                 color = GeodouroTextSecondary
             )
@@ -622,7 +622,7 @@ private fun ObservationProfileCard(
                         tint = GeodouroGreen
                     )
                     Text(
-                        text = "Ja publicada na comunidade",
+                        text = "Já publicada na comunidade",
                         color = GeodouroGreen,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold
@@ -648,7 +648,7 @@ private fun ObservationProfileCard(
                         )
                     }
                     Spacer(modifier = Modifier.size(8.dp))
-                    Text("Transformar em publicacao")
+                    Text("Transformar em publicação")
                 }
             } else {
                 Surface(
@@ -657,7 +657,7 @@ private fun ObservationProfileCard(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = "Publicacao indisponivel em modo convidado.",
+                        text = "Publicação indisponível em modo convidado.",
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         color = GeodouroTextSecondary,
                         style = MaterialTheme.typography.bodyMedium
@@ -674,7 +674,7 @@ private fun buildObservationMeta(observation: ObservationEntity): String {
     val location = if (observation.latitude != null && observation.longitude != null) {
         "GPS %.5f, %.5f".format(observation.latitude, observation.longitude)
     } else {
-        "Localizacao indisponivel"
+        "Localizacao indisponível"
     }
 
     return "$date\n$location"
@@ -727,10 +727,10 @@ private fun profileDisplayName(sessionState: SessionState): String {
 
 private fun profileSessionLabel(sessionState: SessionState): String {
     return when (sessionState) {
-        is SessionState.Authenticated -> "Sessao autenticada"
+        is SessionState.Authenticated -> "Sessão autenticada"
         is SessionState.Guest -> "Modo convidado"
         SessionState.Loading,
-        SessionState.LoggedOut -> "Sem sessao"
+        SessionState.LoggedOut -> "Sem sessão"
     }
 }
 

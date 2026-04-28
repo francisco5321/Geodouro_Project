@@ -214,8 +214,8 @@ fun SpeciesDetailScreen(
                 .pullRefresh(pullRefreshState)
         ) {
             when {
-                uiState.isLoading -> CenteredMessage(PaddingValues(0.dp), "A carregar detalhe da especie...")
-                uiState.detail == null -> CenteredMessage(PaddingValues(0.dp), "Nao foi possivel encontrar esta especie.")
+                uiState.isLoading -> CenteredMessage(PaddingValues(0.dp), "A carregar detalhe da espécie...")
+                uiState.detail == null -> CenteredMessage(PaddingValues(0.dp), "Não foi possível encontrar esta espécie.")
                 else -> {
                     val detail = uiState.detail ?: return@Scaffold
                     LazyColumn(
@@ -261,7 +261,7 @@ fun SpeciesDetailScreen(
                     if (detail.observations.isNotEmpty()) {
                         item {
                             Text(
-                                text = "OBSERVACOES RECENTES",
+                                text = "OBSERVAÇÕES RECENTES",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     letterSpacing = 1.2.sp,
                                     fontWeight = FontWeight.Medium
@@ -298,7 +298,7 @@ fun SpeciesDetailScreen(
     fullscreenImageUri?.let { imageUri ->
         FullscreenImageDialog(
             imageUri = imageUri,
-            contentDescription = uiState.detail?.scientificName ?: "Imagem da especie",
+            contentDescription = uiState.detail?.scientificName ?: "Imagem da espécie",
             onDismiss = { fullscreenImageUri = null }
         )
     }
@@ -559,7 +559,7 @@ private fun LocationCard(summary: String) {
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "LOCALIZACAO",
+                    text = "LOCALIZAÇÃO",
                     style = MaterialTheme.typography.labelSmall.copy(
                         letterSpacing = 1.sp,
                         fontWeight = FontWeight.Medium
@@ -712,8 +712,8 @@ private fun PlantRepository.PlantSpeciesDetailData.toUiModel(): SpeciesDetail =
         id = id,
         scientificName = scientificName,
         commonName = commonName?.takeIf { it.isNotBlank() } ?: "Sem nome comum",
-        family = family.ifBlank { "Familia desconhecida" },
-        genus = genus.ifBlank { "Genero desconhecido" },
+        family = family.ifBlank { "Família desconhecida" },
+        genus = genus.ifBlank { "Género desconhecido" },
         imageCount = imageCount,
         observationCount = observationCount,
         wikipediaUrl = wikipediaUrl,

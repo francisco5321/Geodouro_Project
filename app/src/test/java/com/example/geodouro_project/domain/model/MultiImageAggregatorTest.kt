@@ -6,7 +6,7 @@ import org.junit.Test
 
 class MultiImageAggregatorTest {
 
-    private val aggregator = MultiImageAggregator(nonPlantLabel = "Nao e uma planta")
+    private val aggregator = MultiImageAggregator(nonPlantLabel = "Não é uma planta")
 
     @Test
     fun `aggregate returns majority species and average confidence`() {
@@ -28,13 +28,13 @@ class MultiImageAggregatorTest {
     fun `aggregate returns non-plant when all successful results are rejected`() {
         val result = aggregator.aggregate(
             imageResults = listOf(
-                imageResult("Nao e uma planta", 0.65f),
-                imageResult("Nao e uma planta", 0.75f)
+                imageResult("Não é uma planta", 0.65f),
+                imageResult("Não é uma planta", 0.75f)
             )
         )
 
-        assertEquals("Nao e uma planta", result.finalPredictedSpecies)
-        assertTrue(result.processedImages.all { it.predictedSpecies == "Nao e uma planta" })
+        assertEquals("Não é uma planta", result.finalPredictedSpecies)
+        assertTrue(result.processedImages.all { it.predictedSpecies == "Não é uma planta" })
         assertTrue(result.speciesVotes.isEmpty())
     }
 

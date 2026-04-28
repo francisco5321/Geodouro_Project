@@ -245,7 +245,7 @@ fun AuthScreen() {
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
-                    text = "Iniciar sessao",
+                    text = "Iniciar sessão",
                     style = MaterialTheme.typography.titleLarge,
                     color = GeodouroTextPrimary,
                     fontWeight = FontWeight.Bold
@@ -394,7 +394,7 @@ fun AuthScreen() {
             color = GeodouroLightBg
         ) {
             Text(
-                text = "Faz login para sincronizar as tuas observacoes e aceder a funcionalidades exclusivas. Podes continuar como convidado, mas as tuas observacoes não serão guardadas na tua conta.",
+                text = "Faz login para sincronizar as tuas observações e aceder a funcionalidades exclusivas. Podes continuar como convidado, mas as tuas observações não serão guardadas na tua conta.",
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                 color = GeodouroTextSecondary,
                 style = MaterialTheme.typography.bodyMedium,

@@ -485,9 +485,9 @@ private fun ResultPhotosSection(
 
         if (isPlantDetected) {
             ResultPhotoCard(
-                title = "Foto de referencia",
+                title = "Foto de referência",
                 imageModel = referencePhotoUrl,
-                emptyMessage = "Sem foto remota disponivel para esta especie."
+                emptyMessage = "Sem foto remota disponível para esta espécie."
             )
         } else {
             Surface(
@@ -957,7 +957,7 @@ private fun MultiImagePhotosSection(
             ResultPhotoCard(
                 title = referenceTitle,
                 imageModel = referencePhotoUrl,
-                emptyMessage = "Sem foto remota disponivel para esta especie."
+                emptyMessage = "Sem foto remota disponível para esta espécie."
             )
         } else {
             Surface(
@@ -1126,7 +1126,7 @@ private fun ObservationNotesField(
                 color = GeodouroTextPrimary
             )
             Text(
-                text = "Adiciona um pequeno contexto sobre a observacao, se quiseres.",
+                text = "Adiciona um pequeno contexto sobre a observação, se quiseres.",
                 style = MaterialTheme.typography.bodySmall,
                 color = GeodouroTextSecondary
             )

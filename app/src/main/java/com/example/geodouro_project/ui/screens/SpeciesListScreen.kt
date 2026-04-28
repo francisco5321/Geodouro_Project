@@ -222,7 +222,7 @@ fun SpeciesListScreen(
                         }
                     },
                     placeholder = {
-                        Text("Pesquisar por especie, nome comum, familia...")
+                        Text("Pesquisar por espécie, nome comum, família...")
                     }
                 )
 
@@ -238,7 +238,7 @@ fun SpeciesListScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "A carregar especies observadas...",
+                                text = "A carregar espécies observadas...",
                                 color = GeodouroTextSecondary
                             )
                         }
@@ -445,9 +445,9 @@ private fun EmptySpeciesState(
         ) {
             Text(
                 text = if (hasQuery) {
-                    "Nenhuma especie encontrada para essa pesquisa."
+                    "Nenhuma espécie encontrada para essa pesquisa."
                 } else {
-                    "Ainda nao existem especies guardadas."
+                    "Ainda não existem espécies guardadas."
                 },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
@@ -455,9 +455,9 @@ private fun EmptySpeciesState(
             )
             Text(
                 text = if (hasQuery) {
-                    "Experimenta outro nome cientifico, comum, familia ou genero."
+                    "Tenta outro nome cientifico, comum, familia ou genero."
                 } else {
-                    "Assim que confirmares identificacoes, elas vao aparecer aqui."
+                    "Assim que confirmares identificações, elas vão aparecer aqui."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = GeodouroTextSecondary

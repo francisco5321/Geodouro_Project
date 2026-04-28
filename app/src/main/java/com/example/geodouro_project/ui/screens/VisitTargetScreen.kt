@@ -98,12 +98,12 @@ class VisitTargetViewModel(
                         _uiState.value = if (targets.isEmpty()) VisitTargetUiState.Empty else VisitTargetUiState.Success(targets)
                     }.onFailure { error ->
                         _uiState.value = VisitTargetUiState.Error(
-                            error.message ?: "Nao foi possivel carregar Quero visitar."
+                            error.message ?: "Não foi possível carregar Quero visitar."
                         )
                     }
                 }
                 is SessionState.Guest -> _uiState.value = VisitTargetUiState.GuestRestricted
-                SessionState.LoggedOut, SessionState.Loading -> _uiState.value = VisitTargetUiState.Error("Sessao indisponivel.")
+                SessionState.LoggedOut, SessionState.Loading -> _uiState.value = VisitTargetUiState.Error("Sessão indisponível.")
             }
         }
     }
@@ -112,14 +112,14 @@ class VisitTargetViewModel(
         viewModelScope.launch {
             val session = authRepository.sessionState.value as? SessionState.Authenticated
                 ?: run {
-                    _uiState.value = VisitTargetUiState.Error("Sessao autenticada necessaria.")
+                    _uiState.value = VisitTargetUiState.Error("Sessão autenticada necessária.")
                     return@launch
                 }
             val removed = visitTargetRepository.deleteVisitTarget(savedVisitTargetId, session)
             if (removed) {
                 refresh()
             } else {
-                _uiState.value = VisitTargetUiState.Error("Nao foi possivel remover este alvo de visita.")
+                _uiState.value = VisitTargetUiState.Error("Não foi possível remover este alvo de visita.")
             }
         }
     }
@@ -200,14 +200,14 @@ fun VisitTargetScreen(
                 )
                 is VisitTargetUiState.Error -> VisitTargetMessageState(
                     padding = PaddingValues(0.dp),
-                    title = "Nao foi possivel abrir Quero visitar",
+                    title = "Não foi possível abrir Quero visitar",
                     message = state.message,
                     actionLabel = "Tentar novamente",
                     onAction = viewModel::refresh
                 )
                 VisitTargetUiState.GuestRestricted -> VisitTargetMessageState(
                     padding = PaddingValues(0.dp),
-                    title = "Inicia sessao para guardar visitas",
+                    title = "Inicia sessão para guardar visitas",
                     message = "O modo convidado permite explorar a app, mas a lista Quero visitar fica associada a uma conta autenticada."
                 )
                 is VisitTargetUiState.Success -> VisitTargetList(
@@ -376,9 +376,9 @@ private fun VisitTargetCenteredState(
 }
 
 private fun String.asVisitTargetLabel(): String = when (lowercase()) {
-    "observation" -> "Observacao"
-    "publication" -> "Publicacao"
-    "species" -> "Especie"
+    "observation" -> "Observação"
+    "publication" -> "Publicação"
+    "species" -> "Espécie"
     else -> "Alvo"
 }
 

@@ -120,11 +120,11 @@ class SpeciesService(
             maxLongitude: Double?
         ): String {
             if (observationCount == 0 || minLatitude == null || minLongitude == null) {
-                return "Sem localizacoes registadas para esta especie."
+                return "Sem localizações registadas para esta espécie."
             }
 
             if (observationCount == 1 || maxLatitude == null || maxLongitude == null) {
-                return "1 observacao com localizacao registada em GPS %.5f, %.5f".format(
+                return "1 observação com localização registada em GPS %.5f, %.5f".format(
                     minLatitude,
                     minLongitude
                 )

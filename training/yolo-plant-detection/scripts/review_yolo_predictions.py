@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
         default="artifacts/yolo_prediction_review",
         help="Diretorio onde guardar previews e relatorios.",
     )
-    parser.add_argument("--conf", type=float, default=0.25, help="Threshold de confianca.")
+    parser.add_argument("--conf", type=float, default=0.25, help="Threshold de confiança.")
     parser.add_argument("--imgsz", type=int, default=640, help="Tamanho de inferencia.")
     parser.add_argument("--max-images", type=int, default=120, help="Numero maximo de imagens a rever.")
     parser.add_argument("--seed", type=int, default=42, help="Seed para amostragem.")
@@ -33,7 +33,7 @@ def parse_args() -> argparse.Namespace:
         "--batch-names",
         nargs="*",
         default=["batch_001", "batch_002"],
-        help="Batches de anotacao a usar na revisao.",
+        help="Batches de anotação a usar na revisão.",
     )
     parser.add_argument(
         "--annotation-batches-dir",
@@ -98,7 +98,7 @@ def load_review_rows(annotation_batches_dir: Path, annotations_dir: Path, batch_
     for batch_name in batch_names:
         metadata_path = annotation_batches_dir / batch_name / "metadata.csv"
         if not metadata_path.exists():
-            raise FileNotFoundError(f"Metadata nao encontrada para batch '{batch_name}': {metadata_path}")
+            raise FileNotFoundError(f"Metadata não encontrada para batch '{batch_name}': {metadata_path}")
 
         metadata_df = pd.read_csv(metadata_path)
         for row in metadata_df.to_dict("records"):

@@ -24,7 +24,7 @@ fun CaptureScreen() {
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text("Nova observacao", style = MaterialTheme.typography.headlineMedium)
+        Text("Nova observação", style = MaterialTheme.typography.headlineMedium)
 
         Surface(
             modifier = Modifier
@@ -48,7 +48,7 @@ fun CaptureScreen() {
                     progress = { 0.85f },
                     modifier = Modifier.fillMaxWidth()
                 )
-                Text("90% de confianca", style = MaterialTheme.typography.labelSmall)
+                Text("90% de confiança", style = MaterialTheme.typography.labelSmall)
             }
         }
 

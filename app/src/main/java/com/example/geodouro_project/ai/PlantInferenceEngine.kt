@@ -22,7 +22,7 @@ class PlantInferenceEngine(
 
         val detectorDiagnostic = detector.getModelLoadDiagnostic()
             ?: "sem asset ou falha ao carregar"
-        return "$classifierStatus. Detector YOLO indisponivel: $detectorDiagnostic. A usar classificacao direta."
+        return "$classifierStatus. Detector YOLO indisponível: $detectorDiagnostic. A usar classificação direta."
     }
 
     suspend fun classify(bitmap: Bitmap): InferencePrediction = analyze(bitmap).prediction

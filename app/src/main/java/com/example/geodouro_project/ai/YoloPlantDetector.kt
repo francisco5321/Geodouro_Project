@@ -234,7 +234,7 @@ class YoloPlantDetector(
         val modelPath = try {
             copyAssetToFilesDir(modelFileName)
         } catch (_: Exception) {
-            modelLoadDiagnostic = "Asset do detector nao encontrado em assets/$modelFileName"
+            modelLoadDiagnostic = "Asset do detector não encontrado em assets/$modelFileName"
             return null
         }
 

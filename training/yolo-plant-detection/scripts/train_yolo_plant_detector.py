@@ -36,7 +36,7 @@ def main() -> None:
     yolo_dir = Path(dataset_cfg["yolo_dir"])
     data_yaml = yolo_dir / "data.yaml"
     if not data_yaml.exists():
-        raise FileNotFoundError(f"Ficheiro YOLO nao encontrado: {data_yaml}")
+        raise FileNotFoundError(f"Ficheiro YOLO não encontrado: {data_yaml}")
 
     artifacts_dir = Path(outputs_cfg["artifacts_dir"])
     artifacts_dir.mkdir(parents=True, exist_ok=True)

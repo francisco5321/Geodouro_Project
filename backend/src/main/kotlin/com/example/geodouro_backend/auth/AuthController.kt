@@ -35,7 +35,7 @@ class AuthController(
         val userId = authTokenService.resolveUserId(authorizationHeader)
             ?: throw org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.UNAUTHORIZED,
-                "Token de autenticacao em falta"
+                "Token de autenticação em falta"
             )
         logger.info("GET /api/auth/me userId={}", userId)
         return authService.getCurrentUser(userId)
@@ -85,7 +85,7 @@ class AuthController(
         return authTokenService.resolveUserId(authorizationHeader)
             ?: throw org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.UNAUTHORIZED,
-                "Token de autenticacao em falta"
+                "Token de autenticação em falta"
             )
     }
 

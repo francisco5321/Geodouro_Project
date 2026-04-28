@@ -156,7 +156,7 @@ def draw_preview(image_bgr: np.ndarray, bbox: tuple[int, int, int, int] | None, 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Gera pre-anotacoes YOLO heuristicas para um batch.")
+    parser = argparse.ArgumentParser(description="Gera pré-anotações YOLO heurísticas para um batch.")
     parser.add_argument("--config", type=Path, default=Path("config.local.json"))
     parser.add_argument("--batch-name", type=str, default=None)
     args = parser.parse_args()
@@ -173,7 +173,7 @@ def main() -> None:
     previews_dir = batch_dir / "previews"
 
     if not metadata_path.exists():
-        raise FileNotFoundError(f"Metadata do batch nao encontrado: {metadata_path}")
+        raise FileNotFoundError(f"Metadata do batch não encontrado: {metadata_path}")
 
     labels_dir.mkdir(parents=True, exist_ok=True)
     if bool(pre_cfg.get("save_previews", True)):
@@ -267,7 +267,7 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    print(f"Pre-anotacao concluida em: {batch_dir.resolve()}")
+    print(f"Pré-anotação concluída em: {batch_dir.resolve()}")
     print(f"Caixas geradas: {generated}")
     print(f"Labels vazias: {empty}")
     print(f"Ignoradas: {skipped}")

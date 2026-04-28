@@ -59,7 +59,7 @@ class AuthTokenService(
     }
 
     private fun invalidToken(): ResponseStatusException {
-        return ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token de autenticacao invalido")
+        return ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token de autenticação inválido")
     }
 
     private companion object {

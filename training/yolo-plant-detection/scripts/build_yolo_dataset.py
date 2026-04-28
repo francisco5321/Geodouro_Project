@@ -85,7 +85,7 @@ def resolve_image_path(
         if candidate.exists():
             return candidate
 
-    raise FileNotFoundError(f"Imagem nao encontrada para path '{stored_path}'. Procurado em '{candidate}'.")
+raise FileNotFoundError(f"Imagem não encontrada para path '{stored_path}'. Procurado em '{candidate}'.")
 
 
 def resolve_label_path(annotations_dir: Path, image_path: Path) -> Path:
@@ -244,10 +244,10 @@ def build_dataset(config: dict) -> None:
             extra_roots=extra_roots,
         )
         if df.empty:
-            raise RuntimeError("Nenhuma anotacao revista encontrada para construir o dataset YOLO.")
+            raise RuntimeError("Nenhuma anotação revista encontrada para construir o dataset YOLO.")
     else:
         if not manifest_path.exists():
-            raise FileNotFoundError(f"Manifesto nao encontrado: {manifest_path}")
+            raise FileNotFoundError(f"Manifesto não encontrado: {manifest_path}")
 
         df = pd.read_csv(manifest_path)
         if df.empty:
@@ -256,7 +256,7 @@ def build_dataset(config: dict) -> None:
         required_columns = {"image_path"}
         missing = required_columns - set(df.columns)
         if missing:
-            raise RuntimeError(f"Manifesto invalido. Faltam colunas: {sorted(missing)}")
+            raise RuntimeError(f"Manifesto inválido. Faltam colunas: {sorted(missing)}")
 
     splits = split_dataframe(
         df=df,
@@ -332,7 +332,7 @@ def build_dataset(config: dict) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Constroi dataset YOLO a partir de manifesto + anotacoes.")
+    parser = argparse.ArgumentParser(description="Constrói dataset YOLO a partir de manifesto + anotações.")
     parser.add_argument("--config", type=Path, default=Path("config.local.json"))
     args = parser.parse_args()
 

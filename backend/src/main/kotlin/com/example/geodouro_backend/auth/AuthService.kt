@@ -40,7 +40,7 @@ class AuthService(
             FIND_AUTHENTICATED_USER_BY_ID_SQL,
             MapSqlParameterSource("userId", userId),
             userRowMapper
-        ).firstOrNull() ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessao invalida")
+        ).firstOrNull() ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessão inválida")
 
         return user.toCurrentUserResponse()
     }
@@ -68,7 +68,7 @@ class AuthService(
                 .addValue("username", username)
                 .addValue("passwordHash", passwordEncoder.encode(request.password)),
             Int::class.java
-        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Nao foi possivel criar a conta")
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Não foi possível criar a conta")
 
         val user = loadUser(userId)
         return user.toLoginResponse(authTokenService.createToken(user.userId))
@@ -164,7 +164,7 @@ class AuthService(
             """.trimIndent(),
             MapSqlParameterSource("userId", targetUserId),
             userSummaryRowMapper
-        ).firstOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Utilizador nao encontrado")
+        ).firstOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Utilizador não encontrado")
     }
 
     private fun loadUser(userId: Int): AuthenticatedUserRecord {
@@ -172,7 +172,7 @@ class AuthService(
             FIND_AUTHENTICATED_USER_BY_ID_SQL,
             MapSqlParameterSource("userId", userId),
             userRowMapper
-        ).firstOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Utilizador nao encontrado")
+        ).firstOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Utilizador não encontrado") //2
     }
 
     private fun ensureUniqueLogin(email: String, username: String, currentUserId: Int?) {
@@ -197,7 +197,7 @@ class AuthService(
         ) ?: 0
 
         if (existingCount > 0) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Email ou username ja esta em uso")
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Email ou username já está em uso")
         }
     }
 

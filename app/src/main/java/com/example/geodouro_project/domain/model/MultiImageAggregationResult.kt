@@ -41,7 +41,7 @@ data class ImageInferenceResult(
 
 /**
  * Resultado agregado de multiplas imagens.
- * Combina votacao por especie e media de confianca.
+ * Combina votação por espécie e média de confiança.
  */
 data class MultiImageAggregationResult(
     val finalPredictedSpecies: String,
@@ -65,7 +65,7 @@ data class MultiImageAggregationResult(
             return if (totalImagesAnalyzed > 0) maxVotes.toFloat() / totalImagesAnalyzed else 0f
         }
 
-    /** Unanimidade: todas as imagens predizem a mesma especie. */
+    /** Unanimidade: todas as imagens predizem a mesma espécie. */
     val isUnanimous: Boolean
         get() = speciesVotes.size == 1 && speciesVotes.values.first() == totalImagesAnalyzed
 }

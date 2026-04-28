@@ -17,7 +17,7 @@ class RemoteAuthService(
 
     fun login(identifier: String, password: String): RemoteLoginResult {
         if (!isConfigured()) {
-            throw IllegalStateException("Backend de autenticacao indisponivel.")
+            throw IllegalStateException("Backend de autenticação indisponível.") //2
         }
 
         val requestBody = gson.toJson(
@@ -40,7 +40,7 @@ class RemoteAuthService(
                     response.code == 401 -> throw IllegalArgumentException("Credenciais invalidas.")
                     else -> {
                         Log.w(TAG, "Login failed code=${response.code} body=$body")
-                        throw IllegalStateException("Nao foi possivel autenticar de momento.")
+                        throw IllegalStateException("Não foi possível autenticar de momento.")
                     }
                 }
             }
@@ -53,7 +53,7 @@ class RemoteAuthService(
 
     fun fetchCurrentUser(authToken: String): RemoteCurrentUserResult {
         if (!isConfigured()) {
-            throw IllegalStateException("Backend de autenticacao indisponivel.")
+            throw IllegalStateException("Backend de autenticação indisponível.") //2
         }
 
         val request = Request.Builder()
@@ -67,10 +67,10 @@ class RemoteAuthService(
                 val body = response.body?.string().orEmpty()
                 when {
                     response.isSuccessful -> gson.fromJson(body, RemoteCurrentUserResponse::class.java).toDomain()
-                    response.code == 401 -> throw IllegalArgumentException("Sessao expirada ou invalida.")
+                    response.code == 401 -> throw IllegalArgumentException("Sessão expirada ou inválida.")
                     else -> {
                         Log.w(TAG, "Fetch current user failed code=${response.code} body=$body")
-                        throw IllegalStateException("Nao foi possivel validar a sessao.")
+                        throw IllegalStateException("Não foi possível validar a sessão.")
                     }
                 }
             }

@@ -102,7 +102,7 @@ class RoutePlanDetailViewModel(
                 is SessionState.Authenticated -> {
                     val userId = sessionState.userId
                     if (userId == null) {
-                        _uiState.value = RoutePlanDetailUiState.Error("Sessao autenticada sem identificador remoto.")
+                        _uiState.value = RoutePlanDetailUiState.Error("Sessão autenticada sem identificador remoto.")
                         return@launch
                     }
 
@@ -110,13 +110,13 @@ class RoutePlanDetailViewModel(
                         routePlanRepository.fetchRoutePlanDetail(routePlanId, sessionState)
                     }.getOrElse { error ->
                         _uiState.value = RoutePlanDetailUiState.Error(
-                            error.message ?: "Nao foi possivel abrir o percurso."
+                            error.message ?: "Não foi possível abrir o percurso."
                         )
                         return@launch
                     }
 
                     _uiState.value = if (detail == null) {
-                        RoutePlanDetailUiState.Error("Percurso nao encontrado.")
+                        RoutePlanDetailUiState.Error("Percurso não encontrado.")
                     } else {
                         RoutePlanDetailUiState.Success(detail)
                     }
@@ -128,7 +128,7 @@ class RoutePlanDetailViewModel(
 
                 SessionState.Loading,
                 SessionState.LoggedOut -> {
-                    _uiState.value = RoutePlanDetailUiState.Error("Sessao indisponivel.")
+                    _uiState.value = RoutePlanDetailUiState.Error("Sessão indisponível.")
                 }
             }
         }
@@ -222,7 +222,7 @@ fun RoutePlanDetailScreen(
 
                 is RoutePlanDetailUiState.Error -> {
                     RoutePlanEmptyState(
-                        title = "Nao foi possivel abrir o percurso.",
+                        title = "Não foi possível abrir o percurso.",
                         message = state.message,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -230,7 +230,7 @@ fun RoutePlanDetailScreen(
 
                 RoutePlanDetailUiState.GuestRestricted -> {
                     RoutePlanEmptyState(
-                        title = "Percurso indisponivel em modo convidado.",
+                        title = "Percurso indisponível em modo convidado.",
                         message = "Entra com a tua conta para veres os detalhes e o circuito do percurso.",
                         modifier = Modifier.fillMaxSize()
                     )
@@ -346,7 +346,7 @@ private fun RouteStartCard() {
                     color = GeodouroTextPrimary
                 )
                 Text(
-                    text = "A tua localizacao atual, ao abrir o percurso no Google Maps.",
+                    text = "A tua localização atual, ao abrir o percurso no Google Maps.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = GeodouroTextSecondary
                 )
@@ -452,7 +452,7 @@ private fun RouteMapCard(routePlan: RoutePlanRepository.RoutePlanDetail) {
                             contentDescription = null,
                             modifier = Modifier.padding(end = 8.dp)
                         )
-                        Text("Percurso a pe")
+                        Text("Percurso a pé")
                     }
                 }
             }
@@ -590,9 +590,9 @@ private fun RouteStopCard(stop: RoutePlanRepository.RoutePlanStop) {
 
 private fun String.asUiLabel(): String {
     return when (lowercase()) {
-        "observation" -> "Observacao"
-        "publication" -> "Publicacao"
-        "species" -> "Especie"
+        "observation" -> "Observação"
+        "publication" -> "Publicação"
+        "species" -> "Espécie"
         else -> replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 }

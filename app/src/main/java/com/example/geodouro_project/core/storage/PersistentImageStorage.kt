@@ -37,7 +37,7 @@ class PersistentImageStorage(
             FileOutputStream(outputFile).use { output ->
                 input.copyTo(output)
             }
-        } ?: throw IllegalStateException("Nao foi possivel ler a imagem selecionada.")
+        } ?: throw IllegalStateException("Não foi possível ler a imagem selecionada.")
         return Uri.fromFile(outputFile).toString()
     }
 

@@ -16,7 +16,7 @@ class PublicationService(
 
     fun publishObservation(request: PublishObservationRequest, authenticatedUserId: Int? = null): PublicationResponse {
         if (authenticatedUserId == null) {
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao obrigatoria para publicar observacoes")
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticação obrigatória para publicar observações")
         }
         val observation = jdbcTemplate.query(
             OBSERVATION_FOR_PUBLICATION_SQL,
@@ -28,7 +28,7 @@ class PublicationService(
         )
 
         if (authenticatedUserId != observation.userId) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para publicar esta observacao")
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Não tens permissão para publicar esta observação")
         }
 
         val publicationId = jdbcTemplate.queryForObject(
@@ -98,7 +98,7 @@ class PublicationService(
         requireManageAccess(publicationId, authenticatedUserId)
         val status = request.status?.trim()?.lowercase()
         if (status != null && status !in setOf("draft", "published")) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado editorial invalido")
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado editorial inválido")
         }
 
         jdbcTemplate.update(
@@ -146,7 +146,7 @@ class PublicationService(
 
     private fun requireManageAccess(publicationId: Int, authenticatedUserId: Int?) {
         if (authenticatedUserId == null) {
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticacao obrigatoria")
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticação obrigatória") //
         }
         val canManage = jdbcTemplate.queryForObject(
             """
@@ -162,7 +162,7 @@ class PublicationService(
             Int::class.java
         ) ?: 0
         if (canManage <= 0) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Nao tens permissao para gerir esta publicacao")
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Não tens permissão para gerir esta publicação")
         }
     }
 

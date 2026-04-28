@@ -236,7 +236,7 @@ def main() -> None:
 
     merged_rows = pd.concat([legacy_rows, remote_rows], ignore_index=True)
     if merged_rows.empty:
-        raise RuntimeError("Nao foram encontradas imagens nem nas fontes locais nem na BD remota.")
+        raise RuntimeError("Não foram encontradas imagens nem nas fontes locais nem na BD remota.")
 
     merged_rows = merged_rows.drop_duplicates(subset=["image_path"])
     merged_rows.to_csv(manifest_path, index=False)
