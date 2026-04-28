@@ -1,6 +1,7 @@
 package com.example.geodouro_project.ui.screens
 
 import android.content.Context
+import android.location.Geocoder
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -53,6 +54,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -88,10 +90,12 @@ import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // ──────────────────────────────────────────────
 // ViewModel (sem alterações)
@@ -453,6 +457,7 @@ fun CommunityPostCard(
     onClick: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val locationLabel = rememberCommunityLocationLabel(post)
     val imageRequest = remember(post.imageUrl) {
         ImageRequest.Builder(context)
             .data(post.imageUrl)
@@ -609,12 +614,13 @@ fun CommunityPostCard(
                     }
 
                     // Coordenadas (apenas se disponíveis)
-                    if (post.latitude != null && post.longitude != null) {
+                    if (locationLabel != null) {
                         Text(
-                            text = "%.4f, %.4f".format(post.latitude, post.longitude),
+                            text = locationLabel,
                             style = MaterialTheme.typography.labelSmall,
                             color = GeodouroTextSecondary,
-                            maxLines = 1
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -632,6 +638,51 @@ private fun formatLocation(observation: CommunityPublication): String {
         "GPS %.5f, %.5f".format(observation.latitude, observation.longitude)
     } else {
         "Localização indisponível"
+    }
+}
+
+@Composable
+private fun rememberCommunityLocationLabel(publication: CommunityPublication): String? {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    return produceState(
+        initialValue = communityLocationFallback(publication),
+        key1 = publication.id,
+        key2 = publication.latitude,
+        key3 = publication.longitude
+    ) {
+        value = resolveCommunityLocationLabel(context, publication)
+    }.value
+}
+
+private suspend fun resolveCommunityLocationLabel(
+    context: Context,
+    publication: CommunityPublication
+): String? = withContext(Dispatchers.IO) {
+    val fallback = communityLocationFallback(publication)
+    val latitude = publication.latitude ?: return@withContext fallback
+    val longitude = publication.longitude ?: return@withContext fallback
+    if (!Geocoder.isPresent()) return@withContext fallback
+
+    val geocoder = Geocoder(context, Locale.getDefault())
+    @Suppress("DEPRECATION")
+    val address = runCatching { geocoder.getFromLocation(latitude, longitude, 1)?.firstOrNull() }.getOrNull()
+    val label = buildList {
+        address?.thoroughfare?.takeIf { it.isNotBlank() }?.let(::add)
+        address?.subLocality?.takeIf { it.isNotBlank() }?.let(::add)
+        address?.locality?.takeIf { it.isNotBlank() }?.let(::add)
+        address?.adminArea?.takeIf { it.isNotBlank() }?.let(::add)
+    }.distinct().joinToString(", ")
+
+    if (label.isBlank()) fallback else label
+}
+
+private fun communityLocationFallback(publication: CommunityPublication): String? {
+    val latitude = publication.latitude
+    val longitude = publication.longitude
+    return if (latitude != null && longitude != null) {
+        "%.4f, %.4f".format(latitude, longitude)
+    } else {
+        null
     }
 }
 
