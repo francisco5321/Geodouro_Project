@@ -116,7 +116,16 @@ class VisitTargetService(
 
     private fun validateTargetExists(targetType: String, targetId: Int) {
         val (sql, paramName) = when (targetType) {
-            "species" -> "SELECT COUNT(*) FROM plant_species WHERE plant_species_id = :targetId" to "targetId"
+            "species" -> """
+                SELECT COUNT(*)
+                FROM plant_species ps
+                WHERE ps.plant_species_id = :targetId
+                  AND EXISTS (
+                      SELECT 1
+                      FROM observation o
+                      WHERE o.plant_species_id = ps.plant_species_id
+                  )
+            """.trimIndent() to "targetId"
             "publication" -> "SELECT COUNT(*) FROM publication WHERE publication_id = :targetId" to "targetId"
             "observation" -> """
                 SELECT COUNT(*)
@@ -374,5 +383,3 @@ private data class ExistingVisitTarget(
     val savedVisitTargetId: Int,
     val consumed: Boolean
 )
-
-

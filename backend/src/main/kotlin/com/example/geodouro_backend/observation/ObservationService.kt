@@ -128,6 +128,7 @@ class ObservationService(
             )
         }
 
+        val previousPlantSpeciesId = current.plantSpeciesId
         val scientificName = request.scientificName?.trim().orEmpty().ifBlank { current.scientificName }
         val commonName = request.commonName?.trim()?.takeIf { it.isNotBlank() }
         val family = request.family?.trim()?.takeIf { it.isNotBlank() } ?: current.family ?: "Unknown"
@@ -145,6 +146,9 @@ class ObservationService(
                 .addValue("notes", notes)
         )
 
+        previousPlantSpeciesId
+            ?.takeIf { it != plantSpeciesId }
+            ?.let(::refreshPlantSpeciesImageCount)
         refreshPlantSpeciesImageCount(plantSpeciesId)
         return getObservationDetail(deviceObservationId)
     }
@@ -173,6 +177,12 @@ class ObservationService(
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Não tens permissão para remover esta observação")
         }
 
+        val plantSpeciesId = jdbcTemplate.queryForObject(
+            "SELECT plant_species_id FROM observation WHERE observation_id = :observationId",
+            MapSqlParameterSource("observationId", observationId),
+            java.lang.Integer::class.java
+        )?.toInt()
+
         jdbcTemplate.update(
             "DELETE FROM publication WHERE observation_id = :observationId",
             MapSqlParameterSource("observationId", observationId)
@@ -185,6 +195,7 @@ class ObservationService(
             "DELETE FROM observation WHERE observation_id = :observationId",
             MapSqlParameterSource("observationId", observationId)
         )
+        plantSpeciesId?.let(::refreshPlantSpeciesImageCount)
     }
 
     private fun upsertObservationInternal(

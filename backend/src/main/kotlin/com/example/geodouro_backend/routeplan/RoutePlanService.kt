@@ -194,7 +194,16 @@ class RoutePlanService(
 
     private fun ensureSpeciesExists(plantSpeciesId: Int) {
         val count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM plant_species WHERE plant_species_id = :plantSpeciesId",
+            """
+                SELECT COUNT(*)
+                FROM plant_species ps
+                WHERE ps.plant_species_id = :plantSpeciesId
+                  AND EXISTS (
+                      SELECT 1
+                      FROM observation o
+                      WHERE o.plant_species_id = ps.plant_species_id
+                  )
+            """.trimIndent(),
             MapSqlParameterSource("plantSpeciesId", plantSpeciesId),
             Int::class.java
         ) ?: 0
@@ -550,5 +559,3 @@ class RoutePlanService(
         """
     }
 }
-
-
