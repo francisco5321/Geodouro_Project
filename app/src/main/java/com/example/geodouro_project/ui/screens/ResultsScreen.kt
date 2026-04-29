@@ -22,6 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -66,6 +68,7 @@ import com.example.geodouro_project.domain.model.LocalPredictionCandidate
 import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
 import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
+import com.example.geodouro_project.ui.theme.GeodouroError
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
@@ -87,6 +90,11 @@ data class IdentificationResult(
     val wikipediaUrl: String?,
     val photoUrl: String?
 )
+
+enum class PredictionFeedback {
+    LIKE,
+    DISLIKE
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -113,6 +121,9 @@ fun ResultsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var observationNotes by rememberSaveable(localInferenceResult.imageUri, multiImageUris) {
         mutableStateOf("")
+    }
+    var predictionFeedback by rememberSaveable(localInferenceResult.imageUri, multiImageUris) {
+        mutableStateOf<PredictionFeedback?>(null)
     }
 
     LaunchedEffect(localInferenceResult, multiImageUris, captureLatitude, captureLongitude) {
@@ -238,8 +249,17 @@ fun ResultsScreen(
                         isConfirming = state.isConfirming,
                         notes = observationNotes,
                         onNotesChange = { observationNotes = it },
+                        feedback = predictionFeedback,
+                        onLike = { predictionFeedback = PredictionFeedback.LIKE },
+                        onDislike = {
+                            predictionFeedback = PredictionFeedback.DISLIKE
+                            viewModel.confirmObservation(observationNotes, allowManualReview = true)
+                        },
                         onConfirm = { viewModel.confirmObservation(observationNotes) },
-                        onSubmitUnknownPlant = { viewModel.confirmObservation(observationNotes, allowManualReview = true) },
+                        onSubmitUnknownPlant = {
+                            predictionFeedback = PredictionFeedback.DISLIKE
+                            viewModel.confirmObservation(observationNotes, allowManualReview = true)
+                        },
                         onRetakePhotos = onBackClick
                     )
                 }
@@ -252,8 +272,17 @@ fun ResultsScreen(
                         isConfirming = state.isConfirming,
                         notes = observationNotes,
                         onNotesChange = { observationNotes = it },
+                        feedback = predictionFeedback,
+                        onLike = { predictionFeedback = PredictionFeedback.LIKE },
+                        onDislike = {
+                            predictionFeedback = PredictionFeedback.DISLIKE
+                            viewModel.confirmObservation(observationNotes, allowManualReview = true)
+                        },
                         onConfirm = { viewModel.confirmObservation(observationNotes) },
-                        onSubmitUnknownPlant = { viewModel.confirmObservation(observationNotes, allowManualReview = true) },
+                        onSubmitUnknownPlant = {
+                            predictionFeedback = PredictionFeedback.DISLIKE
+                            viewModel.confirmObservation(observationNotes, allowManualReview = true)
+                        },
                         onRetakePhotos = onBackClick
                     )
                 }
@@ -315,6 +344,9 @@ fun ResultCard(
     isConfirming: Boolean,
     notes: String,
     onNotesChange: (String) -> Unit,
+    feedback: PredictionFeedback?,
+    onLike: () -> Unit,
+    onDislike: () -> Unit,
     onConfirm: () -> Unit,
     onSubmitUnknownPlant: () -> Unit,
     onRetakePhotos: () -> Unit
@@ -467,14 +499,11 @@ fun ResultCard(
 
             if (result.isPlantDetected) {
                 Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = "A previsao esta incorreta? Enviar para a administracao",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = !isConfirming, onClick = onSubmitUnknownPlant),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GeodouroTextSecondary,
-                    textDecoration = TextDecoration.Underline
+                PredictionFeedbackSection(
+                    selectedFeedback = feedback,
+                    enabled = !isConfirming,
+                    onLike = onLike,
+                    onDislike = onDislike
                 )
             }
         }
@@ -672,6 +701,9 @@ fun MultiImageResultCard(
     isConfirming: Boolean,
     notes: String,
     onNotesChange: (String) -> Unit,
+    feedback: PredictionFeedback?,
+    onLike: () -> Unit,
+    onDislike: () -> Unit,
     onConfirm: () -> Unit,
     onSubmitUnknownPlant: () -> Unit,
     onRetakePhotos: () -> Unit
@@ -891,16 +923,75 @@ fun MultiImageResultCard(
 
             if (result.isPlantDetected) {
                 Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = "A previsao esta incorreta? Enviar para a administracao",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = !isConfirming, onClick = onSubmitUnknownPlant),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GeodouroTextSecondary,
-                    textDecoration = TextDecoration.Underline
+                PredictionFeedbackSection(
+                    selectedFeedback = feedback,
+                    enabled = !isConfirming,
+                    onLike = onLike,
+                    onDislike = onDislike
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun PredictionFeedbackSection(
+    selectedFeedback: PredictionFeedback?,
+    enabled: Boolean,
+    onLike: () -> Unit,
+    onDislike: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        val likeSelected = selectedFeedback == PredictionFeedback.LIKE
+        val dislikeSelected = selectedFeedback == PredictionFeedback.DISLIKE
+
+        OutlinedButton(
+            onClick = onLike,
+            enabled = enabled,
+            modifier = Modifier.weight(1f),
+            colors = geodouroOutlinedButtonColors(),
+            border = androidx.compose.foundation.BorderStroke(
+                width = 1.dp,
+                color = if (likeSelected) GeodouroGreen else geodouroOutlinedBorderColor(enabled)
+            ),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ThumbUp,
+                contentDescription = "Like",
+                tint = if (likeSelected) GeodouroGreen else GeodouroTextSecondary
+            )
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(
+                text = "Like",
+                color = if (likeSelected) GeodouroGreen else GeodouroTextPrimary
+            )
+        }
+
+        OutlinedButton(
+            onClick = onDislike,
+            enabled = enabled,
+            modifier = Modifier.weight(1f),
+            colors = geodouroOutlinedButtonColors(),
+            border = androidx.compose.foundation.BorderStroke(
+                width = 1.dp,
+                color = if (dislikeSelected) GeodouroError else geodouroOutlinedBorderColor(enabled)
+            ),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ThumbDown,
+                contentDescription = "Dislike",
+                tint = if (dislikeSelected) GeodouroError else GeodouroTextSecondary
+            )
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(
+                text = "Dislike",
+                color = if (dislikeSelected) GeodouroError else GeodouroTextPrimary
+            )
         }
     }
 }

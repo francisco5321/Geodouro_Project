@@ -215,10 +215,15 @@ fun ProfileScreen(
             val matchesFilter = when (selectedFilter) {
                 ProfileObservationFilter.ALL -> true
                 ProfileObservationFilter.PENDING -> {
-                    !observation.isPublished && observation.syncStatus != ObservationSyncStatus.SYNCED.name
+                    !observation.isPublished && (
+                        observation.requiresManualIdentification ||
+                            observation.syncStatus != ObservationSyncStatus.SYNCED.name
+                    )
                 }
                 ProfileObservationFilter.SYNCED -> {
-                    !observation.isPublished && observation.syncStatus == ObservationSyncStatus.SYNCED.name
+                    !observation.isPublished &&
+                        !observation.requiresManualIdentification &&
+                        observation.syncStatus == ObservationSyncStatus.SYNCED.name
                 }
                 ProfileObservationFilter.PUBLISHED -> observation.isPublished
             }
