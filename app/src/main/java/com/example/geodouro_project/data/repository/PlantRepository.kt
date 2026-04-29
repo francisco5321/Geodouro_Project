@@ -308,7 +308,7 @@ class PlantRepository(
         return observationDao.observeAllForOwner(
             ownerUserId = ownerIdentity?.userId,
             ownerGuestLabel = ownerIdentity?.guestLabel
-        )
+        ).map(::filterUserVisibleObservations)
     }
 
     fun observeFailedObservationIds(): Flow<Set<String>> {
@@ -327,9 +327,11 @@ class PlantRepository(
     suspend fun fetchLocalObservations(): List<ObservationEntity> {
         return withContext(Dispatchers.IO) {
             val ownerIdentity = currentIdentityProvider()
-            observationDao.getAllForOwner(
-                ownerUserId = ownerIdentity?.userId,
-                ownerGuestLabel = ownerIdentity?.guestLabel
+            filterUserVisibleObservations(
+                observationDao.getAllForOwner(
+                    ownerUserId = ownerIdentity?.userId,
+                    ownerGuestLabel = ownerIdentity?.guestLabel
+                )
             )
         }
     }
@@ -346,7 +348,7 @@ class PlantRepository(
             if (remoteObservations.isNotEmpty()) {
                 observationDao.upsertAll(remoteObservations)
             }
-            remoteObservations
+            filterUserVisibleObservations(remoteObservations)
         }
     }
 
@@ -505,10 +507,11 @@ class PlantRepository(
             ownerUserId = ownerIdentity?.userId,
             ownerGuestLabel = ownerIdentity?.guestLabel
         ).map { observations ->
+            val visibleObservations = filterUserVisibleObservations(observations)
             ObservationStats(
-                observationsCount = observations.size,
-                publishedCount = observations.count { it.isPublished },
-                speciesCount = observations
+                observationsCount = visibleObservations.size,
+                publishedCount = visibleObservations.count { it.isPublished },
+                speciesCount = visibleObservations
                     .map { it.enrichedScientificName ?: it.predictedSpecies }
                     .filter { it.isNotBlank() }
                     .distinct()
@@ -523,10 +526,11 @@ class PlantRepository(
             return null
         }
 
+        val visibleObservations = filterUserVisibleObservations(remoteObservations)
         return ObservationStats(
-            observationsCount = remoteObservations.size,
-            publishedCount = remoteObservations.count { it.isPublished },
-            speciesCount = remoteObservations
+            observationsCount = visibleObservations.size,
+            publishedCount = visibleObservations.count { it.isPublished },
+            speciesCount = visibleObservations
                 .map { it.enrichedScientificName ?: it.predictedSpecies }
                 .filter { it.isNotBlank() }
                 .distinct()
@@ -1214,6 +1218,10 @@ class PlantRepository(
                 updatedAtEpochMs = observations.maxOfOrNull { it.capturedAt } ?: 0L
             )
         }
+    }
+
+    private fun filterUserVisibleObservations(observations: List<ObservationEntity>): List<ObservationEntity> {
+        return observations.filterNot { it.requiresManualIdentification }
     }
 
     private fun List<ObservationEntity>.toDetailData(): PlantSpeciesDetailData? {
