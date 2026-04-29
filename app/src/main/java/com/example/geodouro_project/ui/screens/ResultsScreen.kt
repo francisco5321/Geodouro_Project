@@ -464,6 +464,19 @@ fun ResultCard(
                     }
                 )
             }
+
+            if (result.isPlantDetected) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "A previsao esta incorreta? Enviar para a administracao",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !isConfirming, onClick = onSubmitUnknownPlant),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GeodouroTextSecondary,
+                    textDecoration = TextDecoration.Underline
+                )
+            }
         }
     }
 }
@@ -873,6 +886,19 @@ fun MultiImageResultCard(
                         result.isUnknownPlant -> "Enviar para administracao"
                         else -> "Tirar novas fotos"
                     }
+                )
+            }
+
+            if (result.isPlantDetected) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "A previsao esta incorreta? Enviar para a administracao",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !isConfirming, onClick = onSubmitUnknownPlant),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GeodouroTextSecondary,
+                    textDecoration = TextDecoration.Underline
                 )
             }
         }
