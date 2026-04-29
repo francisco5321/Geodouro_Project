@@ -91,6 +91,7 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import kotlin.math.max
 
 sealed interface RoutePlanDetailUiState {
     data object Loading : RoutePlanDetailUiState
@@ -477,28 +478,57 @@ private fun InAppRouteMap(
             if (boundsPoints.isNotEmpty() && !hasFittedRouteBounds) {
                 val bounds = BoundingBox.fromGeoPointsSafe(boundsPoints)
                 view.post {
-                    view.zoomToBoundingBox(bounds, true, 96)
+                    if (locationOverlay.myLocation == null) {
+                        view.zoomToBoundingBox(bounds, true, 96)
+                    }
                     hasFittedRouteBounds = true
                 }
             }
 
             if (showUserLocation && recenterToUserTrigger != lastHandledRecenterTrigger) {
-                val userPoint = view.overlays
-                    .filterIsInstance<MyLocationNewOverlay>()
-                    .firstOrNull()
-                    ?.myLocation
-
+                val userPoint = locationOverlay.myLocation
                 if (userPoint != null) {
-                    view.controller.animateTo(userPoint)
-                    if (view.zoomLevelDouble < 16.5) {
-                        view.controller.setZoom(16.5)
-                    }
+                    animateSmoothRecenter(
+                        view = view,
+                        userPoint = userPoint
+                    )
                     lastHandledRecenterTrigger = recenterToUserTrigger
+                } else {
+                    locationOverlay.runOnFirstFix {
+                        view.post {
+                            locationOverlay.myLocation?.let { firstFixPoint ->
+                                animateSmoothRecenter(
+                                    view = view,
+                                    userPoint = firstFixPoint
+                                )
+                                lastHandledRecenterTrigger = recenterToUserTrigger
+                            }
+                        }
+                    }
                 }
             }
 
             view.invalidate()
         }
+    )
+}
+
+private fun animateSmoothRecenter(
+    view: MapView,
+    userPoint: GeoPoint
+) {
+    val targetZoom = max(view.zoomLevelDouble, 17.0)
+    // Start with a smooth pan, then snap the final center to the exact live coordinate.
+    view.controller.animateTo(userPoint, targetZoom, 1_800L)
+    view.postDelayed(
+        {
+            view.controller.setCenter(userPoint)
+            if (view.zoomLevelDouble < targetZoom) {
+                view.controller.setZoom(targetZoom)
+            }
+            view.invalidate()
+        },
+        1_850L
     )
 }
 
