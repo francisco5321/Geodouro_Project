@@ -584,10 +584,7 @@ class RoutePlanService(
                            NULLIF(species_target.scientific_name, ''),
                            'Sem classificação científ ica'
                        )
-                     ELSE COALESCE(
-                         NULLIF(svt.notes, ''),
-                         NULLIF(rpp.notes, '')
-                     )
+                      ELSE NULLIF(svt.notes, '')
                    END AS subtitle,
                    COALESCE(
                        obs_target_image.image_path,
