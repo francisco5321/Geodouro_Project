@@ -482,6 +482,7 @@ class RoutePlanService(
                 targetType = rs.getString("target_type"),
                 title = rs.getString("title"),
                 subtitle = rs.getString("subtitle"),
+                imagePath = rs.getString("image_path"),
                 observationId = rs.getObject("observation_id", java.lang.Integer::class.java)?.toInt(),
                 plantSpeciesId = rs.getObject("plant_species_id", java.lang.Integer::class.java)?.toInt(),
                 publicationId = rs.getObject("publication_id", java.lang.Integer::class.java)?.toInt(),
@@ -583,11 +584,22 @@ class RoutePlanService(
                            NULLIF(species_target.scientific_name, ''),
                            'Sem classificação científ ica'
                        )
-                       ELSE COALESCE(
-                           NULLIF(svt.notes, ''),
-                           NULLIF(rpp.notes, '')
-                       )
+                     ELSE COALESCE(
+                         NULLIF(svt.notes, ''),
+                         NULLIF(rpp.notes, '')
+                     )
                    END AS subtitle,
+                   COALESCE(
+                       obs_target_image.image_path,
+                       publication_image.image_path,
+                       species_observation_image.image_path,
+                       obs_target.image_uri,
+                       publication_observation.image_uri,
+                       species_observation.image_uri,
+                       obs_target.enriched_photo_url,
+                       publication_observation.enriched_photo_url,
+                       species_target.thumbnail_path
+                   ) AS image_path,
                    svt.observation_id,
                    COALESCE(svt.plant_species_id, obs_target.plant_species_id, publication_target.plant_species_id) AS plant_species_id,
                    svt.publication_id,
@@ -601,17 +613,31 @@ class RoutePlanService(
                        publication_observation.longitude,
                        species_observation.longitude
                    ) AS longitude
-            FROM route_plan rp
-            JOIN route_plan_point rpp ON rpp.route_plan_id = rp.route_plan_id
-            JOIN saved_visit_target svt ON svt.saved_visit_target_id = rpp.saved_visit_target_id
-            LEFT JOIN observation obs_target ON obs_target.observation_id = svt.observation_id
-            LEFT JOIN publication publication_target ON publication_target.publication_id = svt.publication_id
-            LEFT JOIN observation publication_observation ON publication_observation.observation_id = publication_target.observation_id
-            LEFT JOIN plant_species species_target ON species_target.plant_species_id = COALESCE(
-                svt.plant_species_id,
-                obs_target.plant_species_id,
-                publication_target.plant_species_id
-            )
+             FROM route_plan rp
+             JOIN route_plan_point rpp ON rpp.route_plan_id = rp.route_plan_id
+             JOIN saved_visit_target svt ON svt.saved_visit_target_id = rpp.saved_visit_target_id
+             LEFT JOIN observation obs_target ON obs_target.observation_id = svt.observation_id
+             LEFT JOIN LATERAL (
+                 SELECT oi.image_path
+                 FROM observation_image oi
+                 WHERE oi.observation_id = obs_target.observation_id
+                 ORDER BY oi.observation_image_id ASC
+                 LIMIT 1
+             ) obs_target_image ON TRUE
+             LEFT JOIN publication publication_target ON publication_target.publication_id = svt.publication_id
+             LEFT JOIN observation publication_observation ON publication_observation.observation_id = publication_target.observation_id
+             LEFT JOIN LATERAL (
+                 SELECT pi.image_path
+                 FROM publication_image pi
+                 WHERE pi.publication_id = publication_target.publication_id
+                 ORDER BY pi.publication_image_id ASC
+                 LIMIT 1
+             ) publication_image ON TRUE
+             LEFT JOIN plant_species species_target ON species_target.plant_species_id = COALESCE(
+                 svt.plant_species_id,
+                 obs_target.plant_species_id,
+                 publication_target.plant_species_id
+             )
             LEFT JOIN LATERAL (
                 SELECT o.latitude,
                        o.longitude
@@ -622,13 +648,25 @@ class RoutePlanService(
                     publication_target.plant_species_id
                 )
                   AND o.latitude IS NOT NULL
-                  AND o.longitude IS NOT NULL
-                ORDER BY o.observed_at DESC NULLS LAST, o.observation_id DESC
-                LIMIT 1
-            ) species_observation ON TRUE
-            WHERE rp.user_id = :userId
-              AND rp.route_plan_id = :routePlanId
-            ORDER BY rpp.visit_order ASC, rpp.route_plan_point_id ASC
+                   AND o.longitude IS NOT NULL
+                 ORDER BY o.observed_at DESC NULLS LAST, o.observation_id DESC
+                 LIMIT 1
+             ) species_observation ON TRUE
+             LEFT JOIN LATERAL (
+                 SELECT oi.image_path
+                 FROM observation_image oi
+                 JOIN observation o ON o.observation_id = oi.observation_id
+                 WHERE o.plant_species_id = COALESCE(
+                     svt.plant_species_id,
+                     obs_target.plant_species_id,
+                     publication_target.plant_species_id
+                 )
+                 ORDER BY o.observed_at DESC NULLS LAST, o.observation_id DESC, oi.observation_image_id ASC
+                 LIMIT 1
+             ) species_observation_image ON TRUE
+             WHERE rp.user_id = :userId
+               AND rp.route_plan_id = :routePlanId
+             ORDER BY rpp.visit_order ASC, rpp.route_plan_point_id ASC
         """
     }
 }

@@ -1,6 +1,7 @@
 package com.example.geodouro_project.data.remote
 
 import android.util.Log
+import com.example.geodouro_project.BuildConfig
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import okhttp3.OkHttpClient
@@ -119,6 +120,7 @@ data class RemoteRoutePlanStop(
     val targetType: String,
     val title: String,
     val subtitle: String?,
+    val imageUrl: String?,
     val observationId: Int?,
     val plantSpeciesId: Int?,
     val publicationId: Int?,
@@ -189,7 +191,7 @@ private data class RemoteRoutePlanDetailResponse(
             startLatitude = startLatitude,
             startLongitude = startLongitude,
             stopCount = stopCount,
-            stops = stops.map { it.toDomain() },
+            stops = stops.map { it.toDomain(baseUrl = BuildConfig.BACKEND_BASE_URL) },
             routeGeometry = routeGeometry.map { it.toDomain() }
         )
     }
@@ -208,6 +210,8 @@ private data class RemoteRoutePlanStopResponse(
     val title: String,
     @SerializedName("subtitle")
     val subtitle: String?,
+    @SerializedName("imagePath")
+    val imagePath: String?,
     @SerializedName("observationId")
     val observationId: Int?,
     @SerializedName("plantSpeciesId")
@@ -219,7 +223,7 @@ private data class RemoteRoutePlanStopResponse(
     @SerializedName("longitude")
     val longitude: Double?
 ) {
-    fun toDomain(): RemoteRoutePlanStop {
+    fun toDomain(baseUrl: String): RemoteRoutePlanStop {
         return RemoteRoutePlanStop(
             routePlanPointId = routePlanPointId,
             visitOrder = visitOrder,
@@ -227,6 +231,7 @@ private data class RemoteRoutePlanStopResponse(
             targetType = targetType,
             title = title,
             subtitle = subtitle,
+            imageUrl = imagePath?.takeIf { it.isNotBlank() }?.let { resolveRoutePlanImageUrl(baseUrl, it) },
             observationId = observationId,
             plantSpeciesId = plantSpeciesId,
             publicationId = publicationId,
@@ -247,5 +252,14 @@ private data class RemoteRoutePlanCoordinateResponse(
             latitude = latitude,
             longitude = longitude
         )
+    }
+}
+
+private fun resolveRoutePlanImageUrl(baseUrl: String, path: String): String {
+    val normalizedPath = path.trim()
+    return if (normalizedPath.startsWith("http://") || normalizedPath.startsWith("https://")) {
+        normalizedPath
+    } else {
+        baseUrl.trimEnd('/') + "/uploads/" + normalizedPath.trimStart('/')
     }
 }

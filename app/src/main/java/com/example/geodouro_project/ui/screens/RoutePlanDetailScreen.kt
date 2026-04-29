@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -76,6 +77,7 @@ import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
+import coil.compose.AsyncImage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -334,6 +336,7 @@ private fun RouteMapCard(
     val context = LocalContext.current
     val routePoints = remember(routePlan) { buildRouteGeometryPoints(routePlan) }
     val stopPoints = remember(routePlan) { buildStopRoutePoints(routePlan) }
+    var selectedStop by remember(routePlan) { mutableStateOf<RoutePlanRepository.RoutePlanStop?>(null) }
     var locationPermissionGranted by remember { mutableStateOf(hasFineLocationPermission(context)) }
     var followUserLocation by remember { mutableStateOf(locationPermissionGranted) }
     var recenterToUserTrigger by remember { mutableStateOf(0) }
@@ -352,11 +355,21 @@ private fun RouteMapCard(
         InAppRouteMap(
             routePoints = routePoints,
             stopPoints = stopPoints,
+            onStopClick = { selectedStop = it },
             showUserLocation = locationPermissionGranted,
             followUserLocation = followUserLocation,
             recenterToUserTrigger = recenterToUserTrigger,
             modifier = Modifier.fillMaxSize()
         )
+
+        selectedStop?.let { stop ->
+            RouteStopPreviewCard(
+                stop = stop,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+            )
+        }
 
         Button(
             onClick = {
@@ -392,6 +405,7 @@ private fun RouteMapCard(
 private fun InAppRouteMap(
     routePoints: List<VisualRoutePoint>,
     stopPoints: List<VisualRoutePoint>,
+    onStopClick: (RoutePlanRepository.RoutePlanStop) -> Unit,
     showUserLocation: Boolean,
     followUserLocation: Boolean,
     recenterToUserTrigger: Int,
@@ -443,8 +457,14 @@ private fun InAppRouteMap(
             stopPoints.forEach { point ->
                 val marker = Marker(view).apply {
                     position = GeoPoint(point.latitude, point.longitude)
-                    title = point.label?.let { "Paragem $it" } ?: "Paragem"
+                    title = point.stop?.title ?: point.label?.let { "Paragem $it" } ?: "Paragem"
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    point.stop?.let { stop ->
+                        setOnMarkerClickListener { _, _ ->
+                            onStopClick(stop)
+                            true
+                        }
+                    }
                 }
                 markerOverlay.add(marker)
             }
@@ -536,7 +556,8 @@ private fun RouteStopMiniCard(stop: RoutePlanRepository.RoutePlanStop) {
 private data class VisualRoutePoint(
     val latitude: Double,
     val longitude: Double,
-    val label: String? = null
+    val label: String? = null,
+    val stop: RoutePlanRepository.RoutePlanStop? = null
 )
 
 private fun buildStopRoutePoints(routePlan: RoutePlanRepository.RoutePlanDetail): List<VisualRoutePoint> {
@@ -545,7 +566,8 @@ private fun buildStopRoutePoints(routePlan: RoutePlanRepository.RoutePlanDetail)
             VisualRoutePoint(
                 latitude = stop.latitude,
                 longitude = stop.longitude,
-                label = stop.visitOrder.toString()
+                label = stop.visitOrder.toString(),
+                stop = stop
             )
         } else {
             null
@@ -561,6 +583,50 @@ private fun buildRouteGeometryPoints(routePlan: RoutePlanRepository.RoutePlanDet
         routeGeometry
     } else {
         buildStopRoutePoints(routePlan)
+    }
+}
+
+@Composable
+private fun RouteStopPreviewCard(
+    stop: RoutePlanRepository.RoutePlanStop,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = GeodouroWhite.copy(alpha = 0.97f),
+        shape = RoundedCornerShape(20.dp),
+        tonalElevation = 3.dp,
+        shadowElevation = 8.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            stop.imageUrl?.takeIf { it.isNotBlank() }?.let { imageUrl ->
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = stop.title,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .background(GeodouroLightBg),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            Text(
+                text = "${stop.visitOrder}. ${stop.title}",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = GeodouroTextPrimary
+            )
+            stop.subtitle?.takeIf { it.isNotBlank() }?.let { subtitle ->
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GeodouroTextSecondary
+                )
+            }
+        }
     }
 }
 

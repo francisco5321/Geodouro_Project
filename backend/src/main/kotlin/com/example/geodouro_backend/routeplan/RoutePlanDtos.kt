@@ -29,6 +29,7 @@ data class RoutePlanStopResponse(
     val targetType: String,
     val title: String,
     val subtitle: String?,
+    val imagePath: String?,
     val observationId: Int?,
     val plantSpeciesId: Int?,
     val publicationId: Int?,
