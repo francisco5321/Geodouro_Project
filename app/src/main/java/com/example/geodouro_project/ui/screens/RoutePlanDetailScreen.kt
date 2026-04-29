@@ -28,12 +28,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -78,6 +75,7 @@ import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -338,16 +336,30 @@ private fun RouteMapCard(
     val stopPoints = remember(routePlan) { buildStopRoutePoints(routePlan) }
     var selectedStop by remember(routePlan) { mutableStateOf<RoutePlanRepository.RoutePlanStop?>(null) }
     var locationPermissionGranted by remember { mutableStateOf(hasFineLocationPermission(context)) }
-    var followUserLocation by remember { mutableStateOf(locationPermissionGranted) }
     var recenterToUserTrigger by remember { mutableStateOf(0) }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         locationPermissionGranted = granted
-        followUserLocation = granted
         if (granted) {
             recenterToUserTrigger += 1
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!locationPermissionGranted) {
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    LaunchedEffect(locationPermissionGranted) {
+        if (locationPermissionGranted) {
+            recenterToUserTrigger += 1
+            while (true) {
+                delay(15_000)
+                recenterToUserTrigger += 1
+            }
         }
     }
 
@@ -357,7 +369,6 @@ private fun RouteMapCard(
             stopPoints = stopPoints,
             onStopClick = { selectedStop = it },
             showUserLocation = locationPermissionGranted,
-            followUserLocation = followUserLocation,
             recenterToUserTrigger = recenterToUserTrigger,
             modifier = Modifier.fillMaxSize()
         )
@@ -370,34 +381,6 @@ private fun RouteMapCard(
                     .padding(top = 16.dp, start = 16.dp, end = 16.dp)
             )
         }
-
-        Button(
-            onClick = {
-                if (hasFineLocationPermission(context)) {
-                    locationPermissionGranted = true
-                    followUserLocation = true
-                    recenterToUserTrigger += 1
-                } else {
-                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                }
-            },
-            enabled = routePoints.isNotEmpty(),
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 112.dp, end = 16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = GeodouroBrandGreen),
-            shape = CircleShape,
-            contentPadding = PaddingValues(14.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.MyLocation,
-                contentDescription = if (locationPermissionGranted) {
-                    "Seguir localizacao"
-                } else {
-                    "Ativar localizacao"
-                }
-            )
-        }
     }
 }
 
@@ -407,7 +390,6 @@ private fun InAppRouteMap(
     stopPoints: List<VisualRoutePoint>,
     onStopClick: (RoutePlanRepository.RoutePlanStop) -> Unit,
     showUserLocation: Boolean,
-    followUserLocation: Boolean,
     recenterToUserTrigger: Int,
     modifier: Modifier = Modifier
 ) {
@@ -473,11 +455,7 @@ private fun InAppRouteMap(
             if (showUserLocation) {
                 val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(context), view).apply {
                     enableMyLocation()
-                    if (followUserLocation) {
-                        enableFollowLocation()
-                    } else {
-                        disableFollowLocation()
-                    }
+                    disableFollowLocation()
                 }
                 view.overlays.add(locationOverlay)
             }
@@ -494,11 +472,7 @@ private fun InAppRouteMap(
                 }
             }
 
-            if (
-                showUserLocation &&
-                followUserLocation &&
-                recenterToUserTrigger != lastHandledRecenterTrigger
-            ) {
+            if (showUserLocation && recenterToUserTrigger != lastHandledRecenterTrigger) {
                 val userPoint = view.overlays
                     .filterIsInstance<MyLocationNewOverlay>()
                     .firstOrNull()
