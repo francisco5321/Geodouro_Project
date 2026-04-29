@@ -597,8 +597,7 @@ class RoutePlanService(
                        publication_observation.image_uri,
                        species_observation.image_uri,
                        obs_target.enriched_photo_url,
-                       publication_observation.enriched_photo_url,
-                       species_target.thumbnail_path
+                       publication_observation.enriched_photo_url
                    ) AS image_path,
                    svt.observation_id,
                    COALESCE(svt.plant_species_id, obs_target.plant_species_id, publication_target.plant_species_id) AS plant_species_id,
