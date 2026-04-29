@@ -688,6 +688,7 @@ private fun buildObservationMeta(observation: ObservationEntity): String {
 private fun buildProfileObservationStatusLabel(observation: ObservationEntity): String {
     return when {
         observation.isPublished -> "Publicada"
+        observation.requiresManualIdentification -> "Em revisão"
         observation.syncStatus == ObservationSyncStatus.SYNCED.name -> "Sincronizada"
         observation.syncStatus == ObservationSyncStatus.FAILED.name -> "Guardada localmente - backend indisponivel"
         else -> "Pendente de sincronizacao"

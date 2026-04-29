@@ -344,7 +344,11 @@ class PlantRepository(
 
             val ownerIdentity = currentIdentityProvider()
             val remoteObservations = remoteObservationCatalogService.fetchObservations()
-                .map { it.toObservationEntity(ownerIdentity) }
+                .map { remoteObservation ->
+                    mergeRemoteObservationWithLocal(
+                        remoteObservation = remoteObservation.toObservationEntity(ownerIdentity)
+                    )
+                }
             if (remoteObservations.isNotEmpty()) {
                 observationDao.upsertAll(remoteObservations)
             }
@@ -364,9 +368,11 @@ class PlantRepository(
             }
 
             val ownerIdentity = currentIdentityProvider()
-            remoteObservationCatalogService.fetchObservationDetail(observationId)
+            val remoteObservation = remoteObservationCatalogService.fetchObservationDetail(observationId)
                 ?.toObservationEntity(ownerIdentity)
-                ?.also { observationDao.upsert(it) }
+                ?: return@withContext null
+            mergeRemoteObservationWithLocal(remoteObservation)
+                .also { observationDao.upsert(it) }
         }
     }
 
@@ -898,10 +904,78 @@ class PlantRepository(
         observation: ObservationEntity,
         syncAttemptAt: Long
     ): Boolean = withContext(Dispatchers.IO) {
-        remoteObservationSyncService.uploadObservation(
+        val uploadSucceeded = remoteObservationSyncService.uploadObservation(
             observation = observation,
             syncAttemptAt = syncAttemptAt
         )
+
+        if (uploadSucceeded) {
+            true
+        } else {
+            reconcileObservationAlreadySynced(observation)
+        }
+    }
+
+    private suspend fun reconcileObservationAlreadySynced(
+        observation: ObservationEntity
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (!remoteObservationCatalogService.isConfigured()) {
+            return@withContext false
+        }
+
+        val ownerIdentity = currentIdentityProvider()
+        val remoteObservation = remoteObservationCatalogService.fetchObservationDetail(observation.id)
+            ?: return@withContext false
+
+        val sameOwner = when {
+            ownerIdentity?.userId != null -> remoteObservation.userId == ownerIdentity.userId
+            else -> true
+        }
+
+        if (!sameOwner) {
+            Log.w(
+                TAG,
+                "Remote observation ${observation.id} exists but belongs to a different owner. Keeping local sync as failed."
+            )
+            return@withContext false
+        }
+
+        val mergedRemoteObservation = mergeRemoteObservationWithLocal(
+            remoteObservation = remoteObservation.toObservationEntity(ownerIdentity)
+        )
+        observationDao.upsert(
+            mergedRemoteObservation.copy(
+                imageUri = observation.imageUri.takeIf { it.isNotBlank() }
+                    ?: mergedRemoteObservation.imageUri,
+                imageUrisSerialized = ObservationEntity.serializeImageUris(
+                    imageUris = observation.allImageUris().ifEmpty {
+                        mergedRemoteObservation.allImageUris()
+                    },
+                    fallbackImageUri = observation.imageUri.takeIf { it.isNotBlank() }
+                        ?: mergedRemoteObservation.imageUri
+                ),
+                lastSyncAttemptAt = observation.lastSyncAttemptAt
+            )
+        )
+        Log.i(
+            TAG,
+            "Recovered observation sync after upload failure by confirming backend record id=${observation.id}"
+        )
+        true
+    }
+
+    private suspend fun mergeRemoteObservationWithLocal(
+        remoteObservation: ObservationEntity
+    ): ObservationEntity {
+        val localObservation = observationDao.getById(remoteObservation.id)
+        return if (localObservation?.requiresManualIdentification == true) {
+            remoteObservation.copy(
+                requiresManualIdentification = true,
+                notes = localObservation.notes ?: remoteObservation.notes
+            )
+        } else {
+            remoteObservation
+        }
     }
 
     private fun InaturalistTaxonDto.toCacheEntity(query: String): TaxonCacheEntity {
