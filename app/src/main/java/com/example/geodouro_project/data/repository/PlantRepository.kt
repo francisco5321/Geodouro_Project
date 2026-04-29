@@ -303,12 +303,14 @@ class PlantRepository(
         return syncedCount
     }
 
-    fun observeObservations(): Flow<List<ObservationEntity>> {
+    fun observeObservations(includeManualReview: Boolean = false): Flow<List<ObservationEntity>> {
         val ownerIdentity = currentIdentityProvider()
         return observationDao.observeAllForOwner(
             ownerUserId = ownerIdentity?.userId,
             ownerGuestLabel = ownerIdentity?.guestLabel
-        ).map(::filterUserVisibleObservations)
+        ).map { observations ->
+            filterUserVisibleObservations(observations, includeManualReview)
+        }
     }
 
     fun observeFailedObservationIds(): Flow<Set<String>> {
@@ -324,19 +326,20 @@ class PlantRepository(
         return observationDao.observePublished()
     }
 
-    suspend fun fetchLocalObservations(): List<ObservationEntity> {
+    suspend fun fetchLocalObservations(includeManualReview: Boolean = false): List<ObservationEntity> {
         return withContext(Dispatchers.IO) {
             val ownerIdentity = currentIdentityProvider()
             filterUserVisibleObservations(
                 observationDao.getAllForOwner(
                     ownerUserId = ownerIdentity?.userId,
                     ownerGuestLabel = ownerIdentity?.guestLabel
-                )
+                ),
+                includeManualReview
             )
         }
     }
 
-    suspend fun fetchRemoteObservations(): List<ObservationEntity> {
+    suspend fun fetchRemoteObservations(includeManualReview: Boolean = false): List<ObservationEntity> {
         return withContext(Dispatchers.IO) {
             if (!connectivityChecker.hasInternetConnection() || !remoteObservationCatalogService.isConfigured()) {
                 return@withContext emptyList()
@@ -352,13 +355,17 @@ class PlantRepository(
             if (remoteObservations.isNotEmpty()) {
                 observationDao.upsertAll(remoteObservations)
             }
-            filterUserVisibleObservations(remoteObservations)
+            filterUserVisibleObservations(remoteObservations, includeManualReview)
         }
     }
 
-    suspend fun fetchObservationsRemoteFirst(): List<ObservationEntity> {
-        val remote = fetchRemoteObservations()
-        return if (remote.isNotEmpty()) remote else fetchLocalObservations()
+    suspend fun fetchObservationsRemoteFirst(includeManualReview: Boolean = false): List<ObservationEntity> {
+        val remote = fetchRemoteObservations(includeManualReview = includeManualReview)
+        return if (remote.isNotEmpty()) {
+            remote
+        } else {
+            fetchLocalObservations(includeManualReview = includeManualReview)
+        }
     }
 
     suspend fun fetchRemoteObservationDetail(observationId: String): ObservationEntity? {
@@ -526,8 +533,8 @@ class PlantRepository(
         }
     }
 
-    suspend fun fetchRemoteObservationStats(): ObservationStats? {
-        val remoteObservations = fetchRemoteObservations()
+    suspend fun fetchRemoteObservationStats(includeManualReview: Boolean = false): ObservationStats? {
+        val remoteObservations = fetchRemoteObservations(includeManualReview = includeManualReview)
         if (remoteObservations.isEmpty()) {
             return null
         }
@@ -544,8 +551,9 @@ class PlantRepository(
         )
     }
 
-    suspend fun fetchObservationStatsRemoteFirst(): ObservationStats {
-        return fetchRemoteObservationStats() ?: fetchLocalObservationStats()
+    suspend fun fetchObservationStatsRemoteFirst(includeManualReview: Boolean = false): ObservationStats {
+        return fetchRemoteObservationStats(includeManualReview = includeManualReview)
+            ?: fetchLocalObservationStats(includeManualReview = includeManualReview)
     }
 
     suspend fun fetchCommunityPublications(): List<CommunityPublication> {
@@ -1262,8 +1270,8 @@ class PlantRepository(
         )
     }
 
-    private suspend fun fetchLocalObservationStats(): ObservationStats {
-        val observations = fetchLocalObservations()
+    private suspend fun fetchLocalObservationStats(includeManualReview: Boolean = false): ObservationStats {
+        val observations = fetchLocalObservations(includeManualReview = includeManualReview)
         return ObservationStats(
             observationsCount = observations.size,
             publishedCount = observations.count { it.isPublished },
@@ -1294,8 +1302,15 @@ class PlantRepository(
         }
     }
 
-    private fun filterUserVisibleObservations(observations: List<ObservationEntity>): List<ObservationEntity> {
-        return observations.filterNot { it.requiresManualIdentification }
+    private fun filterUserVisibleObservations(
+        observations: List<ObservationEntity>,
+        includeManualReview: Boolean = false
+    ): List<ObservationEntity> {
+        return if (includeManualReview) {
+            observations
+        } else {
+            observations.filterNot { it.requiresManualIdentification }
+        }
     }
 
     private fun List<ObservationEntity>.toDetailData(): PlantSpeciesDetailData? {

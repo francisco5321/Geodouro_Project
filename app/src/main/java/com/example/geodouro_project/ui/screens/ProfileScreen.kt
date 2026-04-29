@@ -128,8 +128,8 @@ class ProfileViewModel(
     fun refresh() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-            val observations = repository.fetchObservationsRemoteFirst()
-            val stats = repository.fetchObservationStatsRemoteFirst()
+            val observations = repository.fetchObservationsRemoteFirst(includeManualReview = true)
+            val stats = repository.fetchObservationStatsRemoteFirst(includeManualReview = true)
             _uiState.value = _uiState.value.copy(
                 observations = observations,
                 observationsCount = stats.observationsCount,
