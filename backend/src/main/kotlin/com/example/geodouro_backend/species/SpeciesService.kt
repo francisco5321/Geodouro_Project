@@ -20,13 +20,58 @@ class SpeciesService(
 
     fun getSpeciesDetail(speciesId: String): PlantSpeciesDetailResponse {
         val normalizedSpeciesId = speciesId.trim().lowercase()
+        val plantSpeciesId = findPlantSpeciesIdBySlug(normalizedSpeciesId)
+            ?: throw ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Species not found for speciesId=$speciesId"
+            )
+        return getSpeciesDetailByPlantSpeciesId(plantSpeciesId)
+    }
+
+    fun updateSpecies(speciesId: String, requesterId: Int, request: UpdatePlantSpeciesRequest): PlantSpeciesDetailResponse {
+        ensureAdmin(requesterId)
+        val plantSpeciesId = findPlantSpeciesIdBySlug(speciesId.trim().lowercase())
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Species not found for speciesId=$speciesId")
+
+        val scientificName = request.scientificName.trim()
+        val family = request.family.trim()
+        val genus = request.genus.trim()
+        val specificEpithet = request.species.trim()
+        if (scientificName.isBlank() || family.isBlank() || genus.isBlank() || specificEpithet.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "scientificName, family, genus and species are required")
+        }
+
+        jdbcTemplate.update(
+            UPDATE_SPECIES_SQL,
+            MapSqlParameterSource()
+                .addValue("plantSpeciesId", plantSpeciesId)
+                .addValue("scientificName", scientificName)
+                .addValue("commonName", request.commonName?.trim()?.takeIf { it.isNotBlank() })
+                .addValue("family", family)
+                .addValue("genus", genus)
+                .addValue("species", specificEpithet)
+                .addValue("description", request.description?.trim()?.takeIf { it.isNotBlank() })
+        )
+        jdbcTemplate.update(
+            SYNC_OBSERVATION_SPECIES_METADATA_SQL,
+            MapSqlParameterSource()
+                .addValue("plantSpeciesId", plantSpeciesId)
+                .addValue("scientificName", scientificName)
+                .addValue("commonName", request.commonName?.trim()?.takeIf { it.isNotBlank() })
+                .addValue("family", family)
+        )
+
+        return getSpeciesDetailByPlantSpeciesId(plantSpeciesId)
+    }
+
+    private fun getSpeciesDetailByPlantSpeciesId(plantSpeciesId: Int): PlantSpeciesDetailResponse {
         val summary = jdbcTemplate.query(
             SPECIES_DETAIL_SQL,
-            MapSqlParameterSource("speciesId", normalizedSpeciesId),
+            MapSqlParameterSource("plantSpeciesId", plantSpeciesId),
             speciesDetailRowMapper
         ).firstOrNull() ?: throw ResponseStatusException(
             HttpStatus.NOT_FOUND,
-            "Species not found for speciesId=$speciesId"
+            "Species not found for plantSpeciesId=$plantSpeciesId"
         )
 
         val galleryImagePaths = jdbcTemplate.query(
@@ -48,6 +93,24 @@ class SpeciesService(
         )
     }
 
+    private fun findPlantSpeciesIdBySlug(speciesId: String): Int? {
+        return jdbcTemplate.query(
+            FIND_SPECIES_ID_SQL,
+            MapSqlParameterSource("speciesId", speciesId)
+        ) { rs, _ -> rs.getInt("plant_species_id") }.firstOrNull()
+    }
+
+    private fun ensureAdmin(requesterId: Int) {
+        val role = jdbcTemplate.query(
+            "SELECT COALESCE(role, 'user') AS role FROM app_user WHERE user_id = :userId",
+            MapSqlParameterSource("userId", requesterId)
+        ) { rs, _ -> rs.getString("role") }.firstOrNull()
+
+        if (!role.equals("admin", ignoreCase = true)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Acesso reservado a administradores")
+        }
+    }
+
     companion object {
         private val speciesRowMapper = RowMapper { rs, _ ->
             PlantSpeciesResponse(
@@ -59,6 +122,7 @@ class SpeciesService(
                 genus = rs.getString("genus"),
                 species = rs.getString("species"),
                 imageCount = rs.getInt("image_count"),
+                description = rs.getString("description"),
                 thumbnailPath = rs.getString("thumbnail_path"),
                 wikipediaUrl = rs.getString("wikipedia_url"),
                 updatedAt = rs.getTimestamp("updated_at").toInstant()
@@ -75,6 +139,7 @@ class SpeciesService(
                 genus = rs.getString("genus"),
                 species = rs.getString("species"),
                 imageCount = rs.getInt("image_count"),
+                description = rs.getString("description"),
                 observationCount = rs.getInt("observation_count"),
                 syncedCount = rs.getInt("synced_count"),
                 publishedCount = rs.getInt("published_count"),
@@ -147,6 +212,7 @@ class SpeciesService(
                    ps.genus,
                    ps.species,
                    ps.image_count,
+                   ps.description,
                    ps.updated_at,
                    COALESCE(obs_image.image_path, latest_observation.image_uri, latest_observation.enriched_photo_url) AS thumbnail_path,
                    latest_observation.enriched_wikipedia_url AS wikipedia_url
@@ -188,6 +254,7 @@ class SpeciesService(
                    ps.genus,
                    ps.species,
                    ps.image_count,
+                   ps.description,
                    ps.updated_at,
                    COALESCE(obs_image.image_path, latest_observation.image_uri, latest_observation.enriched_photo_url) AS hero_image_path,
                    latest_observation.enriched_wikipedia_url AS wikipedia_url,
@@ -229,12 +296,40 @@ class SpeciesService(
                 FROM observation o
                 WHERE o.plant_species_id = ps.plant_species_id
             ) observation_stats ON TRUE
-            WHERE lower(replace(trim(ps.scientific_name), ' ', '_')) = :speciesId
+            WHERE ps.plant_species_id = :plantSpeciesId
               AND EXISTS (
                   SELECT 1
                   FROM observation o
                   WHERE o.plant_species_id = ps.plant_species_id
               )
+        """
+
+        private const val FIND_SPECIES_ID_SQL = """
+            SELECT plant_species_id
+            FROM plant_species
+            WHERE lower(replace(trim(scientific_name), ' ', '_')) = :speciesId
+            LIMIT 1
+        """
+
+        private const val UPDATE_SPECIES_SQL = """
+            UPDATE plant_species
+            SET scientific_name = :scientificName,
+                common_name = :commonName,
+                family = :family,
+                genus = :genus,
+                species = :species,
+                description = :description,
+                updated_at = NOW()
+            WHERE plant_species_id = :plantSpeciesId
+        """
+
+        private const val SYNC_OBSERVATION_SPECIES_METADATA_SQL = """
+            UPDATE observation
+            SET enriched_scientific_name = :scientificName,
+                enriched_common_name = :commonName,
+                enriched_family = :family,
+                updated_at = NOW()
+            WHERE plant_species_id = :plantSpeciesId
         """
 
         private const val SPECIES_GALLERY_SQL = """

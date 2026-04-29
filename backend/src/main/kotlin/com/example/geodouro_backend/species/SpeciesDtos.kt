@@ -12,6 +12,7 @@ data class PlantSpeciesResponse(
     val genus: String,
     val species: String,
     val imageCount: Int,
+    val description: String?,
     val thumbnailPath: String?,
     val wikipediaUrl: String?,
     val updatedAt: Instant
@@ -26,6 +27,7 @@ data class PlantSpeciesDetailResponse(
     val genus: String,
     val species: String,
     val imageCount: Int,
+    val description: String?,
     val observationCount: Int,
     val syncedCount: Int,
     val publishedCount: Int,
@@ -46,4 +48,13 @@ data class PlantSpeciesObservationResponse(
     val syncStatus: String,
     val isPublished: Boolean,
     val imagePath: String?
+)
+
+data class UpdatePlantSpeciesRequest(
+    val scientificName: String,
+    val commonName: String?,
+    val family: String,
+    val genus: String,
+    val species: String,
+    val description: String?
 )
