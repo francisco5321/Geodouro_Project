@@ -2,6 +2,7 @@ package com.example.geodouro_project.data.repository
 
 import com.example.geodouro_project.data.remote.RemoteRoutePlanCoordinate
 import com.example.geodouro_project.data.remote.RemoteRoutePlanDetail
+import com.example.geodouro_project.data.remote.RemoteRouteGeometryService
 import com.example.geodouro_project.data.remote.RemoteRoutePlanService
 import com.example.geodouro_project.data.remote.RemoteRoutePlanStop
 import com.example.geodouro_project.data.remote.RemoteRoutePlanSummary
@@ -10,7 +11,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class RoutePlanRepository(
-    private val remoteRoutePlanService: RemoteRoutePlanService
+    private val remoteRoutePlanService: RemoteRoutePlanService,
+    private val remoteRouteGeometryService: RemoteRouteGeometryService
 ) {
     suspend fun fetchRoutePlans(session: SessionState.Authenticated): List<RoutePlanSummary> = withContext(Dispatchers.IO) {
         remoteRoutePlanService.fetchRoutePlans(
@@ -25,11 +27,36 @@ class RoutePlanRepository(
         routePlanId: Int,
         session: SessionState.Authenticated
     ): RoutePlanDetail? = withContext(Dispatchers.IO) {
-        remoteRoutePlanService.fetchRoutePlanDetail(
+        val detail = remoteRoutePlanService.fetchRoutePlanDetail(
             routePlanId = routePlanId,
             userId = session.userId,
             authToken = session.authToken
-        )?.toDomain()
+        )?.toDomain() ?: return@withContext null
+
+        if (detail.routeGeometry.isNotEmpty()) {
+            return@withContext detail
+        }
+
+        val routedGeometry = remoteRouteGeometryService.fetchRouteGeometry(
+            detail.toRoutingWaypoints()
+                .map { point ->
+                    RemoteRoutePlanCoordinate(
+                        latitude = point.latitude,
+                        longitude = point.longitude
+                    )
+                }
+        ).map { coordinate ->
+            RoutePlanCoordinate(
+                latitude = coordinate.latitude,
+                longitude = coordinate.longitude
+            )
+        }
+
+        if (routedGeometry.isNotEmpty()) {
+            detail.copy(routeGeometry = routedGeometry)
+        } else {
+            detail
+        }
     }
 
     data class RoutePlanSummary(
@@ -120,5 +147,30 @@ class RoutePlanRepository(
             latitude = latitude,
             longitude = longitude
         )
+    }
+
+    private fun RoutePlanDetail.toRoutingWaypoints(): List<RoutePlanCoordinate> {
+        val waypoints = mutableListOf<RoutePlanCoordinate>()
+
+        if (startLatitude != null && startLongitude != null) {
+            waypoints += RoutePlanCoordinate(
+                latitude = startLatitude,
+                longitude = startLongitude
+            )
+        }
+
+        stops.forEach { stop ->
+            if (stop.latitude != null && stop.longitude != null) {
+                val candidate = RoutePlanCoordinate(
+                    latitude = stop.latitude,
+                    longitude = stop.longitude
+                )
+                if (waypoints.lastOrNull() != candidate) {
+                    waypoints += candidate
+                }
+            }
+        }
+
+        return waypoints
     }
 }

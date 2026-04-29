@@ -1,18 +1,31 @@
 package com.example.geodouro_backend.routeplan
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.http.HttpStatus
 import org.springframework.dao.EmptyResultDataAccessException
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
+import java.net.URI
+import java.net.URLEncoder
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.nio.charset.StandardCharsets
 
 @Service
 class RoutePlanService(
-    private val jdbcTemplate: NamedParameterJdbcTemplate
+    private val jdbcTemplate: NamedParameterJdbcTemplate,
+    private val objectMapper: ObjectMapper,
+    @Value("\${app.routing.osrm-base-url:https://router.project-osrm.org}")
+    private val osrmBaseUrl: String
 ) {
+    private val httpClient: HttpClient = HttpClient.newHttpClient()
 
     fun listRoutePlans(userId: Int): List<RoutePlanSummaryResponse> {
         return jdbcTemplate.query(
@@ -363,15 +376,75 @@ class RoutePlanService(
             stopCoordinates.firstOrNull()
         } ?: return emptyList()
 
-        val geometry = mutableListOf<RoutePlanCoordinateResponse>()
-        geometry += startCoordinate
-        geometry += stopCoordinates
-
-        if (geometry.lastOrNull() != startCoordinate) {
-            geometry += startCoordinate
+        val waypointCoordinates = buildList {
+            add(startCoordinate)
+            addAll(stopCoordinates)
+            if (stopCoordinates.isNotEmpty() && stopCoordinates.last() != startCoordinate) {
+                add(startCoordinate)
+            }
         }
 
-        return geometry
+        if (waypointCoordinates.size < 2) {
+            return waypointCoordinates
+        }
+
+        return fetchRoutedGeometry(waypointCoordinates) ?: waypointCoordinates
+    }
+
+    private fun fetchRoutedGeometry(
+        waypoints: List<RoutePlanCoordinateResponse>
+    ): List<RoutePlanCoordinateResponse>? {
+        return runCatching {
+            val coordinates = waypoints.joinToString(";") { point ->
+                "${point.longitude},${point.latitude}"
+            }
+            val encodedCoordinates = URLEncoder.encode(coordinates, StandardCharsets.UTF_8)
+            val url = buildString {
+                append(osrmBaseUrl.trimEnd('/'))
+                append("/route/v1/foot/")
+                append(encodedCoordinates)
+                append("?overview=full&geometries=geojson")
+            }
+
+            val request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .GET()
+                .build()
+
+            val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+            if (response.statusCode() !in 200..299) {
+                return@runCatching null
+            }
+
+            val root = objectMapper.readTree(response.body())
+            if (root.path("code").asText() != "Ok") {
+                return@runCatching null
+            }
+
+            root.path("routes")
+                .firstOrNull()
+                ?.path("geometry")
+                ?.path("coordinates")
+                ?.mapNotNull(::toRouteCoordinate)
+                ?.takeIf { it.isNotEmpty() }
+        }.getOrNull()
+    }
+
+    private fun toRouteCoordinate(node: JsonNode): RoutePlanCoordinateResponse? {
+        if (!node.isArray || node.size() < 2) {
+            return null
+        }
+
+        val longitude = node[0]?.asDouble()
+        val latitude = node[1]?.asDouble()
+        if (latitude == null || longitude == null) {
+            return null
+        }
+
+        return RoutePlanCoordinateResponse(
+            latitude = latitude,
+            longitude = longitude
+        )
     }
 
     companion object {

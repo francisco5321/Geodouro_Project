@@ -13,6 +13,7 @@ import com.example.geodouro_project.data.remote.RemoteDbConfig
 import com.example.geodouro_project.data.remote.RemoteObservationCatalogService
 import com.example.geodouro_project.data.remote.RemoteObservationSyncService
 import com.example.geodouro_project.data.remote.RemotePublicationService
+import com.example.geodouro_project.data.remote.RemoteRouteGeometryService
 import com.example.geodouro_project.data.remote.RemoteRoutePlanService
 import com.example.geodouro_project.data.remote.RemoteSpeciesService
 import com.example.geodouro_project.data.remote.RemoteVisitTargetService
@@ -113,6 +114,10 @@ object AppContainer {
                         guestLabel = BuildConfig.BACKEND_GUEST_LABEL,
                         defaultUserId = BuildConfig.BACKEND_DEFAULT_USER_ID
                     )
+                ),
+                remoteRouteGeometryService = RemoteRouteGeometryService(
+                    httpClient = httpClient,
+                    gson = Gson()
                 )
             ).also { routePlanRepositoryInstance = it }
         }

@@ -89,6 +89,7 @@ dependencies {
     implementation(libs.androidx.fragment.ktx)
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
     implementation("org.pytorch:pytorch_android:1.13.1")
     implementation("org.pytorch:pytorch_android_torchvision:1.13.1")
     testImplementation(libs.junit)

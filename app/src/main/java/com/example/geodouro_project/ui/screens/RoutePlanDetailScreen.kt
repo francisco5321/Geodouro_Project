@@ -2,11 +2,10 @@ package com.example.geodouro_project.ui.screens
 
 import android.Manifest
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,23 +13,25 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -46,21 +47,25 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.geodouro_project.core.location.LocationResolver
 import com.example.geodouro_project.data.repository.RoutePlanRepository
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.SessionState
@@ -75,6 +80,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.FolderOverlay
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
 sealed interface RoutePlanDetailUiState {
     data object Loading : RoutePlanDetailUiState
@@ -102,7 +117,7 @@ class RoutePlanDetailViewModel(
                 is SessionState.Authenticated -> {
                     val userId = sessionState.userId
                     if (userId == null) {
-                        _uiState.value = RoutePlanDetailUiState.Error("Sessão autenticada sem identificador remoto.")
+                        _uiState.value = RoutePlanDetailUiState.Error("Sessao autenticada sem identificador remoto.")
                         return@launch
                     }
 
@@ -110,13 +125,13 @@ class RoutePlanDetailViewModel(
                         routePlanRepository.fetchRoutePlanDetail(routePlanId, sessionState)
                     }.getOrElse { error ->
                         _uiState.value = RoutePlanDetailUiState.Error(
-                            error.message ?: "Não foi possível abrir o percurso."
+                            error.message ?: "Nao foi possivel abrir o percurso."
                         )
                         return@launch
                     }
 
                     _uiState.value = if (detail == null) {
-                        RoutePlanDetailUiState.Error("Percurso não encontrado.")
+                        RoutePlanDetailUiState.Error("Percurso nao encontrado.")
                     } else {
                         RoutePlanDetailUiState.Success(detail)
                     }
@@ -128,7 +143,7 @@ class RoutePlanDetailViewModel(
 
                 SessionState.Loading,
                 SessionState.LoggedOut -> {
-                    _uiState.value = RoutePlanDetailUiState.Error("Sessão indisponível.")
+                    _uiState.value = RoutePlanDetailUiState.Error("Sessao indisponivel.")
                 }
             }
         }
@@ -222,7 +237,7 @@ fun RoutePlanDetailScreen(
 
                 is RoutePlanDetailUiState.Error -> {
                     RoutePlanEmptyState(
-                        title = "Não foi possível abrir o percurso.",
+                        title = "Nao foi possivel abrir o percurso.",
                         message = state.message,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -230,7 +245,7 @@ fun RoutePlanDetailScreen(
 
                 RoutePlanDetailUiState.GuestRestricted -> {
                     RoutePlanEmptyState(
-                        title = "Percurso indisponível em modo convidado.",
+                        title = "Percurso indisponivel em modo convidado.",
                         message = "Entra com a tua conta para veres os detalhes e o circuito do percurso.",
                         modifier = Modifier.fillMaxSize()
                     )
@@ -257,281 +272,303 @@ private fun RoutePlanDetailContent(
     routePlan: RoutePlanRepository.RoutePlanDetail,
     padding: PaddingValues
 ) {
-    LazyColumn(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(padding)
-            .background(GeodouroBg),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .background(GeodouroBg)
     ) {
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
-                elevation = CardDefaults.cardElevation(2.dp),
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = routePlan.name,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = GeodouroTextPrimary,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                    routePlan.description?.takeIf { it.isNotBlank() }?.let { description ->
-                        Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = GeodouroTextSecondary
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        RoutePlanMetaChip("${routePlan.stopCount} paragens")
-                        RoutePlanMetaChip("Partida: localizacao atual")
-                    }
-                }
-            }
-        }
+        RouteMapCard(
+            routePlan = routePlan,
+            modifier = Modifier.fillMaxSize()
+        )
 
-        item { RouteStartCard() }
-        item { RouteMapCard(routePlan) }
+        RouteStopsOverlay(
+            routePlan = routePlan,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        )
+    }
+}
 
-        item {
+@Composable
+private fun RouteStopsOverlay(
+    routePlan: RoutePlanRepository.RoutePlanDetail,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = GeodouroWhite.copy(alpha = 0.94f),
+        shape = RoundedCornerShape(20.dp),
+        tonalElevation = 2.dp,
+        shadowElevation = 8.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             Text(
-                text = "Paragens por ordem",
-                style = MaterialTheme.typography.titleMedium,
+                text = "Paragens",
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = GeodouroTextPrimary
             )
-        }
-
-        items(routePlan.stops, key = { it.routePlanPointId }) { stop ->
-            RouteStopCard(stop)
-        }
-    }
-}
-
-@Composable
-private fun RouteStartCard() {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
-        elevation = CardDefaults.cardElevation(2.dp),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(shape = CircleShape, color = GeodouroLightBg) {
-                Icon(
-                    imageVector = Icons.Default.Flag,
-                    contentDescription = null,
-                    tint = GeodouroBrandGreen,
-                    modifier = Modifier
-                        .padding(12.dp)
-                        .size(22.dp)
-                )
-            }
-            Column {
-                Text(
-                    text = "Ponto de partida",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = GeodouroTextPrimary
-                )
-                Text(
-                    text = "A tua localização atual, ao abrir o percurso no Google Maps.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = GeodouroTextSecondary
-                )
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                routePlan.stops.forEach { stop ->
+                    RouteStopMiniCard(stop)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun RouteMapCard(routePlan: RoutePlanRepository.RoutePlanDetail) {
-    val points = buildGoogleMapsPoints(routePlan)
+private fun RouteMapCard(
+    routePlan: RoutePlanRepository.RoutePlanDetail,
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
-    val appContext = context.applicationContext
-    val locationResolver = remember(appContext) { LocationResolver(appContext) }
-    val coroutineScope = rememberCoroutineScope()
+    val routePoints = remember(routePlan) { buildRouteGeometryPoints(routePlan) }
+    val stopPoints = remember(routePlan) { buildStopRoutePoints(routePlan) }
+    var locationPermissionGranted by remember { mutableStateOf(hasFineLocationPermission(context)) }
+    var followUserLocation by remember { mutableStateOf(locationPermissionGranted) }
+    var recenterToUserTrigger by remember { mutableStateOf(0) }
+
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
-        coroutineScope.launch {
-            val originCoordinates = if (granted) {
-                locationResolver.getCurrentCoordinates()
-            } else {
-                null
-            }
-            openDriveToRouteStartInGoogleMaps(context, points, originCoordinates)
+        locationPermissionGranted = granted
+        followUserLocation = granted
+        if (granted) {
+            recenterToUserTrigger += 1
         }
     }
-    Card(
-        colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
-        elevation = CardDefaults.cardElevation(2.dp),
-        shape = RoundedCornerShape(18.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+
+    Box(modifier = modifier) {
+        InAppRouteMap(
+            routePoints = routePoints,
+            stopPoints = stopPoints,
+            showUserLocation = locationPermissionGranted,
+            followUserLocation = followUserLocation,
+            recenterToUserTrigger = recenterToUserTrigger,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Button(
+            onClick = {
+                if (hasFineLocationPermission(context)) {
+                    locationPermissionGranted = true
+                    followUserLocation = true
+                    recenterToUserTrigger += 1
+                } else {
+                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
+            },
+            enabled = routePoints.isNotEmpty(),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 112.dp, end = 16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = GeodouroBrandGreen),
+            shape = CircleShape,
+            contentPadding = PaddingValues(14.dp)
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.Map, contentDescription = null, tint = GeodouroBrandGreen)
-                Text(
-                    text = "Mapa do percurso",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = GeodouroTextPrimary
-                )
+            Icon(
+                imageVector = Icons.Default.MyLocation,
+                contentDescription = if (locationPermissionGranted) {
+                    "Seguir localizacao"
+                } else {
+                    "Ativar localizacao"
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun InAppRouteMap(
+    routePoints: List<VisualRoutePoint>,
+    stopPoints: List<VisualRoutePoint>,
+    showUserLocation: Boolean,
+    followUserLocation: Boolean,
+    recenterToUserTrigger: Int,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current.applicationContext
+    var hasFittedRouteBounds by remember(routePoints, stopPoints) { mutableStateOf(false) }
+    var lastHandledRecenterTrigger by remember { mutableStateOf(-1) }
+
+    DisposableEffect(context) {
+        Configuration.getInstance().userAgentValue = context.packageName
+        onDispose { }
+    }
+    val mapView = remember {
+        MapView(context).apply {
+            setTileSource(TileSourceFactory.MAPNIK)
+            setMultiTouchControls(true)
+            minZoomLevel = 4.0
+            maxZoomLevel = 20.0
+            controller.setZoom(15.0)
+        }
+    }
+
+    DisposableEffect(mapView) {
+        mapView.onResume()
+        onDispose {
+            mapView.onPause()
+            mapView.onDetach()
+        }
+    }
+
+    AndroidView(
+        factory = { mapView },
+        modifier = modifier,
+        update = { view ->
+            view.overlays.clear()
+
+            val geoPoints = routePoints.map { GeoPoint(it.latitude, it.longitude) }
+            if (geoPoints.isNotEmpty()) {
+                val polyline = Polyline().apply {
+                    outlinePaint.color = android.graphics.Color.parseColor("#2E7D32")
+                    outlinePaint.strokeWidth = 9f
+                    setPoints(geoPoints)
+                }
+                view.overlays.add(polyline)
             }
 
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                color = GeodouroLightBg,
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = if (points.isEmpty()) {
-                            "Adiciona pelo menos uma paragem com coordenadas para abrir no Google Maps."
-                        } else {
-                            "Primeiro navega de carro ate ao inicio. Depois abre o circuito a pe, passando pelas paragens e regressando ao primeiro ponto."
-                        },
-                        color = GeodouroTextSecondary,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Button(
-                        onClick = {
-                            if (locationResolver.hasLocationPermission()) {
-                                coroutineScope.launch {
-                                    openDriveToRouteStartInGoogleMaps(
-                                        context = context,
-                                        points = points,
-                                        originCoordinates = locationResolver.getCurrentCoordinates()
-                                    )
-                                }
-                            } else {
-                                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                            }
-                        },
-                        enabled = points.isNotEmpty(),
-                        colors = ButtonDefaults.buttonColors(containerColor = GeodouroBrandGreen),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DirectionsCar,
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text("Ir ate ao inicio de carro")
-                    }
-                    Button(
-                        onClick = { openWalkingRouteInGoogleMaps(context, points) },
-                        enabled = points.size >= 2,
-                        colors = ButtonDefaults.buttonColors(containerColor = GeodouroGreen),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Directions,
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text("Percurso a pé")
+            val markerOverlay = FolderOverlay()
+            stopPoints.forEach { point ->
+                val marker = Marker(view).apply {
+                    position = GeoPoint(point.latitude, point.longitude)
+                    title = point.label?.let { "Paragem $it" } ?: "Paragem"
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                }
+                markerOverlay.add(marker)
+            }
+            view.overlays.add(markerOverlay)
+
+            if (showUserLocation) {
+                val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(context), view).apply {
+                    enableMyLocation()
+                    if (followUserLocation) {
+                        enableFollowLocation()
+                    } else {
+                        disableFollowLocation()
                     }
                 }
+                view.overlays.add(locationOverlay)
             }
+
+            val boundsPoints = buildList {
+                addAll(geoPoints)
+                addAll(stopPoints.map { GeoPoint(it.latitude, it.longitude) })
+            }
+            if (boundsPoints.isNotEmpty() && !hasFittedRouteBounds) {
+                val bounds = BoundingBox.fromGeoPointsSafe(boundsPoints)
+                view.post {
+                    view.zoomToBoundingBox(bounds, true, 96)
+                    hasFittedRouteBounds = true
+                }
+            }
+
+            if (
+                showUserLocation &&
+                followUserLocation &&
+                recenterToUserTrigger != lastHandledRecenterTrigger
+            ) {
+                val userPoint = view.overlays
+                    .filterIsInstance<MyLocationNewOverlay>()
+                    .firstOrNull()
+                    ?.myLocation
+
+                if (userPoint != null) {
+                    view.controller.animateTo(userPoint)
+                    if (view.zoomLevelDouble < 16.5) {
+                        view.controller.setZoom(16.5)
+                    }
+                    lastHandledRecenterTrigger = recenterToUserTrigger
+                }
+            }
+
+            view.invalidate()
+        }
+    )
+}
+
+@Composable
+private fun RouteStopMiniCard(stop: RoutePlanRepository.RoutePlanStop) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = GeodouroLightBg,
+        modifier = Modifier.width(170.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "${stop.visitOrder}. ${stop.title}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = GeodouroTextPrimary,
+                maxLines = 2
+            )
+            stop.subtitle?.takeIf { it.isNotBlank() }?.let { subtitle ->
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GeodouroTextSecondary,
+                    maxLines = 2
+                )
+            }
+            Text(
+                text = stop.targetType.asUiLabel(),
+                style = MaterialTheme.typography.labelSmall,
+                color = GeodouroBrandGreen
+            )
         }
     }
 }
 
 private data class VisualRoutePoint(
     val latitude: Double,
-    val longitude: Double
+    val longitude: Double,
+    val label: String? = null
 )
 
-private fun openDriveToRouteStartInGoogleMaps(
-    context: Context,
-    points: List<VisualRoutePoint>,
-    originCoordinates: Pair<Double, Double>?
-) {
-    if (points.isEmpty()) return
-
-    val origin = originCoordinates?.let { (latitude, longitude) ->
-        "$latitude,$longitude"
-    } ?: "Current Location"
-    val destination = points.first().asMapsCoordinate()
-
-    val uriBuilder = Uri.parse("https://www.google.com/maps/dir/").buildUpon()
-        .appendQueryParameter("api", "1")
-        .appendQueryParameter("origin", origin)
-        .appendQueryParameter("destination", destination)
-        .appendQueryParameter("travelmode", "driving")
-
-    openMapsIntent(context, uriBuilder.build())
-}
-
-private fun openWalkingRouteInGoogleMaps(context: Context, points: List<VisualRoutePoint>) {
-    if (points.size < 2) return
-
-    val origin = points.first().asMapsCoordinate()
-    val destination = points.first().asMapsCoordinate()
-    val waypoints = points
-        .drop(1)
-        .take(23)
-        .joinToString("|") { it.asMapsCoordinate() }
-
-    val uriBuilder = Uri.parse("https://www.google.com/maps/dir/").buildUpon()
-        .appendQueryParameter("api", "1")
-        .appendQueryParameter("origin", origin)
-        .appendQueryParameter("destination", destination)
-        .appendQueryParameter("travelmode", "walking")
-
-    if (waypoints.isNotBlank()) {
-        uriBuilder.appendQueryParameter("waypoints", waypoints)
-    }
-
-    openMapsIntent(context, uriBuilder.build())
-}
-
-private fun openMapsIntent(context: Context, uri: Uri) {
-    val mapsIntent = Intent(Intent.ACTION_VIEW, uri).apply {
-        setPackage("com.google.android.apps.maps")
-    }
-
-    val fallbackIntent = Intent(Intent.ACTION_VIEW, uri)
-    runCatching {
-        context.startActivity(mapsIntent)
-    }.getOrElse {
-        context.startActivity(fallbackIntent)
-    }
-}
-
-private fun VisualRoutePoint.asMapsCoordinate(): String = "$latitude,$longitude"
-
-private fun buildGoogleMapsPoints(routePlan: RoutePlanRepository.RoutePlanDetail): List<VisualRoutePoint> {
+private fun buildStopRoutePoints(routePlan: RoutePlanRepository.RoutePlanDetail): List<VisualRoutePoint> {
     return routePlan.stops.mapNotNull { stop ->
         if (stop.latitude != null && stop.longitude != null) {
-            VisualRoutePoint(stop.latitude, stop.longitude)
+            VisualRoutePoint(
+                latitude = stop.latitude,
+                longitude = stop.longitude,
+                label = stop.visitOrder.toString()
+            )
         } else {
             null
         }
     }
+}
+
+private fun buildRouteGeometryPoints(routePlan: RoutePlanRepository.RoutePlanDetail): List<VisualRoutePoint> {
+    val routeGeometry = routePlan.routeGeometry.map {
+        VisualRoutePoint(latitude = it.latitude, longitude = it.longitude)
+    }
+    return if (routeGeometry.isNotEmpty()) {
+        routeGeometry
+    } else {
+        buildStopRoutePoints(routePlan)
+    }
+}
+
+private fun hasFineLocationPermission(context: Context): Boolean {
+    return ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
 }
 
 @Composable
@@ -590,9 +627,9 @@ private fun RouteStopCard(stop: RoutePlanRepository.RoutePlanStop) {
 
 private fun String.asUiLabel(): String {
     return when (lowercase()) {
-        "observation" -> "Observação"
-        "publication" -> "Publicação"
-        "species" -> "Espécie"
+        "observation" -> "Observacao"
+        "publication" -> "Publicacao"
+        "species" -> "Especie"
         else -> replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 }
