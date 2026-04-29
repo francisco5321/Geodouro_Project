@@ -426,6 +426,27 @@ class PlantRepository(
                 val normalizedFamily = family.trim().ifBlank { null }
                 val normalizedNotes = notes.trim().takeIf { it.isNotBlank() } ?: observation.notes
 
+                val requiresRemoteUpdate = ownerIdentity.userId != null &&
+                    observation.syncStatus.equals(ObservationSyncStatus.SYNCED.name, ignoreCase = true)
+
+                if (requiresRemoteUpdate) {
+                    if (!connectivityChecker.hasInternetConnection() || !remoteObservationCatalogService.isConfigured()) {
+                        return@withContext false
+                    }
+
+                    val updated = remoteObservationCatalogService.updateObservationMetadata(
+                        deviceObservationId = observationId,
+                        scientificName = scientificName,
+                        commonName = commonName,
+                        family = family,
+                        notes = notes
+                    )
+
+                    if (!updated) {
+                        return@withContext false
+                    }
+                }
+
                 observationDao.updateObservationMetadata(
                     id = observationId,
                     scientificName = normalizedScientificName,
