@@ -52,6 +52,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,6 +66,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.geodouro_project.domain.model.LocalInferenceResult
+import com.example.geodouro_project.domain.model.SessionState
 import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
 import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
@@ -76,19 +78,23 @@ import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
 import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IdentifyScreen(
     onIdentifyClick: (LocalInferenceResult) -> Unit,
+    sessionState: SessionState,
     clearCapturesTrigger: Int = 0
 ) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     val viewModel: IdentifyViewModel = viewModel(
         factory = IdentifyViewModel.factory(context.applicationContext)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val canCreateObservation = sessionState is SessionState.Authenticated
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -294,6 +300,13 @@ fun IdentifyScreen(
 
                     FloatingActionButton(
                         onClick = {
+                            if (!canCreateObservation) {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("É preciso realizar login para fazer observações.")
+                                }
+                                return@FloatingActionButton
+                            }
+
                             if (uiState.isProcessing) {
                                 return@FloatingActionButton
                             }
@@ -333,7 +346,11 @@ fun IdentifyScreen(
 
                     FloatingActionButton(
                         onClick = {
-                            if (!uiState.isProcessing) {
+                            if (!canCreateObservation) {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("É preciso realizar login para fazer observações.")
+                                }
+                            } else if (!uiState.isProcessing) {
                                 galleryLauncher.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                 )

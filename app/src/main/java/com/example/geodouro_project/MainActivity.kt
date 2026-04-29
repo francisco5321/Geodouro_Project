@@ -278,6 +278,7 @@ fun AppNavigation() {
                         latestCaptureLongitude = inferenceResult.longitude
                         navigateAboveAnchor("identify", "results")
                     },
+                    sessionState = sessionState,
                     clearCapturesTrigger = clearIdentifyCapturesVersion
                 )
             }
@@ -484,7 +485,6 @@ private fun SessionLoadingScreen() {
         }
     }
 }
-
 
 
 
