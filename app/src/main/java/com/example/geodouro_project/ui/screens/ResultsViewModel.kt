@@ -318,7 +318,7 @@ class ResultsViewModel(
                 )
 
                 Log.d(TAG, "saveObservation result observationId=${saveResult.observationId} syncStatus=${saveResult.syncStatus}")
-                val message = when (saveResult.syncStatus) {
+                var message = when (saveResult.syncStatus) {
                     ObservationSyncStatus.SYNCED -> if (allowManualReview) {
                         "Observação enviada para a administração e sincronizada."
                     } else {
@@ -337,6 +337,24 @@ class ResultsViewModel(
                         } else {
                             "Observação guardada localmente. Não foi possível contactar o backend, por isso tentaremos sincronizar novamente mais tarde."
                         }
+                    }
+                }
+
+                message = when (saveResult.syncStatus) {
+                    ObservationSyncStatus.SYNCED -> if (allowManualReview) {
+                        "Observacao realizada com sucesso! Enviada para a administracao e sincronizada."
+                    } else {
+                        "Observacao realizada com sucesso!"
+                    }
+                    ObservationSyncStatus.PENDING -> if (allowManualReview) {
+                        "Observacao realizada com sucesso! Foi enviada localmente e ficara pendente ate haver ligacao ao backend."
+                    } else {
+                        "Observacao realizada com sucesso! Ficou guardada localmente e a sincronizacao fica pendente ate haver ligacao ao backend."
+                    }
+                    ObservationSyncStatus.FAILED -> if (allowManualReview) {
+                        "Observacao realizada com sucesso! Ficou guardada localmente para revisao manual, mas nao foi possivel contactar o backend por agora."
+                    } else {
+                        "Observacao realizada com sucesso! Ficou guardada localmente, mas nao foi possivel contactar o backend e tentaremos sincronizar novamente mais tarde."
                     }
                 }
 
