@@ -124,6 +124,7 @@ class RemoteObservationCatalogService(
             latitude = latitude,
             longitude = longitude,
             notes = notes,
+            requiresManualIdentification = requiresManualIdentification ?: false,
             syncStatus = syncStatus,
             isPublished = isPublished
         )
@@ -166,6 +167,7 @@ data class RemoteObservationDetail(
     val latitude: Double?,
     val longitude: Double?,
     val notes: String?,
+    val requiresManualIdentification: Boolean,
     val syncStatus: String,
     val isPublished: Boolean
 )
@@ -197,6 +199,8 @@ private data class RemoteObservationDetailResponse(
     val longitude: Double?,
     @SerializedName("notes")
     val notes: String?,
+    @SerializedName("requiresManualIdentification")
+    val requiresManualIdentification: Boolean? = null,
     @SerializedName("syncStatus")
     val syncStatus: String,
     @SerializedName("isPublished")

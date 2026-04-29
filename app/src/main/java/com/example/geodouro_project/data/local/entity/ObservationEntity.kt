@@ -31,6 +31,7 @@ data class ObservationEntity(
     val enrichedFamily: String?,
     val enrichedWikipediaUrl: String?,
     val enrichedPhotoUrl: String?,
+    val requiresManualIdentification: Boolean,
     val notes: String?,
     val isPublished: Boolean,
     val syncStatus: String,

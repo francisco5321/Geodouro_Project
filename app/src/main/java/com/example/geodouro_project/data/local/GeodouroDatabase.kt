@@ -22,7 +22,7 @@ import com.example.geodouro_project.data.local.entity.TaxonCacheEntity
         CachedSpeciesCatalogEntity::class,
         CachedCommunityPublicationEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class GeodouroDatabase : RoomDatabase() {
@@ -52,7 +52,8 @@ abstract class GeodouroDatabase : RoomDatabase() {
                         MIGRATION_3_4,
                         MIGRATION_4_5,
                         MIGRATION_5_6,
-                        MIGRATION_6_7
+                        MIGRATION_6_7,
+                        MIGRATION_7_8
                     )
                     .build()
                     .also { INSTANCE = it }
@@ -128,6 +129,14 @@ abstract class GeodouroDatabase : RoomDatabase() {
                         cachedAt INTEGER NOT NULL
                     )
                     """.trimIndent()
+                )
+            }
+        }
+
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE observation ADD COLUMN requiresManualIdentification INTEGER NOT NULL DEFAULT 0"
                 )
             }
         }
