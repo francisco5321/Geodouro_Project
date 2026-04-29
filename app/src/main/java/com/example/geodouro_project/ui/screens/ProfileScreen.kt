@@ -544,6 +544,7 @@ private fun ObservationProfileCard(
     onClick: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val canPublishThisObservation = canPublish && !observation.requiresManualIdentification
     val imageRequest = androidx.compose.runtime.remember(observation.imageUri) {
         ImageRequest.Builder(context)
             .data(observation.imageUri)
@@ -633,7 +634,7 @@ private fun ObservationProfileCard(
                         fontWeight = FontWeight.Bold
                     )
                 }
-            } else if (canPublish) {
+            } else if (canPublishThisObservation) {
                 Button(
                     onClick = onPublish,
                     enabled = !isPublishing,
@@ -662,7 +663,11 @@ private fun ObservationProfileCard(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = "Publicação indisponível em modo convidado.",
+                        text = if (observation.requiresManualIdentification) {
+                            "Publicação indisponível enquanto a observação estiver em revisão."
+                        } else {
+                            "Publicação indisponível em modo convidado."
+                        },
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         color = GeodouroTextSecondary,
                         style = MaterialTheme.typography.bodyMedium

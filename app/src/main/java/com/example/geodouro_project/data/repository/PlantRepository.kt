@@ -395,7 +395,8 @@ class PlantRepository(
                 ownerGuestLabel = ownerIdentity.guestLabel
             )
             if (observation != null) {
-                if (observation.syncStatus != ObservationSyncStatus.SYNCED.name) {
+                if (observation.requiresManualIdentification ||
+                    observation.syncStatus != ObservationSyncStatus.SYNCED.name) {
                     return@withContext false
                 }
 
