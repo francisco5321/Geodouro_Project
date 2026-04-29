@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
@@ -376,6 +377,7 @@ private fun RouteMapCard(
         selectedStop?.let { stop ->
             RouteStopPreviewCard(
                 stop = stop,
+                onClose = { selectedStop = null },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 16.dp, start = 16.dp, end = 16.dp)
@@ -410,10 +412,15 @@ private fun InAppRouteMap(
             controller.setZoom(15.0)
         }
     }
+    val locationOverlay = remember(mapView) {
+        MyLocationNewOverlay(GpsMyLocationProvider(context), mapView)
+    }
 
     DisposableEffect(mapView) {
         mapView.onResume()
         onDispose {
+            locationOverlay.disableMyLocation()
+            locationOverlay.onDetach(mapView)
             mapView.onPause()
             mapView.onDetach()
         }
@@ -453,11 +460,14 @@ private fun InAppRouteMap(
             view.overlays.add(markerOverlay)
 
             if (showUserLocation) {
-                val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(context), view).apply {
-                    enableMyLocation()
-                    disableFollowLocation()
+                if (!view.overlays.contains(locationOverlay)) {
+                    view.overlays.add(locationOverlay)
                 }
-                view.overlays.add(locationOverlay)
+                locationOverlay.enableMyLocation()
+                locationOverlay.disableFollowLocation()
+            } else {
+                locationOverlay.disableMyLocation()
+                view.overlays.remove(locationOverlay)
             }
 
             val boundsPoints = buildList {
@@ -563,6 +573,7 @@ private fun buildRouteGeometryPoints(routePlan: RoutePlanRepository.RoutePlanDet
 @Composable
 private fun RouteStopPreviewCard(
     stop: RoutePlanRepository.RoutePlanStop,
+    onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -576,6 +587,18 @@ private fun RouteStopPreviewCard(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                IconButton(onClick = onClose) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Fechar observacao",
+                        tint = GeodouroTextPrimary
+                    )
+                }
+            }
             stop.imageUrl?.takeIf { it.isNotBlank() }?.let { imageUrl ->
                 AsyncImage(
                     model = imageUrl,
