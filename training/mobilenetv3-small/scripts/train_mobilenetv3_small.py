@@ -4,7 +4,7 @@ import argparse
 import copy
 import json
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable, Mapping
 
 import pandas as pd
 import torch
@@ -43,6 +43,21 @@ class CsvImageDataset(Dataset):
 
 def load_config(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def extract_state_dict(checkpoint: Any) -> dict[str, torch.Tensor]:
+    if isinstance(checkpoint, nn.Module):
+        return checkpoint.state_dict()
+
+    if isinstance(checkpoint, Mapping):
+        for key in ("model_state_dict", "state_dict"):
+            value = checkpoint.get(key)
+            if isinstance(value, Mapping):
+                return dict(value)
+        if checkpoint and all(isinstance(value, torch.Tensor) for value in checkpoint.values()):
+            return dict(checkpoint)
+
+    raise ValueError("Could not extract state_dict from checkpoint.")
 
 
 def load_labels(splits_dir: Path) -> list[str]:
@@ -92,6 +107,33 @@ def build_model(num_classes: int, dropout: float, freeze_features: bool) -> nn.M
             parameter.requires_grad = False
 
     return model
+
+
+def maybe_load_transfer_checkpoint(
+    model: nn.Module,
+    training_cfg: dict,
+) -> str | None:
+    checkpoint_path_text = str(training_cfg.get("pretrained_checkpoint_path", "")).strip()
+    if not checkpoint_path_text:
+        return None
+
+    checkpoint_path = Path(checkpoint_path_text)
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(f"Pretrained checkpoint not found: {checkpoint_path}")
+
+    checkpoint = torch.load(checkpoint_path, map_location="cpu")
+    state_dict = extract_state_dict(checkpoint)
+    state_dict = dict(state_dict)
+
+    if bool(training_cfg.get("transfer_exclude_classifier", True)):
+        state_dict.pop("classifier.3.weight", None)
+        state_dict.pop("classifier.3.bias", None)
+
+    load_result = model.load_state_dict(state_dict, strict=False)
+    return (
+        f"Loaded transfer checkpoint from {checkpoint_path.resolve()} | "
+        f"missing={list(load_result.missing_keys)} unexpected={list(load_result.unexpected_keys)}"
+    )
 
 
 def set_feature_training(model: nn.Module, trainable: bool) -> None:
@@ -156,6 +198,9 @@ def main() -> None:
         dropout=float(training_cfg["dropout"]),
         freeze_features=bool(training_cfg["freeze_features"]),
     ).to(device)
+    transfer_summary = maybe_load_transfer_checkpoint(model, training_cfg)
+    if transfer_summary:
+        print(transfer_summary)
 
     criterion = nn.CrossEntropyLoss(label_smoothing=float(training_cfg["label_smoothing"]))
     optimizer = torch.optim.AdamW(

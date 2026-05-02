@@ -29,33 +29,64 @@ class PlantInferenceEngine(
 
     suspend fun analyze(bitmap: Bitmap): InferenceAnalysis = withContext(Dispatchers.Default) {
         val detectionResult = detector.detect(bitmap)
-        val bitmapForClassification = when {
-            !detectionResult.detectorApplied -> bitmap
-            detectionResult.croppedBitmap != null -> detectionResult.croppedBitmap
-            else -> {
-                return@withContext InferenceAnalysis(
-                    prediction = InferencePrediction(
-                        label = MobileNetV3Classifier.NON_PLANT_LABEL,
-                        confidence = NO_PLANT_CONFIDENCE,
-                        fromModel = true,
-                        candidates = emptyList(),
-                        rejectionReason = RejectionReason.NON_PLANT
-                    ),
-                    embedding = null
-                )
-            }
+        val fullImageAnalysis = classifier.analyze(bitmap)
+        val croppedBitmap = detectionResult.croppedBitmap
+
+        if (!detectionResult.detectorApplied || croppedBitmap == null) {
+            return@withContext fullImageAnalysis
         }
 
         try {
-            classifier.analyze(bitmapForClassification)
+            val croppedAnalysis = classifier.analyze(croppedBitmap)
+            selectBestAnalysis(
+                croppedAnalysis = croppedAnalysis,
+                fullImageAnalysis = fullImageAnalysis,
+                detectorConfidence = detectionResult.detectorConfidence
+            )
         } finally {
-            if (bitmapForClassification !== bitmap) {
-                bitmapForClassification.recycle()
-            }
+            croppedBitmap.recycle()
         }
+    }
+
+    private fun selectBestAnalysis(
+        croppedAnalysis: InferenceAnalysis,
+        fullImageAnalysis: InferenceAnalysis,
+        detectorConfidence: Float
+    ): InferenceAnalysis {
+        val croppedPrediction = croppedAnalysis.prediction
+        val fullPrediction = fullImageAnalysis.prediction
+
+        val croppedLooksRejected = croppedPrediction.rejectionReason != null
+        val fullLooksRejected = fullPrediction.rejectionReason != null
+
+        if (croppedLooksRejected && !fullLooksRejected) {
+            return fullImageAnalysis
+        }
+
+        if (!croppedLooksRejected && fullLooksRejected) {
+            return croppedAnalysis
+        }
+
+        if (
+            detectorConfidence < MIN_TRUSTED_DETECTOR_CONFIDENCE &&
+            fullPrediction.confidence >= croppedPrediction.confidence
+        ) {
+            return fullImageAnalysis
+        }
+
+        if (
+            !fullLooksRejected &&
+            fullPrediction.confidence >= croppedPrediction.confidence + FULL_IMAGE_CONFIDENCE_MARGIN
+        ) {
+            return fullImageAnalysis
+        }
+
+        return croppedAnalysis
     }
 
     companion object {
         private const val NO_PLANT_CONFIDENCE = 0.85f
+        private const val MIN_TRUSTED_DETECTOR_CONFIDENCE = 0.55f
+        private const val FULL_IMAGE_CONFIDENCE_MARGIN = 0.08f
     }
 }

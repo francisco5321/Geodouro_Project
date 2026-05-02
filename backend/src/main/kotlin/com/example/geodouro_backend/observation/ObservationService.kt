@@ -74,7 +74,8 @@ class ObservationService(
             params.addValue("userId", resolvedUserId)
         }
 
-        return jdbcTemplate.query(sql, params, observationDetailSummaryRowMapper).map(::withObservationImages)
+        val summaries = jdbcTemplate.query(sql, params, observationDetailSummaryRowMapper)
+        return withObservationImages(summaries)
     }
 
     fun getObservationDetail(
@@ -342,6 +343,31 @@ class ObservationService(
         )
     }
 
+    private fun withObservationImages(summaries: List<ObservationDetailResponse>): List<ObservationDetailResponse> {
+        if (summaries.isEmpty()) {
+            return summaries
+        }
+
+        val imagePathsByObservationId = jdbcTemplate.query(
+            OBSERVATION_IMAGE_PATHS_BY_IDS_SQL,
+            MapSqlParameterSource("observationIds", summaries.map { it.observationId })
+        ) { rs, _ ->
+            rs.getInt("observation_id") to rs.getString("image_path")
+        }.fold(mutableMapOf<Int, MutableList<String>>()) { acc, (observationId, imagePath) ->
+            if (!imagePath.isNullOrBlank()) {
+                acc.getOrPut(observationId) { mutableListOf() }.add(imagePath)
+            }
+            acc
+        }
+
+        return summaries.map { summary ->
+            val imagePaths = imagePathsByObservationId[summary.observationId].orEmpty()
+            summary.copy(
+                imagePaths = if (imagePaths.isNotEmpty()) imagePaths else summary.imagePaths
+            )
+        }
+    }
+
     private fun replaceObservationImages(observationId: Int, storedImagePaths: List<String>) {
         jdbcTemplate.update(
             "DELETE FROM observation_image WHERE observation_id = :observationId",
@@ -511,6 +537,13 @@ class ObservationService(
             FROM observation_image
             WHERE observation_id = :observationId
             ORDER BY observation_image_id ASC
+        """
+
+        private const val OBSERVATION_IMAGE_PATHS_BY_IDS_SQL = """
+            SELECT observation_id, image_path
+            FROM observation_image
+            WHERE observation_id IN (:observationIds)
+            ORDER BY observation_id ASC, observation_image_id ASC
         """
 
         private val UPSERT_PLANT_SPECIES_SQL = """

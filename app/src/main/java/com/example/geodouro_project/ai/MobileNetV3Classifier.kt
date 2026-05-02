@@ -340,9 +340,9 @@ class MobileNetV3Classifier(
     }
 
     companion object {
-        const val DEFAULT_MODEL_FILE = "mobilenetv3_small_best_android.pt"
+        const val DEFAULT_MODEL_FILE = "mobilenetv3_small_hybrid_android.pt"
         const val LEGACY_MODEL_FILE = "mobilenetv3_small_best.pt"
-        const val DEFAULT_LABELS_FILE = "species_labels.txt"
+        const val DEFAULT_LABELS_FILE = "species_labels_hybrid.txt"
         const val DEFAULT_INPUT_SIZE = 224
         const val MODEL_DISPLAY_NAME = "MobileNetV3-Small (PyTorch)"
         const val FALLBACK_LABEL = "Modelo PyTorch ainda indisponivel"

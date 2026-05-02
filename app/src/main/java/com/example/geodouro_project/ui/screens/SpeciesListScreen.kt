@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,18 +18,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -79,16 +76,19 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class SpeciesFilter {
-    FAMILY, GENUS, SPECIES
-}
-
 data class SpeciesListItem(
     val id: String,
     val scientificName: String,
     val commonName: String,
     val family: String,
     val genus: String,
+    val imageCount: Int,
+    val thumbnailUri: String?
+)
+
+data class SpeciesFamilyListItem(
+    val family: String,
+    val speciesCount: Int,
     val imageCount: Int,
     val thumbnailUri: String?
 )
@@ -147,10 +147,10 @@ fun SpeciesListScreen(
         refreshing = uiState.isLoading,
         onRefresh = { viewModel.refresh() }
     )
-    var selectedFilter by rememberSaveable { mutableStateOf(SpeciesFilter.SPECIES) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
+    var selectedFamily by rememberSaveable { mutableStateOf<String?>(null) }
 
-    val filteredSpecies = remember(uiState.species, searchQuery, selectedFilter) {
+    val baseFilteredSpecies = remember(uiState.species, searchQuery) {
         val query = searchQuery.trim().lowercase(Locale.ROOT)
         uiState.species.filter { species ->
             if (query.isBlank()) {
@@ -161,13 +161,39 @@ fun SpeciesListScreen(
                     species.family.lowercase(Locale.ROOT).contains(query) ||
                     species.genus.lowercase(Locale.ROOT).contains(query)
             }
-        }.sortedWith(
-            when (selectedFilter) {
-                SpeciesFilter.FAMILY -> compareBy<SpeciesListItem> { it.family }.thenBy { it.scientificName }
-                SpeciesFilter.GENUS -> compareBy<SpeciesListItem> { it.genus }.thenBy { it.scientificName }
-                SpeciesFilter.SPECIES -> compareBy<SpeciesListItem> { it.scientificName }
+        }
+    }
+
+    val filteredFamilies = remember(baseFilteredSpecies, selectedFamily) {
+        if (selectedFamily != null) {
+            emptyList()
+        } else {
+            baseFilteredSpecies
+                .groupBy { it.family }
+                .map { (family, species) ->
+                    SpeciesFamilyListItem(
+                        family = family,
+                        speciesCount = species.size,
+                        imageCount = species.sumOf { it.imageCount },
+                        thumbnailUri = species.firstOrNull { !it.thumbnailUri.isNullOrBlank() }?.thumbnailUri
+                    )
+                }
+                .sortedBy { it.family }
+        }
+    }
+
+    val filteredSpecies = remember(baseFilteredSpecies, selectedFamily) {
+        baseFilteredSpecies
+            .let { species ->
+                if (selectedFamily == null) species else species.filter { it.family == selectedFamily }
             }
-        )
+            .sortedBy { it.scientificName }
+    }
+
+    LaunchedEffect(uiState.species, selectedFamily) {
+        if (selectedFamily != null && uiState.species.none { it.family == selectedFamily }) {
+            selectedFamily = null
+        }
     }
 
     LaunchedEffect(refreshTrigger) {
@@ -222,14 +248,16 @@ fun SpeciesListScreen(
                         }
                     },
                     placeholder = {
-                        Text("Pesquisar por espécie, nome comum, família...")
+                        Text("Pesquisar por especie, nome comum, familia...")
                     }
                 )
 
-                FilterTabRow(
-                    selectedFilter = selectedFilter,
-                    onFilterSelected = { selectedFilter = it }
-                )
+                if (selectedFamily != null) {
+                    SelectedFamilyBanner(
+                        family = selectedFamily.orEmpty(),
+                        onClear = { selectedFamily = null }
+                    )
+                }
 
                 when {
                     uiState.isLoading -> {
@@ -238,13 +266,20 @@ fun SpeciesListScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "A carregar espécies observadas...",
+                                text = "A carregar especies observadas...",
                                 color = GeodouroTextSecondary
                             )
                         }
                     }
 
-                    filteredSpecies.isEmpty() -> {
+                    selectedFamily == null && filteredFamilies.isEmpty() -> {
+                        EmptySpeciesState(
+                            hasQuery = searchQuery.isNotBlank(),
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    selectedFamily != null && filteredSpecies.isEmpty() -> {
                         EmptySpeciesState(
                             hasQuery = searchQuery.isNotBlank(),
                             modifier = Modifier.fillMaxSize()
@@ -256,14 +291,26 @@ fun SpeciesListScreen(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            items(
-                                items = filteredSpecies,
-                                key = { it.id }
-                            ) { species ->
-                                SpeciesCard(
-                                    species = species,
-                                    onClick = { onSpeciesClick(species.id) }
-                                )
+                            if (selectedFamily == null) {
+                                items(
+                                    items = filteredFamilies,
+                                    key = { it.family }
+                                ) { family ->
+                                    FamilyCard(
+                                        family = family,
+                                        onClick = { selectedFamily = family.family }
+                                    )
+                                }
+                            } else {
+                                items(
+                                    items = filteredSpecies,
+                                    key = { it.id }
+                                ) { species ->
+                                    SpeciesCard(
+                                        species = species,
+                                        onClick = { onSpeciesClick(species.id) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -282,40 +329,120 @@ fun SpeciesListScreen(
 }
 
 @Composable
-fun FilterTabRow(
-    selectedFilter: SpeciesFilter,
-    onFilterSelected: (speciesFilter: SpeciesFilter) -> Unit
+private fun SelectedFamilyBanner(
+    family: String,
+    onClear: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        SpeciesFilter.entries.forEach { filter ->
-            FilterChip(
-                selected = selectedFilter == filter,
-                onClick = { onFilterSelected(filter) },
-                label = {
-                    Text(
-                        filter.name,
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                },
-                enabled = true,
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = GeodouroGreen,
-                    selectedLabelColor = Color.White,
-                    containerColor = GeodouroLightBg,
-                    labelColor = GeodouroTextSecondary
-                ),
-                border = FilterChipDefaults.filterChipBorder(
-                    enabled = true,
-                    selected = selectedFilter == filter,
-                    borderColor = Color.Transparent,
-                    selectedBorderColor = Color.Transparent
-                )
+        Text(
+            text = family,
+            style = MaterialTheme.typography.titleSmall,
+            color = GeodouroTextPrimary,
+            fontWeight = FontWeight.Bold
+        )
+        Surface(
+            modifier = Modifier.clickable(onClick = onClear),
+            color = GeodouroGreen,
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                text = "Ver familias",
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = GeodouroWhite,
+                fontWeight = FontWeight.SemiBold
             )
+        }
+    }
+}
+
+@Composable
+private fun FamilyCard(
+    family: SpeciesFamilyListItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val thumbnailRequest = remember(family.thumbnailUri) {
+        ImageRequest.Builder(context)
+            .data(family.thumbnailUri)
+            .size(SPECIES_THUMBNAIL_MAX_SIZE)
+            .crossfade(false)
+            .build()
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
+        elevation = CardDefaults.cardElevation(2.dp),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(GeodouroLightBg),
+                contentAlignment = Alignment.BottomEnd
+            ) {
+                if (!family.thumbnailUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = thumbnailRequest,
+                        contentDescription = family.family,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = GeodouroGrey,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+
+                Surface(
+                    color = Color.Black.copy(alpha = 0.6f),
+                    shape = RoundedCornerShape(topStart = 8.dp)
+                ) {
+                    Text(
+                        text = family.imageCount.toString(),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = family.family,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = GeodouroTextPrimary
+                )
+                Text(
+                    text = "${family.speciesCount} especies nesta familia",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = GeodouroTextSecondary
+                )
+                SpeciesMetaChip("Abrir especies")
+            }
         }
     }
 }
@@ -445,9 +572,9 @@ private fun EmptySpeciesState(
         ) {
             Text(
                 text = if (hasQuery) {
-                    "Nenhuma espécie encontrada para essa pesquisa."
+                    "Nenhuma especie encontrada para essa pesquisa."
                 } else {
-                    "Ainda não existem espécies guardadas."
+                    "Ainda nao existem especies guardadas."
                 },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
@@ -457,7 +584,7 @@ private fun EmptySpeciesState(
                 text = if (hasQuery) {
                     "Tenta outro nome cientifico, comum, familia ou genero."
                 } else {
-                    "Assim que confirmares identificações, elas vão aparecer aqui."
+                    "Assim que confirmares identificacoes, elas vao aparecer aqui."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = GeodouroTextSecondary

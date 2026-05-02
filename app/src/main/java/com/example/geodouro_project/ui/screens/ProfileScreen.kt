@@ -129,12 +129,17 @@ class ProfileViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             val observations = repository.fetchObservationsRemoteFirst(includeManualReview = true)
-            val stats = repository.fetchObservationStatsRemoteFirst(includeManualReview = true)
+            val visibleObservations = observations.filterNot { it.requiresManualIdentification }
+            val speciesCount = visibleObservations
+                .map { it.enrichedScientificName ?: it.predictedSpecies }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .size
             _uiState.value = _uiState.value.copy(
                 observations = observations,
-                observationsCount = stats.observationsCount,
-                publishedCount = stats.publishedCount,
-                speciesCount = stats.speciesCount,
+                observationsCount = visibleObservations.size,
+                publishedCount = visibleObservations.count { it.isPublished },
+                speciesCount = speciesCount,
                 isLoading = false
             )
         }

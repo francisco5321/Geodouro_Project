@@ -88,7 +88,6 @@ fun AppNavigation() {
     var latestInferenceResult by rememberSaveable(stateSaver = localInferenceResultStateSaver()) {
         mutableStateOf<LocalInferenceResult?>(null)
     }
-    var latestMultiImageUris by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var latestCaptureLatitude by rememberSaveable { mutableStateOf<Double?>(null) }
     var latestCaptureLongitude by rememberSaveable { mutableStateOf<Double?>(null) }
     var clearIdentifyCapturesVersion by remember { mutableStateOf(0) }
@@ -273,7 +272,6 @@ fun AppNavigation() {
                 IdentifyScreen(
                     onIdentifyClick = { inferenceResult ->
                         latestInferenceResult = inferenceResult
-                        latestMultiImageUris = emptyList()
                         latestCaptureLatitude = inferenceResult.latitude
                         latestCaptureLongitude = inferenceResult.longitude
                         navigateAboveAnchor("identify", "results")
@@ -332,14 +330,12 @@ fun AppNavigation() {
                     },
                     onConfirmResult = {
                         latestInferenceResult = null
-                        latestMultiImageUris = emptyList()
                         latestCaptureLatitude = null
                         latestCaptureLongitude = null
                         clearIdentifyCapturesVersion += 1
                         savedObservationRefreshVersion += 1
                         popToDetailAnchorOrBack()
                     },
-                    multiImageUris = latestMultiImageUris,
                     captureLatitude = latestCaptureLatitude,
                     captureLongitude = latestCaptureLongitude,
                     localInferenceResult = latestInferenceResult ?: LocalInferenceResult(
@@ -485,7 +481,6 @@ private fun SessionLoadingScreen() {
         }
     }
 }
-
 
 
 

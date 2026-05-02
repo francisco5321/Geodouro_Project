@@ -102,7 +102,6 @@ fun ResultsScreen(
     refreshTrigger: Int = 0,
     onBackClick: () -> Unit,
     onConfirmResult: (IdentificationResult) -> Unit,
-    multiImageUris: List<String> = emptyList(),
     captureLatitude: Double? = null,
     captureLongitude: Double? = null,
     localInferenceResult: LocalInferenceResult = LocalInferenceResult(
@@ -119,39 +118,22 @@ fun ResultsScreen(
     )
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var observationNotes by rememberSaveable(localInferenceResult.imageUri, multiImageUris) {
+    var observationNotes by rememberSaveable(localInferenceResult.imageUri) {
         mutableStateOf("")
     }
-    var predictionFeedback by rememberSaveable(localInferenceResult.imageUri, multiImageUris) {
+    var predictionFeedback by rememberSaveable(localInferenceResult.imageUri) {
         mutableStateOf<PredictionFeedback?>(null)
     }
 
-    LaunchedEffect(localInferenceResult, multiImageUris, captureLatitude, captureLongitude) {
-        if (multiImageUris.size >= 2) {
-            viewModel.loadMultiImageResult(
-                imageUris = multiImageUris,
-                latitude = captureLatitude,
-                longitude = captureLongitude
-            )
-        } else {
-            viewModel.loadHybridResult(localInferenceResult)
-        }
+    LaunchedEffect(localInferenceResult, captureLatitude, captureLongitude) {
+        viewModel.loadHybridResult(localInferenceResult)
     }
 
     LaunchedEffect(refreshTrigger) {
         if (refreshTrigger <= 0) {
             return@LaunchedEffect
         }
-
-        if (multiImageUris.size >= 2) {
-            viewModel.loadMultiImageResult(
-                imageUris = multiImageUris,
-                latitude = captureLatitude,
-                longitude = captureLongitude
-            )
-        } else {
-            viewModel.loadHybridResult(localInferenceResult)
-        }
+        viewModel.loadHybridResult(localInferenceResult)
     }
 
     LaunchedEffect(viewModel) {

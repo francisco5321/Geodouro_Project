@@ -399,6 +399,9 @@ private fun InAppRouteMap(
     val context = LocalContext.current.applicationContext
     var hasFittedRouteBounds by remember(routePoints, stopPoints) { mutableStateOf(false) }
     var lastHandledRecenterTrigger by remember { mutableStateOf(-1) }
+    var lastRecenteredUserPoint by remember { mutableStateOf<GeoPoint?>(null) }
+    var lastRouteSignature by remember { mutableStateOf<String?>(null) }
+    var lastStopSignature by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(context) {
         Configuration.getInstance().userAgentValue = context.packageName
@@ -416,8 +419,21 @@ private fun InAppRouteMap(
     val locationOverlay = remember(mapView) {
         MyLocationNewOverlay(GpsMyLocationProvider(context), mapView)
     }
+    val routePolyline = remember(mapView) {
+        Polyline().apply {
+            outlinePaint.color = android.graphics.Color.parseColor("#2E7D32")
+            outlinePaint.strokeWidth = 9f
+        }
+    }
+    val markerOverlay = remember(mapView) { FolderOverlay() }
 
     DisposableEffect(mapView) {
+        if (!mapView.overlays.contains(routePolyline)) {
+            mapView.overlays.add(routePolyline)
+        }
+        if (!mapView.overlays.contains(markerOverlay)) {
+            mapView.overlays.add(markerOverlay)
+        }
         mapView.onResume()
         onDispose {
             locationOverlay.disableMyLocation()
@@ -431,34 +447,36 @@ private fun InAppRouteMap(
         factory = { mapView },
         modifier = modifier,
         update = { view ->
-            view.overlays.clear()
-
             val geoPoints = routePoints.map { GeoPoint(it.latitude, it.longitude) }
-            if (geoPoints.isNotEmpty()) {
-                val polyline = Polyline().apply {
-                    outlinePaint.color = android.graphics.Color.parseColor("#2E7D32")
-                    outlinePaint.strokeWidth = 9f
-                    setPoints(geoPoints)
-                }
-                view.overlays.add(polyline)
+            val routeSignature = routePoints.joinToString(separator = "|") { point ->
+                "${point.latitude},${point.longitude}"
+            }
+            if (lastRouteSignature != routeSignature) {
+                routePolyline.setPoints(geoPoints)
+                lastRouteSignature = routeSignature
             }
 
-            val markerOverlay = FolderOverlay()
-            stopPoints.forEach { point ->
-                val marker = Marker(view).apply {
-                    position = GeoPoint(point.latitude, point.longitude)
-                    title = point.stop?.title ?: point.label?.let { "Paragem $it" } ?: "Paragem"
-                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                    point.stop?.let { stop ->
-                        setOnMarkerClickListener { _, _ ->
-                            onStopClick(stop)
-                            true
+            val stopSignature = stopPoints.joinToString(separator = "|") { point ->
+                "${point.latitude},${point.longitude},${point.label},${point.stop?.routePlanPointId}"
+            }
+            if (lastStopSignature != stopSignature) {
+                markerOverlay.items.clear()
+                stopPoints.forEach { point ->
+                    val marker = Marker(view).apply {
+                        position = GeoPoint(point.latitude, point.longitude)
+                        title = point.stop?.title ?: point.label?.let { "Paragem $it" } ?: "Paragem"
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        point.stop?.let { stop ->
+                            setOnMarkerClickListener { _, _ ->
+                                onStopClick(stop)
+                                true
+                            }
                         }
                     }
+                    markerOverlay.add(marker)
                 }
-                markerOverlay.add(marker)
+                lastStopSignature = stopSignature
             }
-            view.overlays.add(markerOverlay)
 
             if (showUserLocation) {
                 if (!view.overlays.contains(locationOverlay)) {
@@ -488,19 +506,25 @@ private fun InAppRouteMap(
             if (showUserLocation && recenterToUserTrigger != lastHandledRecenterTrigger) {
                 val userPoint = locationOverlay.myLocation
                 if (userPoint != null) {
-                    animateSmoothRecenter(
-                        view = view,
-                        userPoint = userPoint
-                    )
+                    if (shouldRecenterToUser(lastRecenteredUserPoint, userPoint)) {
+                        animateSmoothRecenter(
+                            view = view,
+                            userPoint = userPoint
+                        )
+                        lastRecenteredUserPoint = GeoPoint(userPoint)
+                    }
                     lastHandledRecenterTrigger = recenterToUserTrigger
                 } else {
                     locationOverlay.runOnFirstFix {
                         view.post {
                             locationOverlay.myLocation?.let { firstFixPoint ->
-                                animateSmoothRecenter(
-                                    view = view,
-                                    userPoint = firstFixPoint
-                                )
+                                if (shouldRecenterToUser(lastRecenteredUserPoint, firstFixPoint)) {
+                                    animateSmoothRecenter(
+                                        view = view,
+                                        userPoint = firstFixPoint
+                                    )
+                                    lastRecenteredUserPoint = GeoPoint(firstFixPoint)
+                                }
                                 lastHandledRecenterTrigger = recenterToUserTrigger
                             }
                         }
@@ -511,6 +535,14 @@ private fun InAppRouteMap(
             view.invalidate()
         }
     )
+}
+
+private fun shouldRecenterToUser(
+    previousPoint: GeoPoint?,
+    currentPoint: GeoPoint
+): Boolean {
+    return previousPoint == null ||
+        previousPoint.distanceToAsDouble(currentPoint) >= 15.0
 }
 
 private fun animateSmoothRecenter(

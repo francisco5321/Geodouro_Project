@@ -1,0 +1,4 @@
+Epoch 01/30 train_acc=0.0257 val_acc=0.0825
+Epoch 02/30 train_acc=0.0972 val_acc=0.1188
+Epoch 03/30 train_acc=0.1415 val_acc=0.1405
+Epoch 04/30 train_acc=0.1732 val_acc=0.1549
