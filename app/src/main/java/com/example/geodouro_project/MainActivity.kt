@@ -143,7 +143,7 @@ fun AppNavigation() {
         if (hasInternet && previous == false) {
             networkRefreshVersion += 1
             repository.syncPendingObservations()
-            snackbarHostState.showSnackbar("Ligacao restaurada. Dados atualizados.")
+            snackbarHostState.showSnackbar("Ligação restaurada. Dados atualizados.")
         }
     }
 
@@ -156,7 +156,7 @@ fun AppNavigation() {
 
             if (previous != null && (failedObservationIds - previous).isNotEmpty()) {
                 snackbarHostState.showSnackbar(
-                    "Backend indisponivel. As observacoes foram guardadas localmente e serao sincronizadas mais tarde."
+                    "Backend indisponível. As observações foram guardadas localmente e serão sincronizadas mais tarde."
                 )
             }
         }
@@ -335,18 +335,13 @@ fun AppNavigation() {
                         clearIdentifyCapturesVersion += 1
                         popToDetailAnchorOrBack()
                     },
-                    onConfirmResult = { _, saveMessage ->
+                    onConfirmResult = {
                         latestInferenceResult = null
                         latestCaptureLatitude = null
                         latestCaptureLongitude = null
                         clearIdentifyCapturesVersion += 1
                         savedObservationRefreshVersion += 1
                         popToDetailAnchorOrBack()
-                        saveMessage?.takeIf { it.isNotBlank() }?.let { message ->
-                            coroutineScope.launch {
-                                snackbarHostState.showSnackbar(message)
-                            }
-                        }
                     },
                     captureLatitude = latestCaptureLatitude,
                     captureLongitude = latestCaptureLongitude,
@@ -493,5 +488,6 @@ private fun SessionLoadingScreen() {
         }
     }
 }
+
 
 
