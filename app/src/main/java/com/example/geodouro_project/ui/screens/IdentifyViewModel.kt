@@ -111,7 +111,7 @@ class IdentifyViewModel(
                     current.copy(
                         latitude = coordinates.first,
                         longitude = coordinates.second,
-                        locationLabel = "GPS: %.6f, %.6f".format(coordinates.first, coordinates.second)
+                        locationLabel = resolveLocationLabel(coordinates.first, coordinates.second)
                     )
                 } else {
                     current.copy(
@@ -193,14 +193,15 @@ class IdentifyViewModel(
             runCatching {
                 val resolvedCoordinates = resolveCoordinates()
                 if (resolvedCoordinates != null) {
+                    val resolvedLocationLabel = resolveLocationLabel(
+                        resolvedCoordinates.first,
+                        resolvedCoordinates.second
+                    )
                     _uiState.update {
                         it.copy(
                             latitude = resolvedCoordinates.first,
                             longitude = resolvedCoordinates.second,
-                            locationLabel = "GPS: %.6f, %.6f".format(
-                                resolvedCoordinates.first,
-                                resolvedCoordinates.second
-                            )
+                            locationLabel = resolvedLocationLabel
                         )
                     }
                 }
@@ -256,6 +257,12 @@ class IdentifyViewModel(
         return withTimeoutOrNull(2_000) {
             locationResolver.getCurrentCoordinates()
         }
+    }
+
+    private suspend fun resolveLocationLabel(latitude: Double, longitude: Double): String {
+        return withContext(Dispatchers.IO) {
+            locationResolver.getLocationLabel(latitude, longitude)
+        } ?: "GPS %.6f, %.6f".format(latitude, longitude)
     }
 
     private fun emitMessage(message: String) {

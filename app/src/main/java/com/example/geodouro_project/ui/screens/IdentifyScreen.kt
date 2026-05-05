@@ -184,7 +184,7 @@ fun IdentifyScreen(
                     .padding(top = 20.dp, bottom = 4.dp)
                     .fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                color = GeodouroLightBg
+                color = GeodouroCardBg
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),

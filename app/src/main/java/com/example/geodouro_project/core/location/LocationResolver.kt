@@ -3,11 +3,13 @@ package com.example.geodouro_project.core.location
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Geocoder
 import android.location.LocationManager
 import android.os.CancellationSignal
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import java.util.Locale
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 
@@ -110,5 +112,24 @@ class LocationResolver(
             }
             .maxByOrNull { it.time }
             ?.let { it.latitude to it.longitude }
+    }
+
+    suspend fun getLocationLabel(latitude: Double, longitude: Double): String? {
+        if (!Geocoder.isPresent()) {
+            return null
+        }
+
+        val geocoder = Geocoder(appContext, Locale.getDefault())
+        @Suppress("DEPRECATION")
+        val address = runCatching {
+            geocoder.getFromLocation(latitude, longitude, 1)?.firstOrNull()
+        }.getOrNull() ?: return null
+
+        return buildList {
+            address.thoroughfare?.takeIf { it.isNotBlank() }?.let(::add)
+            address.subLocality?.takeIf { it.isNotBlank() }?.let(::add)
+            address.locality?.takeIf { it.isNotBlank() }?.let(::add)
+            address.adminArea?.takeIf { it.isNotBlank() }?.let(::add)
+        }.distinct().joinToString(", ").takeIf { it.isNotBlank() }
     }
 }
