@@ -235,35 +235,6 @@ fun IdentifyScreen(
                 }
             }
 
-            Surface(
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(50),
-                color = if (uiState.modelReady) {
-                    GeodouroBrandGreen.copy(alpha = 0.10f)
-                } else {
-                    GeodouroGrey.copy(alpha = 0.12f)
-                }
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(if (uiState.modelReady) GeodouroBrandGreen else GeodouroGrey)
-                    )
-                    Spacer(modifier = Modifier.width(7.dp))
-                    Text(
-                        text = uiState.modelStatusLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (uiState.modelReady) GeodouroBrandGreen else GeodouroGrey,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-
             Spacer(modifier = Modifier.height(20.dp))
 
             Surface(
