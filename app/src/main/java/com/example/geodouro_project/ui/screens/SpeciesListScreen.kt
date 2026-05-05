@@ -248,7 +248,7 @@ fun SpeciesListScreen(
                         }
                     },
                     placeholder = {
-                        Text("Pesquisar por especie, nome comum, familia...")
+                        Text("Pesquisar por espécie, nome comum, família...")
                     }
                 )
 
@@ -266,7 +266,7 @@ fun SpeciesListScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "A carregar especies observadas...",
+                                text = "A carregar espécies observadas...",
                                 color = GeodouroTextSecondary
                             )
                         }
@@ -352,7 +352,7 @@ private fun SelectedFamilyBanner(
             shape = RoundedCornerShape(12.dp)
         ) {
             Text(
-                text = "Ver familias",
+                text = "Ver famílias",
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                 style = MaterialTheme.typography.labelMedium,
                 color = GeodouroWhite,
@@ -437,11 +437,11 @@ private fun FamilyCard(
                     color = GeodouroTextPrimary
                 )
                 Text(
-                    text = "${family.speciesCount} especies nesta familia",
+                    text = "${family.speciesCount} espécies nesta família",
                     style = MaterialTheme.typography.bodyMedium,
                     color = GeodouroTextSecondary
                 )
-                SpeciesMetaChip("Abrir especies")
+                SpeciesMetaChip("Abrir espécies")
             }
         }
     }
@@ -572,9 +572,9 @@ private fun EmptySpeciesState(
         ) {
             Text(
                 text = if (hasQuery) {
-                    "Nenhuma especie encontrada para essa pesquisa."
+                    "Nenhuma espécie encontrada para essa pesquisa."
                 } else {
-                    "Ainda nao existem especies guardadas."
+                    "Ainda não existem espécies guardadas."
                 },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
@@ -582,9 +582,9 @@ private fun EmptySpeciesState(
             )
             Text(
                 text = if (hasQuery) {
-                    "Tenta outro nome cientifico, comum, familia ou genero."
+                    "Tenta outro nome científico, comum, família ou género."
                 } else {
-                    "Assim que confirmares identificacoes, elas vao aparecer aqui."
+                    "Assim que confirmares identificações, elas vão aparecer aqui."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = GeodouroTextSecondary
@@ -599,8 +599,8 @@ private fun List<PlantSpeciesCatalogItem>.toRemoteSpeciesListItems(): List<Speci
             id = species.id,
             scientificName = species.scientificName,
             commonName = species.commonName?.takeIf { it.isNotBlank() } ?: "Sem nome comum",
-            family = species.family.ifBlank { "Familia desconhecida" },
-            genus = species.genus.ifBlank { "Genero desconhecido" },
+            family = species.family.ifBlank { "Família desconhecida" },
+            genus = species.genus.ifBlank { "Género desconhecido" },
             imageCount = species.imageCount,
             thumbnailUri = species.thumbnailUri
         )

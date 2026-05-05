@@ -196,7 +196,7 @@ fun VisitTargetScreen(
                 VisitTargetUiState.Empty -> VisitTargetMessageState(
                     padding = PaddingValues(0.dp),
                     title = "Ainda sem alvos guardados",
-                    message = "Guarda especies, publicacoes ou observacoes para aparecerem aqui e depois planeares percursos."
+                    message = "Guarda espécies, publicações ou observações para aparecerem aqui e depois planeares percursos."
                 )
                 is VisitTargetUiState.Error -> VisitTargetMessageState(
                     padding = PaddingValues(0.dp),

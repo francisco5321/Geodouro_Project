@@ -107,7 +107,7 @@ fun ResultsScreen(
         imageUri = "",
         latitude = null,
         longitude = null,
-        predictedSpecies = "Sem inferencia local",
+        predictedSpecies = "Sem inferência local",
         confidence = 0f
     )
 ) {
@@ -166,7 +166,7 @@ fun ResultsScreen(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "Identificacao de resultados",
+                            text = "Identificação de resultados",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = GeodouroBrandGreen
@@ -243,7 +243,7 @@ fun ResultsScreen(
             },
             text = {
                 Text(
-                    "A observacao sera enviada automaticamente para a administracao para analise manual."
+                    "A observação será enviada automaticamente para a administração para análise manual."
                 )
             },
             confirmButton = {
@@ -469,7 +469,7 @@ fun ResultCard(
                     text = when {
                         isConfirming -> "A guardar..."
                         result.isPlantDetected -> "Confirmar e guardar"
-                        result.isUnknownPlant -> "A enviar para administracao"
+                        result.isUnknownPlant -> "A enviar para administração"
                         else -> "Tirar nova foto"
                     }
                 )
@@ -505,7 +505,7 @@ private fun ResultPhotosSection(
             ResultPhotoCard(
                 title = "Foto de referencia",
                 imageModel = referencePhotoUrl,
-                emptyMessage = "Sem foto remota disponivel para esta especie."
+                emptyMessage = "Sem foto remota disponível para esta espécie."
             )
         } else {
             Surface(
@@ -649,7 +649,7 @@ private fun CoordinatesSection(
             text = if (latitude != null && longitude != null) {
                 "Coordenadas: %.6f, %.6f".format(latitude, longitude)
             } else {
-                "Coordenadas: localizacao indisponivel"
+                "Coordenadas: localização indisponível"
             },
             modifier = Modifier.padding(10.dp),
             color = GeodouroTextPrimary,
@@ -802,13 +802,13 @@ private fun ObservationNotesField(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Descricao opcional",
+                text = "Descrição opcional",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 color = GeodouroTextPrimary
             )
             Text(
-                text = "Adiciona um pequeno contexto sobre a observacao, se quiseres.",
+                text = "Adiciona um pequeno contexto sobre a observação, se quiseres.",
                 style = MaterialTheme.typography.bodySmall,
                 color = GeodouroTextSecondary
             )
@@ -819,7 +819,7 @@ private fun ObservationNotesField(
                 minLines = 3,
                 maxLines = 5,
                 placeholder = {
-                    Text("Ex.: junto ao caminho, zona humida, floracao abundante...")
+                    Text("Ex.: junto ao caminho, zona húmida, floração abundante...")
                 },
                 shape = RoundedCornerShape(12.dp),
                 colors = geodouroOutlinedTextFieldColors()

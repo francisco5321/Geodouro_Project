@@ -82,9 +82,9 @@ class ResultsViewModel(
                 _uiState.value = ResultsUiState.Success(
                     result = buildUiModel(localInferenceResult, null),
                     sourceLabel = if (isUnknownPlant) {
-                        "Planta desconhecida. Nao encontrada nas bases de dados disponiveis."
+                        "Planta desconhecida. Não encontrada nas bases de dados disponíveis."
                     } else {
-                        "Nao foi detetada nenhuma planta na imagem."
+                        "Não foi detetada nenhuma planta na imagem."
                     }
                 )
                 return@launch
@@ -102,7 +102,7 @@ class ResultsViewModel(
                 lastEnrichedData = null
                 _uiState.value = ResultsUiState.Success(
                     result = buildUiModel(rerankedInference, null),
-                    sourceLabel = "Nao foi detetada nenhuma planta na imagem."
+                    sourceLabel = "Não foi detetada nenhuma planta na imagem."
                 )
                 return@launch
             }
@@ -148,7 +148,7 @@ class ResultsViewModel(
 
                 val inferenceToPersist = lastInferenceResult
                 if (inferenceToPersist == null || inferenceToPersist.imageUri.isBlank()) {
-                    _uiState.value = ResultsUiState.Error("Sem inferencia local para guardar.")
+                    _uiState.value = ResultsUiState.Error("Sem inferência local para guardar.")
                     return@launch
                 }
 
@@ -161,9 +161,9 @@ class ResultsViewModel(
                 ) {
                     _uiState.value = ResultsUiState.Error(
                         if (isUnknownPlant) {
-                            "Esta planta ainda nao foi identificada. Usa o envio para a administracao."
+                            "Esta planta ainda não foi identificada. Usa o envio para a administração."
                         } else {
-                            "A imagem analisada nao contem uma planta reconhecivel, por isso nao sera guardada."
+                            "A imagem analisada não contém uma planta reconhecível, por isso não será guardada."
                         }
                     )
                     return@launch
@@ -194,19 +194,19 @@ class ResultsViewModel(
                 )
                 val message = when (saveResult.syncStatus) {
                     ObservationSyncStatus.SYNCED -> if (allowManualReview) {
-                        "Observacao realizada com sucesso! Enviada para a administracao e sincronizada."
+                        "Observação realizada com sucesso! Enviada para a administração e sincronizada."
                     } else {
-                        "Observacao realizada com sucesso!"
+                        "Observação realizada com sucesso!"
                     }
                     ObservationSyncStatus.PENDING -> if (allowManualReview) {
-                        "Observacao realizada com sucesso! Foi enviada localmente e ficara pendente ate haver ligacao ao backend."
+                        "Observação realizada com sucesso! Foi enviada localmente e ficará pendente até haver ligação ao backend."
                     } else {
-                        "Observacao realizada com sucesso!"
+                        "Observação realizada com sucesso!"
                     }
                     ObservationSyncStatus.FAILED -> if (allowManualReview) {
-                        "Observacao realizada com sucesso! Ficou guardada localmente para revisao manual, mas nao foi possivel contactar o backend por agora."
+                        "Observação realizada com sucesso! Ficou guardada localmente para revisão manual, mas não foi possível contactar o backend por agora."
                     } else {
-                        "Observacao realizada com sucesso! Ficou guardada localmente, mas nao foi possivel contactar o backend e tentaremos sincronizar novamente mais tarde."
+                        "Observação realizada com sucesso! Ficou guardada localmente, mas não foi possível contactar o backend e tentaremos sincronizar novamente mais tarde."
                     }
                 }
 
@@ -215,7 +215,7 @@ class ResultsViewModel(
             } catch (e: Exception) {
                 Log.e(TAG, "Error while confirming observation", e)
                 _uiState.value = ResultsUiState.Error(
-                    "Erro ao guardar observacao: ${e.message ?: "Desconhecido"}"
+                    "Erro ao guardar observação: ${e.message ?: "Desconhecido"}"
                 )
             } finally {
                 confirmationInProgress = false
@@ -243,15 +243,15 @@ class ResultsViewModel(
         }
 
         val commonName = when {
-            isPlantDetected -> enrichedData?.commonName ?: "Nome comum indisponivel"
-            isUnknownPlant -> "Esta observacao sera enviada automaticamente para a administracao."
-            else -> "Objeto nao identificado como planta"
+            isPlantDetected -> enrichedData?.commonName ?: "Nome comum indisponível"
+            isUnknownPlant -> "Esta observação será enviada automaticamente para a administração."
+            else -> "Objeto não identificado como planta"
         }
 
         val family = when {
-            isPlantDetected -> enrichedData?.family ?: "Familia indisponivel"
-            isUnknownPlant -> "Familia desconhecida"
-            else -> "Sem familia botanica"
+            isPlantDetected -> enrichedData?.family ?: "Família indisponível"
+            isUnknownPlant -> "Família desconhecida"
+            else -> "Sem família botânica"
         }
 
         return ResultUiModel(
@@ -291,11 +291,11 @@ class ResultsViewModel(
             EnrichmentOrigin.CACHE -> "Dados enriquecidos via cache local."
             EnrichmentOrigin.NETWORK -> "Dados enriquecidos via iNaturalist online."
             EnrichmentOrigin.LOCAL_ONLY ->
-                "Sem dados remotos para esta especie. A mostrar apenas inferencia local."
+                "Sem dados remotos para esta espécie. A mostrar apenas inferência local."
         }
 
         return if (rerankApplied) {
-            "$baseLabel Revalidado por similaridade visual devido a baixa confianca."
+            "$baseLabel Revalidado por similaridade visual devido a baixa confiança."
         } else {
             baseLabel
         }

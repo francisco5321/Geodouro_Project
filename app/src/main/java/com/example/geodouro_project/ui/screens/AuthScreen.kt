@@ -122,7 +122,7 @@ class AuthViewModel(
         if (!currentState.canSubmit) {
             _uiState.value = currentState.copy(
                 hasAttemptedSubmit = true,
-                errorMessage = "Preenche os campos obrigatorios para continuar."
+                errorMessage = "Preenche os campos obrigatórios para continuar."
             )
             return
         }
@@ -225,7 +225,7 @@ fun AuthScreen() {
                         lineHeight = 28.sp
                     )
                     Text(
-                        text = "Descobre o mundo da flora de Portugal e guarda as tuas observacoes na tua conta pessoal.",
+                        text = "Descobre o mundo da flora de Portugal e guarda as tuas observações na tua conta pessoal.",
                         color = Color.White.copy(alpha = 0.88f),
                         style = MaterialTheme.typography.bodySmall,
                         lineHeight = 18.sp

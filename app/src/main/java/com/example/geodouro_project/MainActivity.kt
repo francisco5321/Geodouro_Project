@@ -349,7 +349,7 @@ fun AppNavigation() {
                         imageUri = "",
                         latitude = latestCaptureLatitude,
                         longitude = latestCaptureLongitude,
-                        predictedSpecies = "Sem inferencia local",
+                        predictedSpecies = "Sem inferência local",
                         confidence = 0f
                     )
                 )

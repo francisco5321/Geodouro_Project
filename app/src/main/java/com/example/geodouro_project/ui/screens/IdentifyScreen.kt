@@ -207,7 +207,7 @@ fun IdentifyScreen(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Localizacao GPS",
+                            text = "Localização GPS",
                             style = MaterialTheme.typography.labelSmall,
                             color = GeodouroTextSecondary,
                             fontWeight = FontWeight.SemiBold,
@@ -227,7 +227,7 @@ fun IdentifyScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "Atualizar localizacao",
+                            contentDescription = "Atualizar localização",
                             tint = if (!uiState.isProcessing) GeodouroBrandGreen else GeodouroGrey,
                             modifier = Modifier.size(20.dp)
                         )
@@ -415,7 +415,7 @@ fun IdentifyScreen(
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "imagem pronta para analise",
+                                text = "imagem pronta para análise",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = GeodouroTextPrimary,
                                 fontWeight = FontWeight.Medium

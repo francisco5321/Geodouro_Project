@@ -101,7 +101,7 @@ class RoutePlanListViewModel(
                         routePlanRepository.fetchRoutePlans(sessionState)
                     }.getOrElse { error ->
                         _uiState.value = RoutePlanListUiState.Error(
-                            error.message ?: "Nao foi possivel carregar os percursos."
+                            error.message ?: "Não foi possível carregar os percursos."
                         )
                         return@launch
                     }
@@ -119,7 +119,7 @@ class RoutePlanListViewModel(
 
                 SessionState.Loading,
                 SessionState.LoggedOut -> {
-                    _uiState.value = RoutePlanListUiState.Error("Sessao indisponivel.")
+                    _uiState.value = RoutePlanListUiState.Error("Sessão indisponível.")
                 }
             }
         }
@@ -239,7 +239,7 @@ fun RoutePlanListScreen(
                         }
                     },
                     placeholder = {
-                        Text("Pesquisar por percurso, descricao ou partida...")
+                        Text("Pesquisar por percurso, descrição ou partida...")
                     }
                 )
 
@@ -255,15 +255,15 @@ fun RoutePlanListScreen(
 
                     RoutePlanListUiState.Empty -> {
                         RoutePlanEmptyState(
-                            title = "Ainda nao existem percursos planeados.",
-                            message = "Os percursos criados na web vao aparecer aqui quando estiverem associados a esta conta.",
+                            title = "Ainda não existem percursos planeados.",
+                            message = "Os percursos criados na web vão aparecer aqui quando estiverem associados a esta conta.",
                             modifier = Modifier.fillMaxSize()
                         )
                     }
 
                     is RoutePlanListUiState.Error -> {
                         RoutePlanEmptyState(
-                            title = "Nao foi possivel carregar os percursos.",
+                            title = "Não foi possível carregar os percursos.",
                             message = state.message,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -271,7 +271,7 @@ fun RoutePlanListScreen(
 
                     RoutePlanListUiState.GuestRestricted -> {
                         RoutePlanEmptyState(
-                            title = "Percursos disponiveis apenas com sessao autenticada.",
+                            title = "Percursos disponíveis apenas com sessão autenticada.",
                             message = "Entra com a tua conta para veres os percursos planeados criados na web.",
                             modifier = Modifier.fillMaxSize()
                         )
@@ -281,7 +281,7 @@ fun RoutePlanListScreen(
                         if (filteredRoutePlans.isEmpty()) {
                             RoutePlanEmptyState(
                                 title = "Nenhum percurso encontrado.",
-                                message = "Tenta pesquisar por outro nome, descricao ou local de partida.",
+                                message = "Tenta pesquisar por outro nome, descrição ou local de partida.",
                                 modifier = Modifier.fillMaxSize()
                             )
                         } else {

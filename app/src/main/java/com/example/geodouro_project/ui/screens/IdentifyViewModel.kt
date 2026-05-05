@@ -28,7 +28,7 @@ data class IdentifyUiState(
     val capturedImageUris: List<String> = emptyList(),
     val latitude: Double? = null,
     val longitude: Double? = null,
-    val locationLabel: String = "A obter localizacao GPS...",
+    val locationLabel: String = "A obter localização GPS...",
     val modelReady: Boolean = false,
     val modelStatusLabel: String = "",
     val shouldRequestLocationPermission: Boolean = false
@@ -104,7 +104,7 @@ class IdentifyViewModel(
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(locationLabel = "A obter localizacao GPS...") }
+            _uiState.update { it.copy(locationLabel = "A obter localização GPS...") }
             val coordinates = locationResolver.getCurrentCoordinates()
             _uiState.update { current ->
                 if (coordinates != null) {
@@ -117,7 +117,7 @@ class IdentifyViewModel(
                     current.copy(
                         latitude = null,
                         longitude = null,
-                        locationLabel = "Localizacao indisponivel"
+                        locationLabel = "Localização indisponível"
                     )
                 }
             }

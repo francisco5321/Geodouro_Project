@@ -345,7 +345,7 @@ class MobileNetV3Classifier(
         const val DEFAULT_LABELS_FILE = "species_labels_hybrid.txt"
         const val DEFAULT_INPUT_SIZE = 224
         const val MODEL_DISPLAY_NAME = "MobileNetV3-Small (PyTorch)"
-        const val FALLBACK_LABEL = "Modelo PyTorch ainda indisponivel"
+        const val FALLBACK_LABEL = "Modelo PyTorch ainda indisponível"
         const val NON_PLANT_LABEL = "Não é uma planta"
         const val UNKNOWN_PLANT_LABEL = "Não conhecemos essa planta"
         const val MIN_DISPLAY_CONFIDENCE = 0.15f

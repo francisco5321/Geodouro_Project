@@ -230,7 +230,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "Capture e identifique especies da flora portuguesa com inteligencia artificial.",
+                            text = "Capture e identifique espécies da flora portuguesa com inteligência artificial.",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.85f),
                             lineHeight = 18.sp
@@ -249,13 +249,13 @@ fun HomeScreen(
                     StatCard(
                         icon = Icons.Default.Eco,
                         value = uiState.speciesCount.toString(),
-                        label = "Especies\nencontradas",
+                        label = "Espécies\nencontradas",
                         modifier = Modifier.weight(1f)
                     )
                     StatCard(
                         icon = Icons.Default.Check,
                         value = uiState.observationsCount.toString(),
-                        label = "Observacoes\nrealizadas",
+                        label = "Observações\nrealizadas",
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -322,7 +322,7 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Especies Recentes",
+                        text = "Espécies Recentes",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = GeodouroTextPrimary
@@ -359,7 +359,7 @@ fun HomeScreen(
                             }
                             Spacer(modifier = Modifier.height(14.dp))
                             Text(
-                                text = "Ainda sem especies",
+                                text = "Ainda sem espécies",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = GeodouroTextPrimary,
@@ -367,7 +367,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "As especies recentes vao aparecer aqui depois das primeiras identificacoes confirmadas.",
+                                text = "As espécies recentes vão aparecer aqui depois das primeiras identificações confirmadas.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = GeodouroTextSecondary,
                                 textAlign = TextAlign.Center,
@@ -461,8 +461,8 @@ private fun List<ObservationEntity>.toRecentSpeciesItems(): List<SpeciesListItem
             id = scientificName.toSpeciesId(),
             scientificName = scientificName,
             commonName = newestObservation.enrichedCommonName?.takeIf { it.isNotBlank() } ?: "Sem nome comum",
-            family = newestObservation.enrichedFamily?.takeIf { it.isNotBlank() } ?: "Familia desconhecida",
-            genus = scientificName.substringBefore(" ").ifBlank { "Genero desconhecido" },
+            family = newestObservation.enrichedFamily?.takeIf { it.isNotBlank() } ?: "Família desconhecida",
+            genus = scientificName.substringBefore(" ").ifBlank { "Género desconhecido" },
             imageCount = observations.sumOf { it.allImageUris().size },
             thumbnailUri = newestObservation.allImageUris().firstOrNull()
         ) to newestObservation.capturedAt
@@ -479,8 +479,8 @@ private fun List<PlantSpeciesCatalogItem>.toRemoteRecentSpeciesItems(): List<Spe
                 id = species.id,
                 scientificName = species.scientificName,
                 commonName = species.commonName?.takeIf { it.isNotBlank() } ?: "Sem nome comum",
-                family = species.family.ifBlank { "Familia desconhecida" },
-                genus = species.genus.ifBlank { "Genero desconhecido" },
+                family = species.family.ifBlank { "Família desconhecida" },
+                genus = species.genus.ifBlank { "Género desconhecido" },
                 imageCount = species.imageCount,
                 thumbnailUri = species.thumbnailUri
             )

@@ -324,12 +324,12 @@ fun ProfileScreen(
                         ) {
                             StatItem(
                                 value = uiState.observationsCount.toString(),
-                                label = "Observacoes",
+                                label = "Observações",
                                 modifier = Modifier.weight(1f)
                             )
                             StatItem(
                                 value = uiState.publishedCount.toString(),
-                                label = "Publicacoes",
+                                label = "Publicações",
                                 modifier = Modifier.weight(1f)
                             )
                             StatItem(
@@ -377,7 +377,7 @@ fun ProfileScreen(
 
                 item {
                 Text(
-                    "As minhas observacoes",
+                    "As minhas observações",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = GeodouroTextPrimary
@@ -392,7 +392,7 @@ fun ProfileScreen(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = "Em modo convidado podes guardar observacoes, mas não podes transformá-las em publicacoes.",
+                            text = "Em modo convidado podes guardar observações, mas não podes transformá-las em publicações.",
                             modifier = Modifier.padding(12.dp),
                             color = GeodouroTextPrimary,
                             style = MaterialTheme.typography.bodyMedium
@@ -423,7 +423,7 @@ fun ProfileScreen(
                         }
                     },
                     placeholder = {
-                        Text("Pesquisar observacoes")
+                        Text("Pesquisar observações")
                     }
                 )
                 }
@@ -689,7 +689,7 @@ private fun buildObservationMeta(observation: ObservationEntity): String {
     val location = if (observation.latitude != null && observation.longitude != null) {
         "GPS %.5f, %.5f".format(observation.latitude, observation.longitude)
     } else {
-        "Localizacao indisponível"
+        "Localização indisponível"
     }
 
     return "$date\n$location"
@@ -700,8 +700,8 @@ private fun buildProfileObservationStatusLabel(observation: ObservationEntity): 
         observation.isPublished -> "Publicada"
         observation.requiresManualIdentification -> "Em revisão"
         observation.syncStatus == ObservationSyncStatus.SYNCED.name -> "Sincronizada"
-        observation.syncStatus == ObservationSyncStatus.FAILED.name -> "Guardada localmente - backend indisponivel"
-        else -> "Pendente de sincronizacao"
+        observation.syncStatus == ObservationSyncStatus.FAILED.name -> "Guardada localmente - backend indisponível"
+        else -> "Pendente de sincronização"
     }
 }
 

@@ -13,7 +13,7 @@ class PlantInferenceEngine(
 
     fun getModelStatusLabel(): String {
         val classifierStatus = classifier.getModelLoadDiagnostic()?.let {
-            "Classificador ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} indisponivel: $it"
+            "Classificador ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} indisponível: $it"
         } ?: "Classificador ${MobileNetV3Classifier.MODEL_DISPLAY_NAME} pronto"
 
         if (detector.isModelAvailable()) {

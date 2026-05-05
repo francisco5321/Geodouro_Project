@@ -1192,7 +1192,7 @@ class PlantRepository(
             wikipediaUrl = wikipediaUrl,
             heroImageUri = thumbnailUri,
             galleryImageUris = listOfNotNull(thumbnailUri),
-            locationSummary = "Sem detalhe remoto adicional disponivel para esta especie.",
+            locationSummary = "Sem detalhe remoto adicional disponível para esta espécie.",
             observations = emptyList()
         )
     }
@@ -1288,8 +1288,8 @@ class PlantRepository(
                 id = scientificName.toSpeciesId(),
                 scientificName = scientificName,
                 commonName = first.enrichedCommonName,
-                family = first.enrichedFamily ?: "Familia desconhecida",
-                genus = scientificName.substringBefore(" ").ifBlank { "Genero desconhecido" },
+                family = first.enrichedFamily ?: "Família desconhecida",
+                genus = scientificName.substringBefore(" ").ifBlank { "Género desconhecido" },
                 imageCount = observations.sumOf { it.allImageUris().size },
                 thumbnailUri = observations.firstNotNullOfOrNull { it.allImageUris().firstOrNull() },
                 wikipediaUrl = first.enrichedWikipediaUrl,
@@ -1316,8 +1316,8 @@ class PlantRepository(
             id = scientificName.toSpeciesId(),
             scientificName = scientificName,
             commonName = first.enrichedCommonName,
-            family = first.enrichedFamily ?: "Familia desconhecida",
-            genus = scientificName.substringBefore(" ").ifBlank { "Genero desconhecido" },
+            family = first.enrichedFamily ?: "Família desconhecida",
+            genus = scientificName.substringBefore(" ").ifBlank { "Género desconhecido" },
             imageCount = sumOf { it.allImageUris().size },
             observationCount = size,
             syncedCount = count { it.syncStatus == ObservationSyncStatus.SYNCED.name },
