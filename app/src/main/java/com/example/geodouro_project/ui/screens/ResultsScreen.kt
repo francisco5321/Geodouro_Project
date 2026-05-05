@@ -2,8 +2,6 @@ package com.example.geodouro_project.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -20,8 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Button
@@ -33,12 +31,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,9 +49,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -68,18 +67,17 @@ import com.example.geodouro_project.domain.model.LocalPredictionCandidate
 import com.example.geodouro_project.ui.components.GeoFloraHeaderLogo
 import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
+import com.example.geodouro_project.ui.theme.GeodouroCardBg
 import com.example.geodouro_project.ui.theme.GeodouroError
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
-import com.example.geodouro_project.ui.theme.GeodouroWarningBg
 import com.example.geodouro_project.ui.theme.GeodouroWhite
 import com.example.geodouro_project.ui.theme.geodouroOutlinedBorderColor
 import com.example.geodouro_project.ui.theme.geodouroOutlinedButtonColors
 import com.example.geodouro_project.ui.theme.geodouroOutlinedTextFieldColors
 import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
-import com.example.geodouro_project.ui.theme.geodouroSecondaryButtonColors
 
 data class IdentificationResult(
     val scientificName: String,
@@ -101,7 +99,8 @@ enum class PredictionFeedback {
 fun ResultsScreen(
     refreshTrigger: Int = 0,
     onBackClick: () -> Unit,
-    onConfirmResult: (IdentificationResult) -> Unit,
+    onRetakePhotosClick: () -> Unit = onBackClick,
+    onConfirmResult: (IdentificationResult, String?) -> Unit,
     captureLatitude: Double? = null,
     captureLongitude: Double? = null,
     localInferenceResult: LocalInferenceResult = LocalInferenceResult(
@@ -118,11 +117,15 @@ fun ResultsScreen(
     )
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var observationNotes by rememberSaveable(localInferenceResult.imageUri) {
-        mutableStateOf("")
-    }
+    var observationNotes by rememberSaveable(localInferenceResult.imageUri) { mutableStateOf("") }
     var predictionFeedback by rememberSaveable(localInferenceResult.imageUri) {
         mutableStateOf<PredictionFeedback?>(null)
+    }
+    var showUnknownPlantDialog by rememberSaveable(localInferenceResult.imageUri) {
+        mutableStateOf(false)
+    }
+    var unknownPlantDialogHandled by rememberSaveable(localInferenceResult.imageUri) {
+        mutableStateOf(false)
     }
 
     LaunchedEffect(localInferenceResult, captureLatitude, captureLongitude) {
@@ -130,48 +133,31 @@ fun ResultsScreen(
     }
 
     LaunchedEffect(refreshTrigger) {
-        if (refreshTrigger <= 0) {
-            return@LaunchedEffect
+        if (refreshTrigger > 0) {
+            viewModel.loadHybridResult(localInferenceResult)
         }
-        viewModel.loadHybridResult(localInferenceResult)
+    }
+
+    LaunchedEffect(uiState) {
+        val state = uiState
+        showUnknownPlantDialog = state is ResultsUiState.Success &&
+            state.result.isUnknownPlant &&
+            state.saveMessage.isNullOrBlank() &&
+            !state.isConfirming &&
+            !unknownPlantDialogHandled
     }
 
     LaunchedEffect(viewModel) {
         viewModel.confirmedEvents.collect {
-            when (val state = uiState) {
-                is ResultsUiState.Success -> {
-                    onConfirmResult(
-                        IdentificationResult(
-                            scientificName = state.result.scientificName,
-                            commonName = state.result.commonName,
-                            family = state.result.family,
-                            confidence = state.result.confidence,
-                            sourceLabel = state.sourceLabel,
-                            wikipediaUrl = state.result.wikipediaUrl,
-                            photoUrl = state.result.photoUrl
-                        )
-                    )
-                }
-
-                is ResultsUiState.MultiImageSuccess -> {
-                    onConfirmResult(
-                        IdentificationResult(
-                            scientificName = state.result.finalSpecies,
-                            commonName = state.result.commonName,
-                            family = state.result.family,
-                            confidence = state.result.aggregatedConfidence,
-                            sourceLabel = state.sourceLabel,
-                            wikipediaUrl = state.result.wikipediaUrl,
-                            photoUrl = state.result.photoUrl
-                        )
-                    )
-                }
-
-                else -> Unit
+            val state = uiState
+            if (state is ResultsUiState.Success) {
+                onConfirmResult(
+                    state.result.toIdentificationResult(state.sourceLabel),
+                    state.saveMessage
+                )
             }
         }
-    } 
-
+    }
 
     Scaffold(
         topBar = {
@@ -180,7 +166,7 @@ fun ResultsScreen(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "Identificação de resultados",
+                            text = "Identificacao de resultados",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = GeodouroBrandGreen
@@ -215,13 +201,9 @@ fun ResultsScreen(
         ) {
             when (val state = uiState) {
                 is ResultsUiState.Idle,
-                is ResultsUiState.Loading -> {
-                    HybridLoadingCard()
-                }
+                is ResultsUiState.Loading -> HybridLoadingCard()
 
-                is ResultsUiState.Error -> {
-                    ErrorCard(message = state.message)
-                }
+                is ResultsUiState.Error -> ErrorCard(message = state.message)
 
                 is ResultsUiState.Success -> {
                     ResultCard(
@@ -242,34 +224,50 @@ fun ResultsScreen(
                             predictionFeedback = PredictionFeedback.DISLIKE
                             viewModel.confirmObservation(observationNotes, allowManualReview = true)
                         },
-                        onRetakePhotos = onBackClick
-                    )
-                }
-
-                is ResultsUiState.MultiImageSuccess -> {
-                    MultiImageResultCard(
-                        result = state.result,
-                        sourceLabel = state.sourceLabel,
-                        saveMessage = state.saveMessage,
-                        isConfirming = state.isConfirming,
-                        notes = observationNotes,
-                        onNotesChange = { observationNotes = it },
-                        feedback = predictionFeedback,
-                        onLike = { predictionFeedback = PredictionFeedback.LIKE },
-                        onDislike = {
-                            predictionFeedback = PredictionFeedback.DISLIKE
-                            viewModel.confirmObservation(observationNotes, allowManualReview = true)
-                        },
-                        onConfirm = { viewModel.confirmObservation(observationNotes) },
-                        onSubmitUnknownPlant = {
-                            predictionFeedback = PredictionFeedback.DISLIKE
-                            viewModel.confirmObservation(observationNotes, allowManualReview = true)
-                        },
-                        onRetakePhotos = onBackClick
+                        onRetakePhotos = onRetakePhotosClick
                     )
                 }
             }
         }
+    }
+
+    if (showUnknownPlantDialog) {
+        AlertDialog(
+            onDismissRequest = {},
+            containerColor = GeodouroCardBg,
+            titleContentColor = GeodouroBrandGreen,
+            textContentColor = GeodouroTextPrimary,
+            tonalElevation = 0.dp,
+            title = {
+                Text("Planta fora da base de dados")
+            },
+            text = {
+                Text(
+                    "A observacao sera enviada automaticamente para a administracao para analise manual."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        unknownPlantDialogHandled = true
+                        showUnknownPlantDialog = false
+                        viewModel.confirmObservation(observationNotes, allowManualReview = true)
+                    },
+                    enabled = (uiState as? ResultsUiState.Success)?.isConfirming != true,
+                    colors = geodouroPrimaryButtonColors()
+                ) {
+                    if ((uiState as? ResultsUiState.Success)?.isConfirming == true) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = GeodouroWhite
+                        )
+                    } else {
+                        Text("Continuar")
+                    }
+                }
+            }
+        )
     }
 }
 
@@ -419,9 +417,7 @@ fun ResultCard(
 
             if (result.alternativePredictions.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
-                AlternativePredictionsSection(
-                    predictions = result.alternativePredictions
-                )
+                AlternativePredictionsSection(predictions = result.alternativePredictions)
             }
 
             CoordinatesSection(
@@ -473,8 +469,8 @@ fun ResultCard(
                     text = when {
                         isConfirming -> "A guardar..."
                         result.isPlantDetected -> "Confirmar e guardar"
-                        result.isUnknownPlant -> "Enviar para administracao"
-                        else -> "Tirar novas fotos"
+                        result.isUnknownPlant -> "A enviar para administracao"
+                        else -> "Tirar nova foto"
                     }
                 )
             }
@@ -498,9 +494,7 @@ private fun ResultPhotosSection(
     referencePhotoUrl: String?,
     isPlantDetected: Boolean
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ResultPhotoCard(
             title = "Foto capturada",
             imageModel = capturedImageUri,
@@ -509,9 +503,9 @@ private fun ResultPhotosSection(
 
         if (isPlantDetected) {
             ResultPhotoCard(
-                title = "Foto de referência",
+                title = "Foto de referencia",
                 imageModel = referencePhotoUrl,
-                emptyMessage = "Sem foto remota disponível para esta espécie."
+                emptyMessage = "Sem foto remota disponivel para esta especie."
             )
         } else {
             Surface(
@@ -538,6 +532,7 @@ private fun ResultPhotoCard(
     emptyMessage: String
 ) {
     val context = LocalContext.current
+    var isPreviewOpen by remember(imageModel) { mutableStateOf(false) }
     val request = remember(imageModel) {
         ImageRequest.Builder(context)
             .data(imageModel)
@@ -546,9 +541,7 @@ private fun ResultPhotoCard(
             .build()
     }
 
-    Column(
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = title,
             style = MaterialTheme.typography.labelLarge,
@@ -589,9 +582,54 @@ private fun ResultPhotoCard(
                     .fillMaxWidth()
                     .aspectRatio(1.5f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(GeodouroLightBg),
+                    .background(GeodouroLightBg)
+                    .clickable { isPreviewOpen = true },
                 contentScale = ContentScale.Crop
             )
+        }
+    }
+
+    if (isPreviewOpen && !imageModel.isNullOrBlank()) {
+        Dialog(
+            onDismissRequest = { isPreviewOpen = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = Color.Black
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = title,
+                        color = GeodouroWhite,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    AsyncImage(
+                        model = request,
+                        contentDescription = "$title ampliada",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Fit
+                    )
+
+                    Button(
+                        onClick = { isPreviewOpen = false },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = geodouroPrimaryButtonColors()
+                    ) {
+                        Text("Fechar")
+                    }
+                }
+            }
         }
     }
 }
@@ -622,9 +660,7 @@ private fun CoordinatesSection(
 
 @Composable
 private fun AlternativePredictionsSection(predictions: List<LocalPredictionCandidate>) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = "Outras previsoes do modelo acima de 30%",
             style = MaterialTheme.typography.titleSmall,
@@ -670,247 +706,6 @@ private fun AlternativePredictionsSection(predictions: List<LocalPredictionCandi
                         trackColor = GeodouroWhite
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun MultiImageResultCard(
-    result: MultiImageResultUiModel,
-    sourceLabel: String,
-    saveMessage: String?,
-    isConfirming: Boolean,
-    notes: String,
-    onNotesChange: (String) -> Unit,
-    feedback: PredictionFeedback?,
-    onLike: () -> Unit,
-    onDislike: () -> Unit,
-    onConfirm: () -> Unit,
-    onSubmitUnknownPlant: () -> Unit,
-    onRetakePhotos: () -> Unit
-) {
-    val uriHandler = LocalUriHandler.current
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
-        elevation = CardDefaults.cardElevation(2.dp),
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            // Mostrar consenso e número de imagens
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = GeodouroLightBg,
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Análise de ${result.imagesCount} imagem(ns)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = GeodouroTextPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Consenso: ${(result.consensus * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = GeodouroTextSecondary
-                        )
-                    }
-                    Text(
-                        text = "${result.processingTimeMs}ms",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = GeodouroTextSecondary
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            MultiImagePhotosSection(
-                capturedImageUris = result.imageUris,
-                referencePhotoUrl = result.photoUrl,
-                referenceTitle = "Foto da planta mais parecida",
-                isPlantDetected = result.isPlantDetected
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = result.finalSpecies,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = GeodouroTextPrimary
-            )
-
-            Text(
-                text = result.commonName,
-                style = MaterialTheme.typography.bodyMedium,
-                color = GeodouroTextSecondary
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = result.family,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GeodouroTextSecondary
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = "${(result.aggregatedConfidence * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = GeodouroGreen,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LinearProgressIndicator(
-                progress = { result.aggregatedConfidence },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp)),
-                color = GeodouroGreen,
-                trackColor = GeodouroLightBg
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = GeodouroLightBg,
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    text = sourceLabel,
-                    modifier = Modifier.padding(10.dp),
-                    color = GeodouroTextPrimary,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
-            if (!result.wikipediaUrl.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                WikipediaLink(
-                    url = result.wikipediaUrl,
-                    onOpen = { uriHandler.openUri(result.wikipediaUrl) }
-                )
-            }
-
-            // Mostrar alternativa se existir
-            if (!result.topAlternative.isNullOrBlank() && result.topAlternativeConfidence != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = GeodouroWarningBg,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Alternativa:",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = GeodouroTextSecondary
-                            )
-                            Text(
-                                text = result.topAlternative ?: "",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = GeodouroTextPrimary,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Text(
-                            text = "${(result.topAlternativeConfidence!! * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = GeodouroTextPrimary
-                        )
-                    }
-                }
-            }
-
-            CoordinatesSection(
-                latitude = result.latitude,
-                longitude = result.longitude
-            )
-
-            if (result.isPlantDetected || result.isUnknownPlant) {
-                Spacer(modifier = Modifier.height(12.dp))
-                ObservationNotesField(
-                    value = notes,
-                    onValueChange = onNotesChange
-                )
-            }
-
-            if (!saveMessage.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = GeodouroGreen
-                    )
-                    Text(
-                        text = saveMessage,
-                        color = GeodouroTextPrimary,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Button(
-                onClick = when {
-                    result.isPlantDetected -> onConfirm
-                    result.isUnknownPlant -> onSubmitUnknownPlant
-                    else -> onRetakePhotos
-                },
-                enabled = !isConfirming,
-                modifier = Modifier.fillMaxWidth(),
-                colors = geodouroPrimaryButtonColors(),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    text = when {
-                        isConfirming -> "A guardar..."
-                        result.isPlantDetected -> "Confirmar e guardar"
-                        result.isUnknownPlant -> "Enviar para administracao"
-                        else -> "Tirar novas fotos"
-                    }
-                )
-            }
-
-            if (result.isPlantDetected) {
-                Spacer(modifier = Modifier.height(10.dp))
-                PredictionFeedbackSection(
-                    selectedFeedback = feedback,
-                    enabled = !isConfirming,
-                    onLike = onLike,
-                    onDislike = onDislike
-                )
             }
         }
     }
@@ -978,204 +773,6 @@ private fun PredictionFeedbackSection(
     }
 }
 
-@Composable
-private fun MultiImagePhotosSection(
-    capturedImageUris: List<String>,
-    referencePhotoUrl: String?,
-    referenceTitle: String,
-    isPlantDetected: Boolean
-) {
-    var selectedImageIndex by remember { mutableStateOf<Int?>(null) }
-
-    Column(
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Text(
-            text = "Fotos capturadas",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = GeodouroTextPrimary
-        )
-
-        if (capturedImageUris.isEmpty()) {
-            ResultPhotoCard(
-                title = "Capturas",
-                imageModel = null,
-                emptyMessage = "Sem fotos capturadas para mostrar."
-            )
-        } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                capturedImageUris.forEachIndexed { index, imageUri ->
-                    val context = LocalContext.current
-                    val thumbnailRequest = remember(imageUri) {
-                        ImageRequest.Builder(context)
-                            .data(imageUri)
-                            .size(THUMBNAIL_IMAGE_MAX_SIZE)
-                            .crossfade(false)
-                            .build()
-                    }
-
-                    Box {
-                        AsyncImage(
-                            model = thumbnailRequest,
-                            contentDescription = "Foto capturada ${index + 1}",
-                            modifier = Modifier
-                                .size(110.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(GeodouroLightBg)
-                                .clickable { selectedImageIndex = index },
-                            contentScale = ContentScale.Crop
-                        )
-
-                        Surface(
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(6.dp),
-                            shape = RoundedCornerShape(999.dp),
-                            color = GeodouroWhite.copy(alpha = 0.9f)
-                        ) {
-                            Text(
-                                text = "Foto ${index + 1}",
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = GeodouroTextPrimary,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        if (isPlantDetected) {
-            ResultPhotoCard(
-                title = referenceTitle,
-                imageModel = referencePhotoUrl,
-                emptyMessage = "Sem foto remota disponível para esta espécie."
-            )
-        } else {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = GeodouroLightBg,
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    text = "Nenhuma planta encontrada",
-                    modifier = Modifier.padding(10.dp),
-                    color = GeodouroTextPrimary,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-
-    if (selectedImageIndex != null && capturedImageUris.isNotEmpty()) {
-        val currentIndex = selectedImageIndex!!.coerceIn(0, capturedImageUris.lastIndex)
-        val currentImageUri = capturedImageUris[currentIndex]
-        val context = LocalContext.current
-        val fullImageRequest = remember(currentImageUri) {
-            ImageRequest.Builder(context)
-                .data(currentImageUri)
-                .size(FULL_IMAGE_MAX_SIZE)
-                .crossfade(false)
-                .build()
-        }
-
-        Dialog(
-            onDismissRequest = { selectedImageIndex = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = Color.Black
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(12.dp)
-                ) {
-                    AsyncImage(
-                        model = fullImageRequest,
-                        contentDescription = "Foto capturada ampliada",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .pointerInput(currentIndex, capturedImageUris.size) {
-                                detectHorizontalDragGestures(
-                                    onHorizontalDrag = { _, dragAmount ->
-                                        when {
-                                            dragAmount > 20f && currentIndex > 0 -> {
-                                                selectedImageIndex = currentIndex - 1
-                                            }
-                                            dragAmount < -20f && currentIndex < capturedImageUris.lastIndex -> {
-                                                selectedImageIndex = currentIndex + 1
-                                            }
-                                        }
-                                    }
-                                )
-                            },
-                        contentScale = ContentScale.Fit
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedButton(
-                            onClick = { selectedImageIndex = (currentIndex - 1).coerceAtLeast(0) },
-                            enabled = currentIndex > 0,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                geodouroOutlinedBorderColor(currentIndex > 0)
-                            ),
-                            colors = geodouroOutlinedButtonColors()
-                        ) {
-                            Text("Anterior")
-                        }
-
-                        Text(
-                            text = "${currentIndex + 1} / ${capturedImageUris.size}",
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-
-                        OutlinedButton(
-                            onClick = { selectedImageIndex = (currentIndex + 1).coerceAtMost(capturedImageUris.lastIndex) },
-                            enabled = currentIndex < capturedImageUris.lastIndex,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                geodouroOutlinedBorderColor(currentIndex < capturedImageUris.lastIndex)
-                            ),
-                            colors = geodouroOutlinedButtonColors()
-                        ) {
-                            Text("Seguinte")
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Button(
-                        onClick = { selectedImageIndex = null },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = geodouroSecondaryButtonColors()
-                    ) {
-                        Text("Fechar")
-                    }
-                }
-            }
-        }
-    }
-}
-
 private fun ResultUiModel.toIdentificationResult(sourceLabel: String): IdentificationResult {
     return IdentificationResult(
         scientificName = scientificName,
@@ -1188,21 +785,7 @@ private fun ResultUiModel.toIdentificationResult(sourceLabel: String): Identific
     )
 }
 
-private fun MultiImageResultUiModel.toIdentificationResult(sourceLabel: String): IdentificationResult {
-    return IdentificationResult(
-        scientificName = finalSpecies,
-        commonName = commonName,
-        family = family,
-        confidence = aggregatedConfidence,
-        sourceLabel = sourceLabel,
-        wikipediaUrl = wikipediaUrl,
-        photoUrl = photoUrl
-    )
-}
-
 private const val RESULT_IMAGE_MAX_SIZE = 1200
-private const val THUMBNAIL_IMAGE_MAX_SIZE = 240
-private const val FULL_IMAGE_MAX_SIZE = 1800
 
 @Composable
 private fun ObservationNotesField(
@@ -1225,7 +808,7 @@ private fun ObservationNotesField(
                 color = GeodouroTextPrimary
             )
             Text(
-                text = "Adiciona um pequeno contexto sobre a observação, se quiseres.",
+                text = "Adiciona um pequeno contexto sobre a observacao, se quiseres.",
                 style = MaterialTheme.typography.bodySmall,
                 color = GeodouroTextSecondary
             )
@@ -1275,19 +858,3 @@ private fun WikipediaLink(
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -26,7 +26,7 @@ class HybridResultsFragment : Fragment() {
                 Geodouro_ProjectTheme {
                     ResultsScreen(
                         onBackClick = { parentFragmentManager.popBackStack() },
-                        onConfirmResult = { parentFragmentManager.popBackStack() },
+                        onConfirmResult = { _, _ -> parentFragmentManager.popBackStack() },
                         localInferenceResult = localInferenceResult
                     )
                 }

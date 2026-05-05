@@ -19,7 +19,7 @@ class HybridResultsActivity : ComponentActivity() {
             Geodouro_ProjectTheme {
                 ResultsScreen(
                     onBackClick = { finish() },
-                    onConfirmResult = { finish() },
+                    onConfirmResult = { _, _ -> finish() },
                     localInferenceResult = localInferenceResult
                 )
             }

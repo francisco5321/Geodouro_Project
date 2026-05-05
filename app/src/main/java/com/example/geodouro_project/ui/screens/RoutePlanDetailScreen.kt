@@ -76,7 +76,6 @@ import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
 import coil.compose.AsyncImage
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -338,14 +337,14 @@ private fun RouteMapCard(
     val stopPoints = remember(routePlan) { buildStopRoutePoints(routePlan) }
     var selectedStop by remember(routePlan) { mutableStateOf<RoutePlanRepository.RoutePlanStop?>(null) }
     var locationPermissionGranted by remember { mutableStateOf(hasFineLocationPermission(context)) }
-    var recenterToUserTrigger by remember { mutableStateOf(0) }
+    var recenterRequest by remember { mutableStateOf(RecenterRequest()) }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         locationPermissionGranted = granted
         if (granted) {
-            recenterToUserTrigger += 1
+            recenterRequest = recenterRequest.next(immediate = false)
         }
     }
 
@@ -357,11 +356,7 @@ private fun RouteMapCard(
 
     LaunchedEffect(locationPermissionGranted) {
         if (locationPermissionGranted) {
-            recenterToUserTrigger += 1
-            while (true) {
-                delay(15_000)
-                recenterToUserTrigger += 1
-            }
+            recenterRequest = recenterRequest.next(immediate = false)
         }
     }
 
@@ -371,7 +366,7 @@ private fun RouteMapCard(
             stopPoints = stopPoints,
             onStopClick = { selectedStop = it },
             showUserLocation = locationPermissionGranted,
-            recenterToUserTrigger = recenterToUserTrigger,
+            recenterRequest = recenterRequest,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -384,6 +379,32 @@ private fun RouteMapCard(
                     .padding(top = 16.dp, start = 16.dp, end = 16.dp)
             )
         }
+
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp),
+            shape = CircleShape,
+            color = GeodouroBrandGreen,
+            shadowElevation = 6.dp
+        ) {
+            IconButton(
+                onClick = {
+                    if (locationPermissionGranted) {
+                        recenterRequest = recenterRequest.next(immediate = true)
+                    } else {
+                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    }
+                },
+                modifier = Modifier.size(52.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = "Centrar na minha localizacao",
+                    tint = GeodouroWhite
+                )
+            }
+        }
     }
 }
 
@@ -393,13 +414,12 @@ private fun InAppRouteMap(
     stopPoints: List<VisualRoutePoint>,
     onStopClick: (RoutePlanRepository.RoutePlanStop) -> Unit,
     showUserLocation: Boolean,
-    recenterToUserTrigger: Int,
+    recenterRequest: RecenterRequest,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current.applicationContext
     var hasFittedRouteBounds by remember(routePoints, stopPoints) { mutableStateOf(false) }
-    var lastHandledRecenterTrigger by remember { mutableStateOf(-1) }
-    var lastRecenteredUserPoint by remember { mutableStateOf<GeoPoint?>(null) }
+    var lastHandledRecenterToken by remember { mutableStateOf(-1) }
     var lastRouteSignature by remember { mutableStateOf<String?>(null) }
     var lastStopSignature by remember { mutableStateOf<String?>(null) }
 
@@ -503,29 +523,25 @@ private fun InAppRouteMap(
                 }
             }
 
-            if (showUserLocation && recenterToUserTrigger != lastHandledRecenterTrigger) {
+            if (showUserLocation && recenterRequest.token != lastHandledRecenterToken) {
                 val userPoint = locationOverlay.myLocation
                 if (userPoint != null) {
-                    if (shouldRecenterToUser(lastRecenteredUserPoint, userPoint)) {
-                        animateSmoothRecenter(
-                            view = view,
-                            userPoint = userPoint
-                        )
-                        lastRecenteredUserPoint = GeoPoint(userPoint)
-                    }
-                    lastHandledRecenterTrigger = recenterToUserTrigger
+                    recenterToUser(
+                        view = view,
+                        userPoint = userPoint,
+                        immediate = recenterRequest.immediate
+                    )
+                    lastHandledRecenterToken = recenterRequest.token
                 } else {
                     locationOverlay.runOnFirstFix {
                         view.post {
                             locationOverlay.myLocation?.let { firstFixPoint ->
-                                if (shouldRecenterToUser(lastRecenteredUserPoint, firstFixPoint)) {
-                                    animateSmoothRecenter(
-                                        view = view,
-                                        userPoint = firstFixPoint
-                                    )
-                                    lastRecenteredUserPoint = GeoPoint(firstFixPoint)
-                                }
-                                lastHandledRecenterTrigger = recenterToUserTrigger
+                                recenterToUser(
+                                    view = view,
+                                    userPoint = firstFixPoint,
+                                    immediate = recenterRequest.immediate
+                                )
+                                lastHandledRecenterToken = recenterRequest.token
                             }
                         }
                     }
@@ -537,21 +553,22 @@ private fun InAppRouteMap(
     )
 }
 
-private fun shouldRecenterToUser(
-    previousPoint: GeoPoint?,
-    currentPoint: GeoPoint
-): Boolean {
-    return previousPoint == null ||
-        previousPoint.distanceToAsDouble(currentPoint) >= 15.0
-}
-
-private fun animateSmoothRecenter(
+private fun recenterToUser(
     view: MapView,
-    userPoint: GeoPoint
+    userPoint: GeoPoint,
+    immediate: Boolean
 ) {
     val targetZoom = max(view.zoomLevelDouble, 17.0)
-    // Start with a smooth pan, then snap the final center to the exact live coordinate.
-    view.controller.animateTo(userPoint, targetZoom, 1_800L)
+    if (immediate) {
+        view.controller.setCenter(userPoint)
+        if (view.zoomLevelDouble < targetZoom) {
+            view.controller.setZoom(targetZoom)
+        }
+        view.invalidate()
+        return
+    }
+
+    view.controller.animateTo(userPoint, targetZoom, 650L)
     view.postDelayed(
         {
             view.controller.setCenter(userPoint)
@@ -560,7 +577,17 @@ private fun animateSmoothRecenter(
             }
             view.invalidate()
         },
-        1_850L
+        700L
+    )
+}
+
+private data class RecenterRequest(
+    val token: Int = 0,
+    val immediate: Boolean = false
+) {
+    fun next(immediate: Boolean): RecenterRequest = RecenterRequest(
+        token = token + 1,
+        immediate = immediate
     )
 }
 

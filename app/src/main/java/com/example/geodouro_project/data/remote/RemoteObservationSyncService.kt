@@ -1,5 +1,7 @@
 package com.example.geodouro_project.data.remote
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.content.Context
 import android.net.Uri
 import android.util.Log
@@ -8,6 +10,7 @@ import com.example.geodouro_project.data.local.entity.ObservationEntity
 import com.example.geodouro_project.data.remote.model.RemoteObservationPayload
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
 import com.google.gson.Gson
+import java.io.ByteArrayOutputStream
 import java.io.FileInputStream
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -131,28 +134,116 @@ class RemoteObservationSyncService(
     ): MultipartBody.Part? {
         val imageUri = Uri.parse(imageUriString)
         val contentResolver = appContext.contentResolver
-        val mimeType = contentResolver.getType(imageUri)?.takeIf { it.isNotBlank() } ?: "image/jpeg"
         val imageBytes = runCatching {
-            openImageInputStream(imageUri)?.use { it.readBytes() }
+            prepareUploadImage(imageUri)
         }.onFailure { error ->
             Log.e(TAG, "Failed to read observation image uri=$imageUriString", error)
         }.getOrNull()
 
-        if (imageBytes == null || imageBytes.isEmpty()) {
+        if (imageBytes == null || imageBytes.bytes.isEmpty()) {
             Log.w(TAG, "Observation image bytes are empty uri=$imageUriString")
             return null
         }
 
-        val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
-            ?.takeIf { it.isNotBlank() }
-            ?: "jpg"
-        val imageBody = imageBytes.toRequestBody(mimeType.toMediaType())
+        val imageBody = imageBytes.bytes.toRequestBody(imageBytes.mimeType.toMediaType())
 
         return MultipartBody.Part.createFormData(
             "images",
-            "${observationId}-${index + 1}.$extension",
+            "${observationId}-${index + 1}.${imageBytes.extension}",
             imageBody
         )
+    }
+
+    private fun prepareUploadImage(imageUri: Uri): UploadImagePayload? {
+        val originalMimeType = appContext.contentResolver.getType(imageUri)
+            ?.takeIf { it.isNotBlank() }
+            ?: "image/jpeg"
+
+        val originalBytes = openImageInputStream(imageUri)?.use { it.readBytes() }
+            ?: return null
+
+        if (originalBytes.size <= MAX_IMAGE_UPLOAD_BYTES) {
+            val originalExtension = MimeTypeMap.getSingleton().getExtensionFromMimeType(originalMimeType)
+                ?.takeIf { it.isNotBlank() }
+                ?: "jpg"
+            return UploadImagePayload(originalBytes, originalMimeType, originalExtension)
+        }
+
+        val sampledBitmap = decodeSampledBitmap(imageUri)
+        if (sampledBitmap == null) {
+            Log.w(TAG, "Falling back to original image bytes after failed bitmap decode uri=$imageUri")
+            val originalExtension = MimeTypeMap.getSingleton().getExtensionFromMimeType(originalMimeType)
+                ?.takeIf { it.isNotBlank() }
+                ?: "jpg"
+            return UploadImagePayload(originalBytes, originalMimeType, originalExtension)
+        }
+
+        return try {
+            val compressedBytes = compressBitmap(sampledBitmap)
+            Log.d(
+                TAG,
+                "Compressed upload image uri=$imageUri originalBytes=${originalBytes.size} compressedBytes=${compressedBytes.size}"
+            )
+            UploadImagePayload(compressedBytes, COMPRESSED_IMAGE_MIME_TYPE, COMPRESSED_IMAGE_EXTENSION)
+        } finally {
+            sampledBitmap.recycle()
+        }
+    }
+
+    private fun decodeSampledBitmap(imageUri: Uri): Bitmap? {
+        val boundsOptions = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        openImageInputStream(imageUri)?.use { input ->
+            BitmapFactory.decodeStream(input, null, boundsOptions)
+        } ?: return null
+
+        val sampleSize = calculateInSampleSize(boundsOptions, MAX_IMAGE_DIMENSION_PX, MAX_IMAGE_DIMENSION_PX)
+        val decodeOptions = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+        }
+
+        return openImageInputStream(imageUri)?.use { input ->
+            BitmapFactory.decodeStream(input, null, decodeOptions)
+        }
+    }
+
+    private fun calculateInSampleSize(
+        options: BitmapFactory.Options,
+        reqWidth: Int,
+        reqHeight: Int
+    ): Int {
+        val (height, width) = options.run { outHeight to outWidth }
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            var halfHeight = height / 2
+            var halfWidth = width / 2
+
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+
+        return inSampleSize.coerceAtLeast(1)
+    }
+
+    private fun compressBitmap(bitmap: Bitmap): ByteArray {
+        var quality = INITIAL_JPEG_QUALITY
+        var compressedBytes = bitmap.toJpegByteArray(quality)
+
+        while (compressedBytes.size > TARGET_COMPRESSED_IMAGE_BYTES && quality > MIN_JPEG_QUALITY) {
+            quality -= JPEG_QUALITY_STEP
+            compressedBytes = bitmap.toJpegByteArray(quality)
+        }
+
+        return compressedBytes
+    }
+
+    private fun Bitmap.toJpegByteArray(quality: Int): ByteArray {
+        val outputStream = ByteArrayOutputStream()
+        compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+        return outputStream.toByteArray()
     }
 
     private fun buildObservationUrl(): String {
@@ -186,5 +277,19 @@ class RemoteObservationSyncService(
     companion object {
         private const val TAG = "RemoteObservationSync"
         private val JSON_MEDIA_TYPE = "application/json".toMediaType()
+        private const val MAX_IMAGE_UPLOAD_BYTES = 4 * 1024 * 1024
+        private const val TARGET_COMPRESSED_IMAGE_BYTES = 3 * 1024 * 1024
+        private const val MAX_IMAGE_DIMENSION_PX = 1600
+        private const val INITIAL_JPEG_QUALITY = 85
+        private const val MIN_JPEG_QUALITY = 45
+        private const val JPEG_QUALITY_STEP = 10
+        private const val COMPRESSED_IMAGE_MIME_TYPE = "image/jpeg"
+        private const val COMPRESSED_IMAGE_EXTENSION = "jpg"
     }
 }
+
+private data class UploadImagePayload(
+    val bytes: ByteArray,
+    val mimeType: String,
+    val extension: String
+)

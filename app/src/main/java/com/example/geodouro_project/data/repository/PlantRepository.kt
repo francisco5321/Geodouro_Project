@@ -33,17 +33,11 @@ import com.example.geodouro_project.data.remote.RemoteSpeciesService
 import com.example.geodouro_project.data.remote.RemoteUserIdentity
 import com.example.geodouro_project.data.remote.api.INaturalistApiService
 import com.example.geodouro_project.data.remote.model.InaturalistTaxonDto
-import com.example.geodouro_project.domain.model.ConfidencePolicy
-import com.example.geodouro_project.domain.model.ConfidenceState
 import com.example.geodouro_project.domain.model.EnrichedSpeciesData
 import com.example.geodouro_project.domain.model.EnrichmentOrigin
 import com.example.geodouro_project.domain.model.EnrichmentResult
-import com.example.geodouro_project.domain.model.ImageInferenceResult
 import com.example.geodouro_project.domain.model.LocalInferenceResult
 import com.example.geodouro_project.domain.model.LocalPredictionCandidate
-import com.example.geodouro_project.domain.model.MultiImageAggregationConfig
-import com.example.geodouro_project.domain.model.MultiImageAggregator
-import com.example.geodouro_project.domain.model.MultiImageAggregationResult
 import com.example.geodouro_project.domain.model.ObservationSaveResult
 import com.example.geodouro_project.domain.model.ObservationSyncStatus
 import com.google.android.gms.location.LocationServices
@@ -82,9 +76,6 @@ class PlantRepository(
 ) {
 
     private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(appContext) }
-    private val multiImageAggregator by lazy {
-        MultiImageAggregator(nonPlantLabel = MobileNetV3Classifier.NON_PLANT_LABEL)
-    }
     private val speciesLookupCache = ConcurrentHashMap<String, CachedTaxonResult>()
     private val referenceEmbeddingCache = ConcurrentHashMap<String, FloatArray>()
 
@@ -187,7 +178,8 @@ class PlantRepository(
         enrichedData: EnrichedSpeciesData?,
         imageUris: List<String> = listOf(localResult.imageUri),
         notes: String? = null,
-        allowManualReview: Boolean = false
+        allowManualReview: Boolean = false,
+        syncImmediately: Boolean = true
     ): ObservationSaveResult {
         require(
             !isNonPlantPrediction(localResult.predictedSpecies) &&
@@ -237,8 +229,11 @@ class PlantRepository(
 
         val hasInternet = connectivityChecker.hasInternetConnection()
         val isConfigured = remoteObservationSyncService.isConfigured()
-        Log.d(TAG, "saveObservation connectivity=$hasInternet backendConfigured=$isConfigured")
-        if (hasInternet && isConfigured) {
+        Log.d(
+            TAG,
+            "saveObservation connectivity=$hasInternet backendConfigured=$isConfigured syncImmediately=$syncImmediately"
+        )
+        if (syncImmediately && hasInternet && isConfigured) {
             syncPendingObservations()
         }
 
@@ -1398,76 +1393,6 @@ class PlantRepository(
         observation.publishedByDisplayName = userDisplayName
         return observation
     }
-
-    suspend fun inferMultipleImages(
-        imageUris: List<String>,
-        config: MultiImageAggregationConfig = MultiImageAggregationConfig()
-    ): MultiImageAggregationResult = withContext(Dispatchers.Default) {
-        if (imageUris.isEmpty() || imageUris.size < config.minImagesRequired) {
-            throw IllegalArgumentException(
-                "Número de imagens inválido: ${imageUris.size}. " +
-                    "Requerido: ${config.minImagesRequired}-${config.maxImagesRequired}"
-            )
-        }
-
-        val imagesToProcess = imageUris.take(config.maxImagesRequired)
-        val startTime = System.currentTimeMillis()
-
-        val imageResults = imagesToProcess.map { imageUri ->
-            runCatching {
-                val bitmap = decodeLocalBitmap(imageUri, MAX_INFERENCE_BITMAP_SIZE)
-                    ?: return@runCatching ImageInferenceResult(
-                        imageUri = imageUri,
-                        predictedSpecies = "UNKNOWN",
-                        confidence = 0f,
-                        candidatePredictions = emptyList()
-                    )
-
-                val analysis = inferenceEngine.analyze(bitmap)
-                val prediction = analysis.prediction
-
-                ImageInferenceResult(
-                    imageUri = imageUri,
-                    predictedSpecies = prediction.label,
-                    confidence = prediction.confidence,
-                    candidatePredictions = prediction.candidates.map { candidate ->
-                        LocalPredictionCandidate(
-                            species = candidate.label,
-                            confidence = candidate.confidence
-                        )
-                    },
-                    embedding = analysis.embedding,
-                    capturedAt = System.currentTimeMillis()
-                )
-            }.getOrNull() ?: ImageInferenceResult(
-                imageUri = imageUri,
-                predictedSpecies = "ERROR",
-                confidence = 0f,
-                candidatePredictions = emptyList()
-            )
-        }
-
-        val processingTimeMs = System.currentTimeMillis() - startTime
-
-        return@withContext aggregateMultipleInferences(
-            imageResults = imageResults,
-            config = config,
-            processingTimeMs = processingTimeMs
-        )
-    }
-
-    suspend fun aggregateMultipleInferences(
-        imageResults: List<ImageInferenceResult>,
-        config: MultiImageAggregationConfig = MultiImageAggregationConfig(),
-        processingTimeMs: Long = 0
-    ): MultiImageAggregationResult = withContext(Dispatchers.Default) {
-        return@withContext multiImageAggregator.aggregate(
-            imageResults = imageResults,
-            config = config,
-            processingTimeMs = processingTimeMs
-        )
-    }
-
     private fun openImageInputStream(uri: Uri) = when (uri.scheme) {
         "file" -> uri.path?.let { FileInputStream(it) }
         else -> appContext.contentResolver.openInputStream(uri)
@@ -1485,4 +1410,5 @@ class PlantRepository(
         private const val TAXON_LOOKUP_CACHE_TTL_MS = 24 * 60 * 60 * 1000L
     }
 }
+
 

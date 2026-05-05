@@ -29,14 +29,18 @@ class PlantInferenceEngine(
 
     suspend fun analyze(bitmap: Bitmap): InferenceAnalysis = withContext(Dispatchers.Default) {
         val detectionResult = detector.detect(bitmap)
-        val fullImageAnalysis = classifier.analyze(bitmap)
         val croppedBitmap = detectionResult.croppedBitmap
 
-        if (!detectionResult.detectorApplied || croppedBitmap == null) {
-            return@withContext fullImageAnalysis
+        if (!detectionResult.detectorApplied) {
+            return@withContext classifier.analyze(bitmap)
+        }
+
+        if (croppedBitmap == null) {
+            return@withContext nonPlantAnalysis()
         }
 
         try {
+            val fullImageAnalysis = classifier.analyze(bitmap)
             val croppedAnalysis = classifier.analyze(croppedBitmap)
             selectBestAnalysis(
                 croppedAnalysis = croppedAnalysis,
@@ -82,6 +86,19 @@ class PlantInferenceEngine(
         }
 
         return croppedAnalysis
+    }
+
+    private fun nonPlantAnalysis(): InferenceAnalysis {
+        return InferenceAnalysis(
+            prediction = InferencePrediction(
+                label = MobileNetV3Classifier.NON_PLANT_LABEL,
+                confidence = NO_PLANT_CONFIDENCE,
+                fromModel = true,
+                candidates = emptyList(),
+                rejectionReason = RejectionReason.NON_PLANT
+            ),
+            embedding = null
+        )
     }
 
     companion object {
