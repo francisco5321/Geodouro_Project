@@ -36,6 +36,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -382,10 +384,6 @@ fun ObservationDetailScreen(
                             }
                         }
 
-                        if (observation.isPublished) {
-                            item { PublishedBanner() }
-                        }
-
                         item { Spacer(Modifier.height(8.dp)) }
                     }
                 }
@@ -407,6 +405,7 @@ private fun HeroCard(
     observation: ObservationEntity,
     locationContext: ObservationLocationContext
 ) {
+    var previewImageUri by rememberSaveable(observation.id) { mutableStateOf<String?>(null) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = CardRadius,
@@ -419,7 +418,7 @@ private fun HeroCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(190.dp)
+                    .height(260.dp)
                     .background(
                         Brush.linearGradient(listOf(GreenHero, GreenLight))
                     )
@@ -434,10 +433,19 @@ private fun HeroCard(
                             modifier = Modifier.size(48.dp)
                         )
                     }
+                } else if (images.size == 1) {
+                    AsyncImage(
+                        model = images.first(),
+                        contentDescription = observation.predictedSpecies,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clickable { previewImageUri = images.first() },
+                        contentScale = ContentScale.Crop
+                    )
                 } else {
                     LazyRow(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(12.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(images) { uri ->
@@ -445,10 +453,11 @@ private fun HeroCard(
                                 model = uri,
                                 contentDescription = observation.predictedSpecies,
                                 modifier = Modifier
-                                    .height(166.dp)
-                                    .aspectRatio(0.85f)
+                                    .fillParentMaxHeight()
+                                    .aspectRatio(1.02f)
                                     .clip(RoundedCornerShape(14.dp))
-                                    .border(1.dp, Color.White.copy(0.25f), RoundedCornerShape(14.dp)),
+                                    .border(1.dp, Color.White.copy(0.25f), RoundedCornerShape(14.dp))
+                                    .clickable { previewImageUri = uri },
                                 contentScale = ContentScale.Crop
                             )
                         }
@@ -525,6 +534,50 @@ private fun HeroCard(
                             label = formatObservationDate(observation)
                         )
                     }
+                }
+            }
+        }
+    }
+
+    previewImageUri?.let { imageUri ->
+        Dialog(
+            onDismissRequest = { previewImageUri = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = Color.Black
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = observation.enrichedScientificName ?: observation.predictedSpecies,
+                        color = CardBg,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    AsyncImage(
+                        model = imageUri,
+                        contentDescription = "${observation.predictedSpecies} ampliada",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Fit
+                    )
+
+                    GeoButton(
+                        label = "Fechar",
+                        icon = Icons.Default.Close,
+                        primary = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { previewImageUri = null }
+                    )
                 }
             }
         }

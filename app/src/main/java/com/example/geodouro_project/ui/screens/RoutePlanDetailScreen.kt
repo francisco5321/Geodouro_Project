@@ -376,7 +376,7 @@ private fun RouteMapCard(
                 onClose = { selectedStop = null },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+                    .padding(top = 16.dp, start = 16.dp, end = 84.dp)
             )
         }
 

@@ -335,13 +335,18 @@ fun AppNavigation() {
                         clearIdentifyCapturesVersion += 1
                         popToDetailAnchorOrBack()
                     },
-                    onConfirmResult = {
+                    onConfirmResult = { _, saveMessage ->
                         latestInferenceResult = null
                         latestCaptureLatitude = null
                         latestCaptureLongitude = null
                         clearIdentifyCapturesVersion += 1
                         savedObservationRefreshVersion += 1
                         popToDetailAnchorOrBack()
+                        saveMessage?.takeIf { it.isNotBlank() }?.let { message ->
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(message)
+                            }
+                        }
                     },
                     captureLatitude = latestCaptureLatitude,
                     captureLongitude = latestCaptureLongitude,
@@ -488,6 +493,5 @@ private fun SessionLoadingScreen() {
         }
     }
 }
-
 
 
