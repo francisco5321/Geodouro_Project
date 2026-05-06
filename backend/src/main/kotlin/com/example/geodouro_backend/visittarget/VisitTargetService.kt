@@ -16,9 +16,9 @@ class VisitTargetService(
     fun listVisitTargets(userId: Int): List<VisitTargetResponse> {
         val targets = jdbcTemplate.query(
             VISIT_TARGET_SELECT_SQL + """
-                WHERE svt.user_id = :userId
-                  AND (svt.notes IS NULL OR svt.notes <> :consumedNote)
-                ORDER BY svt.created_at DESC NULLS LAST, svt.saved_visit_target_id DESC
+                WHERE rvt.user_id = :userId
+                  AND (rvt.notes IS NULL OR rvt.notes <> :consumedNote)
+                ORDER BY rvt.created_at DESC NULLS LAST, rvt.saved_visit_target_id DESC
             """.trimIndent(),
             MapSqlParameterSource()
                 .addValue("userId", userId)
@@ -84,7 +84,7 @@ class VisitTargetService(
         )
 
         if (affected == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita não encontrado") //3
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nÃ£o encontrado")
         }
     }
 
@@ -92,16 +92,16 @@ class VisitTargetService(
         return try {
             jdbcTemplate.queryForObject(
                 VISIT_TARGET_SELECT_SQL + """
-                    WHERE svt.user_id = :userId
-                      AND svt.saved_visit_target_id = :savedVisitTargetId
+                    WHERE rvt.user_id = :userId
+                      AND rvt.saved_visit_target_id = :savedVisitTargetId
                 """.trimIndent(),
                 MapSqlParameterSource()
                     .addValue("userId", userId)
                     .addValue("savedVisitTargetId", savedVisitTargetId),
                 visitTargetRowMapper
-            ) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita não encontrado") //5
+            ) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nÃ£o encontrado")
         } catch (_: EmptyResultDataAccessException) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita não encontrado") //4
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nÃ£o encontrado")
         }
     }
 
@@ -110,7 +110,7 @@ class VisitTargetService(
             "species", "plant_species", "plant-species" -> "species"
             "publication" -> "publication"
             "observation" -> "observation"
-            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo inválido") //2
+            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo invÃ¡lido")
         }
     }
 
@@ -134,7 +134,7 @@ class VisitTargetService(
                   AND latitude IS NOT NULL
                   AND longitude IS NOT NULL
             """.trimIndent() to "targetId"
-            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo inválido")
+            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo invÃ¡lido")
         }
 
         val count = jdbcTemplate.queryForObject(
@@ -153,7 +153,7 @@ class VisitTargetService(
             "species" -> "plant_species_id"
             "publication" -> "publication_id"
             "observation" -> "observation_id"
-            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo inválido")
+            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo invÃ¡lido")
         }
 
         return try {
@@ -196,7 +196,7 @@ class VisitTargetService(
         ) ?: 0
 
         if (count == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita não encontrado")
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nÃ£o encontrado")
         }
     }
 
@@ -234,7 +234,7 @@ class VisitTargetService(
             "species" -> "plant_species_id"
             "publication" -> "publication_id"
             "observation" -> "observation_id"
-            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo inválido")
+            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo invÃ¡lido")
         }
 
         return jdbcTemplate.queryForObject(
@@ -247,28 +247,28 @@ class VisitTargetService(
                 .addValue("userId", userId)
                 .addValue("targetId", targetId),
             Int::class.java
-        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Não foi possível guardar o alvo")
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "NÃ£o foi possÃ­vel guardar o alvo")
     }
 
     private fun addedMessage(targetType: String): String = when (targetType) {
-        "species" -> "Espécie adicionada a Quero visitar."
-        "publication" -> "Publicação adicionada a Quero visitar."
-        "observation" -> "Observação adicionada a Quero visitar."
+        "species" -> "EspÃ©cie adicionada a Quero visitar."
+        "publication" -> "PublicaÃ§Ã£o adicionada a Quero visitar."
+        "observation" -> "ObservaÃ§Ã£o adicionada a Quero visitar."
         else -> "Alvo adicionado a Quero visitar."
     }
 
     private fun removedMessage(targetType: String): String = when (targetType) {
-        "species" -> "Espécie removida da tua lista de visita."
-        "publication" -> "Publicação removida da tua lista de visita."
-        "observation" -> "Observação removida da tua lista de visita."
+        "species" -> "EspÃ©cie removida da tua lista de visita."
+        "publication" -> "PublicaÃ§Ã£o removida da tua lista de visita."
+        "observation" -> "ObservaÃ§Ã£o removida da tua lista de visita."
         else -> "Alvo removido da tua lista de visita."
     }
 
     private fun notFoundMessage(targetType: String): String = when (targetType) {
-        "species" -> "Espécie não encontrada."
-        "publication" -> "Publicação não encontrada."
-        "observation" -> "Observação não encontrada."
-        else -> "Alvo não encontrado."
+        "species" -> "EspÃ©cie nÃ£o encontrada."
+        "publication" -> "PublicaÃ§Ã£o nÃ£o encontrada."
+        "observation" -> "ObservaÃ§Ã£o nÃ£o encontrada."
+        else -> "Alvo nÃ£o encontrado."
     }
 
     companion object {
@@ -292,89 +292,19 @@ class VisitTargetService(
         }
 
         private const val VISIT_TARGET_SELECT_SQL = """
-            SELECT svt.saved_visit_target_id,
-                   svt.user_id,
-                   CASE
-                       WHEN svt.observation_id IS NOT NULL THEN 'observation'
-                       WHEN svt.publication_id IS NOT NULL THEN 'publication'
-                       WHEN svt.plant_species_id IS NOT NULL THEN 'species'
-                       ELSE 'unknown'
-                   END AS target_type,
-                   CASE
-                       WHEN svt.observation_id IS NOT NULL THEN COALESCE(
-                           NULLIF(obs_target.enriched_common_name, ''),
-                           NULLIF(species_target.common_name, ''),
-                           NULLIF(species_target.scientific_name, ''),
-                           'Observação botânica'
-                       )
-                       WHEN svt.publication_id IS NOT NULL THEN COALESCE(
-                           NULLIF(publication_target.title, ''),
-                           NULLIF(species_target.common_name, ''),
-                           NULLIF(publication_observation.enriched_common_name, ''),
-                           NULLIF(species_target.scientific_name, ''),
-                           'Publicação botânica'
-                       )
-                       WHEN svt.plant_species_id IS NOT NULL THEN COALESCE(
-                           NULLIF(species_target.common_name, ''),
-                           NULLIF(species_target.scientific_name, ''),
-                           'Espécie selecionada'
-                       )
-                       ELSE 'Alvo de visita'
-                   END AS title,
-                   CASE
-                       WHEN svt.observation_id IS NOT NULL THEN COALESCE(
-                           NULLIF(obs_target.enriched_scientific_name, ''),
-                           NULLIF(obs_target.predicted_scientific_name, ''),
-                           NULLIF(species_target.scientific_name, ''),
-                           'Observação com coordenadas'
-                       )
-                       WHEN svt.publication_id IS NOT NULL THEN COALESCE(
-                           NULLIF(species_target.scientific_name, ''),
-                           NULLIF(publication_observation.enriched_scientific_name, ''),
-                           NULLIF(publication_observation.predicted_scientific_name, ''),
-                           'Publicação associada a observação'
-                       )
-                       WHEN svt.plant_species_id IS NOT NULL THEN COALESCE(
-                           NULLIF(species_target.scientific_name, ''),
-                           'Sem classificação científ ica'
-                       )
-                       ELSE NULLIF(svt.notes, '')
-                   END AS subtitle,
-                   svt.notes,
-                   svt.observation_id,
-                   COALESCE(svt.plant_species_id, obs_target.plant_species_id, publication_target.plant_species_id, publication_observation.plant_species_id) AS plant_species_id,
-                   svt.publication_id,
-                   COALESCE(
-                       obs_target.latitude,
-                       publication_observation.latitude,
-                       species_observation.latitude
-                   ) AS latitude,
-                   COALESCE(
-                       obs_target.longitude,
-                       publication_observation.longitude,
-                       species_observation.longitude
-                   ) AS longitude,
-                   svt.created_at
-            FROM saved_visit_target svt
-            LEFT JOIN observation obs_target ON obs_target.observation_id = svt.observation_id
-            LEFT JOIN publication publication_target ON publication_target.publication_id = svt.publication_id
-            LEFT JOIN observation publication_observation ON publication_observation.observation_id = publication_target.observation_id
-            LEFT JOIN plant_species species_target ON species_target.plant_species_id = COALESCE(
-                svt.plant_species_id,
-                obs_target.plant_species_id,
-                publication_target.plant_species_id,
-                publication_observation.plant_species_id
-            )
-            LEFT JOIN LATERAL (
-                SELECT o.latitude,
-                       o.longitude
-                FROM observation o
-                WHERE o.plant_species_id = svt.plant_species_id
-                  AND o.latitude IS NOT NULL
-                  AND o.longitude IS NOT NULL
-                ORDER BY o.observed_at DESC NULLS LAST, o.observation_id DESC
-                LIMIT 1
-            ) species_observation ON TRUE
+            SELECT rvt.saved_visit_target_id,
+                   rvt.user_id,
+                   rvt.target_type,
+                   rvt.title,
+                   rvt.subtitle,
+                   rvt.notes,
+                   rvt.observation_id,
+                   rvt.plant_species_id,
+                   rvt.publication_id,
+                   rvt.latitude,
+                   rvt.longitude,
+                   rvt.created_at
+            FROM resolved_visit_target rvt
         """
     }
 }
