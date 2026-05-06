@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,8 +42,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -86,8 +85,6 @@ import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
 import com.example.geodouro_project.ui.theme.geodouroOutlinedTextFieldColors
 import com.example.geodouro_project.ui.theme.geodouroLoadingIndicatorColor
-import com.example.geodouro_project.ui.theme.geodouroOutlinedBorderColor
-import com.example.geodouro_project.ui.theme.geodouroOutlinedButtonColors
 import com.example.geodouro_project.ui.theme.geodouroPrimaryButtonColors
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -376,121 +373,114 @@ fun ProfileScreen(
                 }
 
                 item {
-                Text(
-                    "As minhas observações",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = GeodouroTextPrimary
-                )
+                    Text(
+                        text = if (sessionState is SessionState.Guest) {
+                            "Desbloqueia o teu perfil"
+                        } else {
+                            "As minhas observações"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = GeodouroTextPrimary
+                    )
                 }
 
                 if (!canPublishObservations) {
                     item {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = GeodouroLightBg,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = "Em modo convidado podes guardar observações, mas não podes transformá-las em publicações.",
-                            modifier = Modifier.padding(12.dp),
-                            color = GeodouroTextPrimary,
-                            style = MaterialTheme.typography.bodyMedium
+                        GuestProfileGate()
+                    }
+                } else {
+                    item {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(16.dp),
+                            colors = geodouroOutlinedTextFieldColors(),
+                            leadingIcon = {
+                                Icon(Icons.Default.Search, contentDescription = null)
+                            },
+                            trailingIcon = {
+                                if (searchQuery.isNotBlank()) {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = "Limpar pesquisa"
+                                        )
+                                    }
+                                }
+                            },
+                            placeholder = {
+                                Text("Pesquisar observações")
+                            }
                         )
                     }
-                    }
-                }
 
-                item {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = geodouroOutlinedTextFieldColors(),
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null)
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotBlank()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(
-                                    imageVector = Icons.Default.Clear,
-                                    contentDescription = "Limpar pesquisa"
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ProfileObservationFilter.entries.forEach { filter ->
+                                FilterChip(
+                                    selected = selectedFilter == filter,
+                                    onClick = { selectedFilter = filter },
+                                    label = { Text(filter.label) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = GeodouroGreen,
+                                        selectedLabelColor = Color.White,
+                                        containerColor = GeodouroLightBg,
+                                        labelColor = GeodouroTextSecondary
+                                    ),
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = selectedFilter == filter,
+                                        borderColor = Color.Transparent,
+                                        selectedBorderColor = Color.Transparent
+                                    )
                                 )
                             }
                         }
-                    },
-                    placeholder = {
-                        Text("Pesquisar observações")
                     }
-                )
-                }
 
-                item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ProfileObservationFilter.entries.forEach { filter ->
-                        FilterChip(
-                            selected = selectedFilter == filter,
-                            onClick = { selectedFilter = filter },
-                            label = { Text(filter.label) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = GeodouroGreen,
-                                selectedLabelColor = Color.White,
-                                containerColor = GeodouroLightBg,
-                                labelColor = GeodouroTextSecondary
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = selectedFilter == filter,
-                                borderColor = Color.Transparent,
-                                selectedBorderColor = Color.Transparent
+                    uiState.statusMessage?.let { message ->
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = GeodouroLightBg,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = message,
+                                    modifier = Modifier.padding(12.dp),
+                                    color = GeodouroTextPrimary,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
+
+                    if (uiState.observations.isEmpty()) {
+                        item {
+                            EmptyProfileState()
+                        }
+                    } else if (filteredObservations.isEmpty()) {
+                        item {
+                            EmptyFilteredProfileState()
+                        }
+                    } else {
+                        items(filteredObservations, key = { it.id }) { observation ->
+                            ObservationProfileCard(
+                                observation = observation,
+                                isPublishing = uiState.publishingIds.contains(observation.id),
+                                canPublish = canPublishObservations,
+                                onPublish = { viewModel.publishObservation(observation.id) },
+                                onClick = { onObservationClick(observation.id) }
                             )
-                        )
-                    }
-                }
-                }
-
-                uiState.statusMessage?.let { message ->
-                    item {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = GeodouroLightBg,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = message,
-                            modifier = Modifier.padding(12.dp),
-                            color = GeodouroTextPrimary,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                    }
-                }
-
-                if (uiState.observations.isEmpty()) {
-                    item {
-                    EmptyProfileState()
-                    }
-                } else if (filteredObservations.isEmpty()) {
-                    item {
-                    EmptyFilteredProfileState()
-                    }
-                } else {
-                    items(filteredObservations, key = { it.id }) { observation ->
-                    ObservationProfileCard(
-                        observation = observation,
-                        isPublishing = uiState.publishingIds.contains(observation.id),
-                        canPublish = canPublishObservations,
-                        onPublish = { viewModel.publishObservation(observation.id) },
-                        onClick = { onObservationClick(observation.id) }
-                    )
+                        }
                     }
                 }
             }
@@ -501,6 +491,110 @@ fun ProfileScreen(
                 modifier = Modifier.align(Alignment.TopCenter),
                 backgroundColor = GeodouroBg,
                 contentColor = GeodouroBrandGreen
+            )
+        }
+    }
+}
+
+@Composable
+private fun GuestProfileGate(
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
+        elevation = CardDefaults.cardElevation(3.dp),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Surface(
+                color = GeodouroLightBg,
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    GeodouroWhite,
+                                    GeodouroLightBg
+                                )
+                            )
+                        )
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Surface(
+                        color = GeodouroBrandGreen.copy(alpha = 0.10f),
+                        shape = RoundedCornerShape(999.dp)
+                    ) {
+                        Text(
+                            text = "Modo convidado",
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            color = GeodouroBrandGreen,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Text(
+                        text = "Faz login para realizar observações e publicações.",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = GeodouroTextPrimary
+                    )
+
+                    Text(
+                        text = "Ao iniciares sessão podes guardar registos no teu perfil, acompanhar espécies observadas e publicar na comunidade.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = GeodouroTextSecondary
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        GuestFeatureChip(
+                            icon = Icons.Default.Visibility,
+                            label = "Observações"
+                        )
+                        GuestFeatureChip(
+                            icon = Icons.Default.Public,
+                            label = "Publicações"
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GuestFeatureChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String
+) {
+    Surface(
+        color = GeodouroWhite,
+        shape = RoundedCornerShape(999.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = GeodouroBrandGreen,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = GeodouroTextPrimary
             )
         }
     }
@@ -661,18 +755,14 @@ private fun ObservationProfileCard(
                     Spacer(modifier = Modifier.size(8.dp))
                     Text("Transformar em publicação")
                 }
-            } else {
+            } else if (observation.requiresManualIdentification) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = GeodouroLightBg,
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = if (observation.requiresManualIdentification) {
-                            "Publicação indisponível enquanto a observação estiver em revisão."
-                        } else {
-                            "Publicação indisponível em modo convidado."
-                        },
+                        text = "Publicação indisponível enquanto a observação estiver em revisão.",
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         color = GeodouroTextSecondary,
                         style = MaterialTheme.typography.bodyMedium
