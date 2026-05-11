@@ -2,6 +2,7 @@
   postgres:
     image: postgres:16
     container_name: geodouro-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: geodouro
       POSTGRES_USER: postgres

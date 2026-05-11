@@ -1,0 +1,19 @@
+[Unit]
+Description=Geodouro Spring Boot backend
+Requires=__DB_SERVICE_UNIT__
+After=__DB_SERVICE_UNIT__ network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sudoer
+WorkingDirectory=/home/sudoer/Geodouro_Project
+EnvironmentFile=/etc/geodouro/backend.env
+ExecStartPre=/usr/bin/mkdir -p /opt/geodouro/uploads
+ExecStart=/usr/bin/java -jar /home/sudoer/Geodouro_Project/backend/build/libs/geodouro-backend-0.0.1-SNAPSHOT.jar
+Restart=always
+RestartSec=10
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

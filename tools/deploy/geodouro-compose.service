@@ -1,0 +1,15 @@
+[Unit]
+Description=Geodouro PostgreSQL stack
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=__START_CMD__
+ExecStop=__STOP_CMD__
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
