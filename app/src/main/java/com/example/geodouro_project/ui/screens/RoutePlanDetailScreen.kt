@@ -5,11 +5,11 @@ import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,9 +24,7 @@ import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -53,29 +49,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.geodouro_project.data.repository.RoutePlanRepository
 import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.domain.model.SessionState
 import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
+import com.example.geodouro_project.ui.theme.GeodouroDarkGreen
 import com.example.geodouro_project.ui.theme.GeodouroGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
 import com.example.geodouro_project.ui.theme.GeodouroWhite
-import coil.compose.AsyncImage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -118,7 +114,7 @@ class RoutePlanDetailViewModel(
                 is SessionState.Authenticated -> {
                     val userId = sessionState.userId
                     if (userId == null) {
-                        _uiState.value = RoutePlanDetailUiState.Error("Sessão autenticada sem identificador remoto.")
+                        _uiState.value = RoutePlanDetailUiState.Error("Sessao autenticada sem identificador remoto.")
                         return@launch
                     }
 
@@ -126,13 +122,13 @@ class RoutePlanDetailViewModel(
                         routePlanRepository.fetchRoutePlanDetail(routePlanId, sessionState)
                     }.getOrElse { error ->
                         _uiState.value = RoutePlanDetailUiState.Error(
-                            error.message ?: "Não foi possível abrir o percurso."
+                            error.message ?: "Nao foi possivel abrir o percurso."
                         )
                         return@launch
                     }
 
                     _uiState.value = if (detail == null) {
-                        RoutePlanDetailUiState.Error("Percurso não encontrado.")
+                        RoutePlanDetailUiState.Error("Percurso nao encontrado.")
                     } else {
                         RoutePlanDetailUiState.Success(detail)
                     }
@@ -144,7 +140,7 @@ class RoutePlanDetailViewModel(
 
                 SessionState.Loading,
                 SessionState.LoggedOut -> {
-                    _uiState.value = RoutePlanDetailUiState.Error("Sessão indisponível.")
+                    _uiState.value = RoutePlanDetailUiState.Error("Sessao indisponivel.")
                 }
             }
         }
@@ -197,9 +193,9 @@ fun RoutePlanDetailScreen(
                 expandedHeight = 48.dp,
                 title = {
                     Text(
-                        "Detalhe do percurso",
+                        text = "Percurso",
                         style = MaterialTheme.typography.titleLarge,
-                        color = GeodouroBrandGreen,
+                        color = GeodouroWhite,
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -208,16 +204,16 @@ fun RoutePlanDetailScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Voltar",
-                            tint = GeodouroBrandGreen
+                            tint = GeodouroWhite
                         )
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = GeodouroBg
+                    containerColor = GeodouroDarkGreen
                 )
             )
         },
-        containerColor = GeodouroBg
+        containerColor = GeodouroDarkGreen
     ) { padding ->
         Box(
             modifier = Modifier
@@ -238,7 +234,7 @@ fun RoutePlanDetailScreen(
 
                 is RoutePlanDetailUiState.Error -> {
                     RoutePlanEmptyState(
-                        title = "Não foi possível abrir o percurso.",
+                        title = "Nao foi possivel abrir o percurso.",
                         message = state.message,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -246,14 +242,14 @@ fun RoutePlanDetailScreen(
 
                 RoutePlanDetailUiState.GuestRestricted -> {
                     RoutePlanEmptyState(
-                        title = "Percurso indisponível em modo convidado.",
+                        title = "Percurso indisponivel em modo convidado.",
                         message = "Entra com a tua conta para veres os detalhes e o circuito do percurso.",
                         modifier = Modifier.fillMaxSize()
                     )
                 }
 
                 is RoutePlanDetailUiState.Success -> {
-                    RoutePlanDetailContent(routePlan = state.routePlan, padding = PaddingValues(0.dp))
+                    RoutePlanDetailContent(routePlan = state.routePlan)
                 }
             }
 
@@ -269,23 +265,25 @@ fun RoutePlanDetailScreen(
 }
 
 @Composable
-private fun RoutePlanDetailContent(
-    routePlan: RoutePlanRepository.RoutePlanDetail,
-    padding: PaddingValues
-) {
+private fun RoutePlanDetailContent(routePlan: RoutePlanRepository.RoutePlanDetail) {
+    var selectedStop by remember(routePlan) { mutableStateOf<RoutePlanRepository.RoutePlanStop?>(null) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(padding)
             .background(GeodouroBg)
     ) {
         RouteMapCard(
             routePlan = routePlan,
+            selectedStop = selectedStop,
+            onStopSelected = { selectedStop = it },
+            onPreviewDismiss = { selectedStop = null },
             modifier = Modifier.fillMaxSize()
         )
 
-        RouteStopsOverlay(
+        RouteObjectivesOverlay(
             routePlan = routePlan,
+            onStopClick = { selectedStop = it },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(16.dp)
@@ -294,35 +292,102 @@ private fun RoutePlanDetailContent(
 }
 
 @Composable
-private fun RouteStopsOverlay(
+private fun RouteObjectivesOverlay(
     routePlan: RoutePlanRepository.RoutePlanDetail,
+    onStopClick: (RoutePlanRepository.RoutePlanStop) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val visibleStops = remember(routePlan) { routePlan.stops.take(5) }
+
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = GeodouroWhite.copy(alpha = 0.94f),
-        shape = RoundedCornerShape(20.dp),
-        tonalElevation = 2.dp,
-        shadowElevation = 8.dp
+        color = GeodouroDarkGreen.copy(alpha = 0.92f),
+        shape = RoundedCornerShape(28.dp),
+        shadowElevation = 10.dp
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Paragens",
-                style = MaterialTheme.typography.titleSmall,
+                text = "Objetivos do percurso",
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = GeodouroTextPrimary
+                color = GeodouroWhite
             )
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                routePlan.stops.forEach { stop ->
-                    RouteStopMiniCard(stop)
+                visibleStops.forEach { stop ->
+                    RouteObjectiveImageCard(
+                        stop = stop,
+                        onClick = { onStopClick(stop) }
+                    )
                 }
             }
+            if (visibleStops.isEmpty()) {
+                Text(
+                    text = "Sem objetivos para mostrar.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GeodouroWhite.copy(alpha = 0.8f)
+                )
+            } else if (routePlan.stops.size > visibleStops.size) {
+                Text(
+                    text = "+${routePlan.stops.size - visibleStops.size} objetivos adicionais",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GeodouroWhite.copy(alpha = 0.8f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RouteObjectiveImageCard(
+    stop: RoutePlanRepository.RoutePlanStop,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .width(112.dp)
+            .clickable(onClick = onClick),
+        color = GeodouroBrandGreen.copy(alpha = 0.9f),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(96.dp)
+                    .background(GeodouroLightBg)
+            ) {
+                stop.imageUrl?.takeIf { it.isNotBlank() }?.let { imageUrl ->
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = stop.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } ?: Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stop.visitOrder.toString(),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = GeodouroBrandGreen,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            Text(
+                text = stop.title,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = GeodouroWhite,
+                maxLines = 2
+            )
         }
     }
 }
@@ -330,12 +395,14 @@ private fun RouteStopsOverlay(
 @Composable
 private fun RouteMapCard(
     routePlan: RoutePlanRepository.RoutePlanDetail,
+    selectedStop: RoutePlanRepository.RoutePlanStop?,
+    onStopSelected: (RoutePlanRepository.RoutePlanStop) -> Unit,
+    onPreviewDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val routePoints = remember(routePlan) { buildRouteGeometryPoints(routePlan) }
     val stopPoints = remember(routePlan) { buildStopRoutePoints(routePlan) }
-    var selectedStop by remember(routePlan) { mutableStateOf<RoutePlanRepository.RoutePlanStop?>(null) }
     var locationPermissionGranted by remember { mutableStateOf(hasFineLocationPermission(context)) }
     var recenterRequest by remember { mutableStateOf(RecenterRequest()) }
 
@@ -360,49 +427,55 @@ private fun RouteMapCard(
         }
     }
 
-    Box(modifier = modifier) {
-        InAppRouteMap(
-            routePoints = routePoints,
-            stopPoints = stopPoints,
-            onStopClick = { selectedStop = it },
-            showUserLocation = locationPermissionGranted,
-            recenterRequest = recenterRequest,
-            modifier = Modifier.fillMaxSize()
-        )
-
-        selectedStop?.let { stop ->
-            RouteStopPreviewCard(
-                stop = stop,
-                onClose = { selectedStop = null },
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp, start = 16.dp, end = 84.dp)
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(28.dp),
+        shadowElevation = 8.dp
+    ) {
+        Box {
+            InAppRouteMap(
+                routePoints = routePoints,
+                stopPoints = stopPoints,
+                onStopClick = onStopSelected,
+                showUserLocation = locationPermissionGranted,
+                recenterRequest = recenterRequest,
+                modifier = Modifier.fillMaxSize()
             )
-        }
 
-        Surface(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp),
-            shape = CircleShape,
-            color = GeodouroBrandGreen,
-            shadowElevation = 6.dp
-        ) {
-            IconButton(
-                onClick = {
-                    if (locationPermissionGranted) {
-                        recenterRequest = recenterRequest.next(immediate = true)
-                    } else {
-                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                    }
-                },
-                modifier = Modifier.size(52.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = "Centrar na minha localização",
-                    tint = GeodouroWhite
+            selectedStop?.let { stop ->
+                RouteStopPreviewCard(
+                    stop = stop,
+                    onClose = onPreviewDismiss,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 16.dp, start = 16.dp, end = 84.dp)
                 )
+            }
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp),
+                shape = CircleShape,
+                color = GeodouroBrandGreen,
+                shadowElevation = 6.dp
+            ) {
+                IconButton(
+                    onClick = {
+                        if (locationPermissionGranted) {
+                            recenterRequest = recenterRequest.next(immediate = true)
+                        } else {
+                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                        }
+                    },
+                    modifier = Modifier.size(52.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = "Centrar na minha localizacao",
+                        tint = GeodouroWhite
+                    )
+                }
             }
         }
     }
@@ -427,6 +500,7 @@ private fun InAppRouteMap(
         Configuration.getInstance().userAgentValue = context.packageName
         onDispose { }
     }
+
     val mapView = remember {
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
@@ -441,7 +515,7 @@ private fun InAppRouteMap(
     }
     val routePolyline = remember(mapView) {
         Polyline().apply {
-            outlinePaint.color = android.graphics.Color.parseColor("#2E7D32")
+            outlinePaint.color = android.graphics.Color.parseColor("#3E7A57")
             outlinePaint.strokeWidth = 9f
         }
     }
@@ -591,41 +665,6 @@ private data class RecenterRequest(
     )
 }
 
-@Composable
-private fun RouteStopMiniCard(stop: RoutePlanRepository.RoutePlanStop) {
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = GeodouroLightBg,
-        modifier = Modifier.width(170.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = "${stop.visitOrder}. ${stop.title}",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                color = GeodouroTextPrimary,
-                maxLines = 2
-            )
-            stop.subtitle?.takeIf { it.isNotBlank() }?.let { subtitle ->
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GeodouroTextSecondary,
-                    maxLines = 2
-                )
-            }
-            Text(
-                text = stop.targetType.asUiLabel(),
-                style = MaterialTheme.typography.labelSmall,
-                color = GeodouroBrandGreen
-            )
-        }
-    }
-}
-
 private data class VisualRoutePoint(
     val latitude: Double,
     val longitude: Double,
@@ -652,11 +691,7 @@ private fun buildRouteGeometryPoints(routePlan: RoutePlanRepository.RoutePlanDet
     val routeGeometry = routePlan.routeGeometry.map {
         VisualRoutePoint(latitude = it.latitude, longitude = it.longitude)
     }
-    return if (routeGeometry.isNotEmpty()) {
-        routeGeometry
-    } else {
-        buildStopRoutePoints(routePlan)
-    }
+    return if (routeGeometry.isNotEmpty()) routeGeometry else buildStopRoutePoints(routePlan)
 }
 
 @Composable
@@ -667,47 +702,101 @@ private fun RouteStopPreviewCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = GeodouroWhite.copy(alpha = 0.97f),
-        shape = RoundedCornerShape(20.dp),
-        tonalElevation = 3.dp,
-        shadowElevation = 8.dp
+        color = GeodouroWhite.copy(alpha = 0.98f),
+        shape = RoundedCornerShape(28.dp),
+        tonalElevation = 4.dp,
+        shadowElevation = 12.dp
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .background(GeodouroLightBg)
             ) {
-                IconButton(onClick = onClose) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                            contentDescription = "Fechar observação",
-                        tint = GeodouroTextPrimary
+                stop.imageUrl?.takeIf { it.isNotBlank() }?.let { imageUrl ->
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = stop.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } ?: Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stop.visitOrder.toString(),
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = GeodouroBrandGreen,
+                        fontWeight = FontWeight.Bold
                     )
                 }
-            }
-            stop.imageUrl?.takeIf { it.isNotBlank() }?.let { imageUrl ->
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = stop.title,
+
+                Surface(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                        .background(GeodouroLightBg),
-                    contentScale = ContentScale.Crop
-                )
+                        .align(Alignment.TopStart)
+                        .padding(14.dp),
+                    color = GeodouroDarkGreen.copy(alpha = 0.88f),
+                    shape = RoundedCornerShape(999.dp)
+                ) {
+                    Text(
+                        text = "${stop.visitOrder}. paragem",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = GeodouroWhite,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp),
+                    shape = CircleShape,
+                    color = GeodouroWhite.copy(alpha = 0.94f),
+                    shadowElevation = 4.dp
+                ) {
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Fechar",
+                            tint = GeodouroTextPrimary
+                        )
+                    }
+                }
             }
-            Text(
-                text = "${stop.visitOrder}. ${stop.title}",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = GeodouroTextPrimary
-            )
-            stop.subtitle?.takeIf { it.isNotBlank() }?.let { subtitle ->
+
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RoutePlanMetaChip(stop.targetType.asUiLabel())
+                    if (stop.latitude != null && stop.longitude != null) {
+                        RoutePlanMetaChip("GPS")
+                    }
+                }
+
                 Text(
-                    text = subtitle,
+                    text = stop.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = GeodouroTextPrimary
+                )
+
+                stop.subtitle?.takeIf { it.isNotBlank() }?.let { subtitle ->
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = GeodouroTextSecondary
+                    )
+                }
+
+                Text(
+                    text = "Toca noutros objetivos ou marcadores do mapa para alternar a observacao em destaque.",
                     style = MaterialTheme.typography.bodySmall,
                     color = GeodouroTextSecondary
                 )
@@ -724,26 +813,37 @@ private fun hasFineLocationPermission(context: Context): Boolean {
 }
 
 @Composable
-private fun RouteStopCard(stop: RoutePlanRepository.RoutePlanStop) {
+private fun RouteStopCard(
+    stop: RoutePlanRepository.RoutePlanStop,
+    modifier: Modifier = Modifier
+) {
     Card(
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = GeodouroWhite),
-        elevation = CardDefaults.cardElevation(1.dp),
-        shape = RoundedCornerShape(16.dp)
+        elevation = CardDefaults.cardElevation(3.dp),
+        shape = RoundedCornerShape(22.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(shape = CircleShape, color = GeodouroBrandGreen.copy(alpha = 0.12f)) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .background(GeodouroDarkGreen, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
                     text = stop.visitOrder.toString(),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    color = GeodouroBrandGreen,
-                    fontWeight = FontWeight.Bold
+                    color = GeodouroWhite,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
                 )
             }
+
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -768,20 +868,27 @@ private fun RouteStopCard(stop: RoutePlanRepository.RoutePlanStop) {
                     }
                 }
             }
-            Icon(
-                imageVector = Icons.Default.LocationOn,
-                contentDescription = null,
-                tint = GeodouroGreen
-            )
+
+            Surface(
+                shape = CircleShape,
+                color = GeodouroGreen.copy(alpha = 0.18f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = GeodouroBrandGreen,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
         }
     }
 }
 
 private fun String.asUiLabel(): String {
     return when (lowercase()) {
-        "observation" -> "Observação"
-        "publication" -> "Publicação"
-        "species" -> "Espécie"
+        "observation" -> "Observacao"
+        "publication" -> "Publicacao"
+        "species" -> "Especie"
         else -> replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 }
