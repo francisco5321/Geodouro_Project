@@ -93,6 +93,7 @@ fun AppNavigation() {
     var clearIdentifyCapturesVersion by remember { mutableStateOf(0) }
     var networkRefreshVersion by remember { mutableStateOf(0) }
     var savedObservationRefreshVersion by remember { mutableStateOf(0) }
+    var sessionRefreshVersion by remember { mutableStateOf(0) }
     var previousInternetState by remember { mutableStateOf<Boolean?>(null) }
     var detailAnchorRoute by remember { mutableStateOf<String?>(null) }
     var previousSessionState by remember { mutableStateOf<SessionState>(SessionState.Loading) }
@@ -102,6 +103,16 @@ fun AppNavigation() {
 
     LaunchedEffect(sessionState) {
         val previous = previousSessionState
+        val previousSessionKey = previous.toRefreshKey()
+        val currentSessionKey = sessionState.toRefreshKey()
+
+        if (
+            previous != SessionState.Loading &&
+            sessionState != SessionState.Loading &&
+            previousSessionKey != currentSessionKey
+        ) {
+            sessionRefreshVersion += 1
+        }
 
         if (shouldRedirectToHomeAfterLogin) {
             detailAnchorRoute = null
@@ -245,7 +256,7 @@ fun AppNavigation() {
         ) {
             composable("home") {
                 HomeScreen(
-                    refreshTrigger = savedObservationRefreshVersion,
+                    refreshTrigger = savedObservationRefreshVersion + sessionRefreshVersion,
                     onSpeciesClick = { speciesId ->
                         navigateAboveAnchor("home", speciesDetailRoute(speciesId))
                     },
@@ -292,7 +303,7 @@ fun AppNavigation() {
 
             composable("profile") {
                 ProfileScreen(
-                    refreshTrigger = savedObservationRefreshVersion,
+                    refreshTrigger = savedObservationRefreshVersion + sessionRefreshVersion,
                     sessionState = sessionState,
                     onLogout = {
                         coroutineScope.launch {
@@ -411,6 +422,15 @@ fun AppNavigation() {
     }
 }
 
+private fun SessionState.toRefreshKey(): String {
+    return when (this) {
+        SessionState.Loading -> "loading"
+        SessionState.LoggedOut -> "logged-out"
+        is SessionState.Authenticated -> "auth:${userId}:${authToken.orEmpty()}"
+        is SessionState.Guest -> "guest:$guestLabel"
+    }
+}
+
 private fun localInferenceResultStateSaver(): Saver<LocalInferenceResult?, Any> = listSaver(
     save = { inference ->
         if (inference == null) {
@@ -493,5 +513,3 @@ private fun SessionLoadingScreen() {
         }
     }
 }
-
-

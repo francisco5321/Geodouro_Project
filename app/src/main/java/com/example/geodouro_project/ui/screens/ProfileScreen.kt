@@ -122,7 +122,7 @@ class ProfileViewModel(
         refresh()
     }
 
-    fun refresh() {
+    fun refresh(sessionState: SessionState? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             val observations = repository.fetchObservationsRemoteFirst(includeManualReview = true)
@@ -197,7 +197,7 @@ fun ProfileScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pullRefreshState = rememberPullRefreshState(
         refreshing = uiState.isLoading,
-        onRefresh = { viewModel.refresh() }
+        onRefresh = { viewModel.refresh(sessionState) }
     )
     val canPublishObservations = sessionState is SessionState.Authenticated
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -234,10 +234,8 @@ fun ProfileScreen(
         }
     }
 
-    LaunchedEffect(refreshTrigger) {
-        if (refreshTrigger > 0) {
-            viewModel.refresh()
-        }
+    LaunchedEffect(refreshTrigger, sessionState) {
+        viewModel.refresh(sessionState)
     }
 
     Scaffold(

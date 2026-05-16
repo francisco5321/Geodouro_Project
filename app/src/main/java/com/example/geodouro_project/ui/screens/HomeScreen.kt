@@ -96,7 +96,7 @@ class HomeViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             val speciesCatalogDeferred = async { repository.fetchSpeciesCatalogRemoteFirst() }
-            val statsDeferred = async { repository.fetchObservationStatsRemoteFirst() }
+            val statsDeferred = async { repository.fetchCommunityObservationStatsRemoteFirst() }
             val speciesCatalog = speciesCatalogDeferred.await()
             val stats = statsDeferred.await()
             _uiState.value = HomeUiState(
@@ -140,9 +140,7 @@ fun HomeScreen(
     )
 
     LaunchedEffect(refreshTrigger) {
-        if (refreshTrigger > 0) {
-            viewModel.refresh()
-        }
+        viewModel.refresh()
     }
 
     Scaffold(

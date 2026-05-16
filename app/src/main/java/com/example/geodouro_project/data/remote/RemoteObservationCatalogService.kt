@@ -43,6 +43,27 @@ class RemoteObservationCatalogService(
         }.getOrDefault(emptyList())
     }
 
+    fun fetchPublicObservations(): List<RemoteObservationDetail> {
+        if (!isConfigured()) return emptyList()
+
+        val request = Request.Builder()
+            .url(config.baseUrl.trimEnd('/') + "/api/observations")
+            .get()
+            .build()
+
+        return runCatching {
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use emptyList()
+                val body = response.body?.string().orEmpty()
+                gson.fromJson(body, Array<RemoteObservationDetailResponse>::class.java)
+                    ?.map { it.toDomain() }
+                    .orEmpty()
+            }
+        }.onFailure { error ->
+            Log.e(TAG, "Failed to fetch public observations", error)
+        }.getOrDefault(emptyList())
+    }
+
     fun fetchObservationDetail(deviceObservationId: String): RemoteObservationDetail? {
         if (!isConfigured()) return null
         val identity = currentIdentityProvider() ?: fallbackIdentity()
