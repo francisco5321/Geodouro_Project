@@ -543,7 +543,7 @@ class RoutePlanService(
                            NULLIF(obs_target.enriched_common_name, ''),
                            NULLIF(species_target.common_name, ''),
                            NULLIF(species_target.scientific_name, ''),
-                           'Observacao botanica'
+                           'Observação botânica'
                        )
                        WHEN svt.publication_id IS NOT NULL THEN COALESCE(
                            NULLIF(publication_target.title, ''),
@@ -559,7 +559,7 @@ class RoutePlanService(
                        ) IS NOT NULL THEN COALESCE(
                            NULLIF(species_target.common_name, ''),
                            NULLIF(species_target.scientific_name, ''),
-                           'Especie selecionada'
+                           'Espécie selecionada'
                        )
                        ELSE 'Paragem ' || rpp.visit_order
                    END AS title,
@@ -568,7 +568,7 @@ class RoutePlanService(
                            NULLIF(obs_target.enriched_scientific_name, ''),
                            NULLIF(obs_target.predicted_scientific_name, ''),
                            NULLIF(species_target.scientific_name, ''),
-                           'Observacao com coordenadas'
+                           'Observação com coordenadas'
                        )
                        WHEN svt.publication_id IS NOT NULL THEN COALESCE(
                            NULLIF(species_target.scientific_name, ''),

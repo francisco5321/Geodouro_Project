@@ -195,7 +195,7 @@ class SpeciesService(
                 )
             }
 
-            return "Localizacoes registadas em $observationCount observacoes. Intervalo aproximado: %.5f, %.5f ate %.5f, %.5f".format(
+            return "Localizações registadas em $observationCount observações. Intervalo aproximado: %.5f, %.5f até %.5f, %.5f".format(
                 minLatitude,
                 minLongitude,
                 maxLatitude,
