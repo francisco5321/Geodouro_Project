@@ -1,4 +1,4 @@
-package com.example.geodouro_project.ui.screens
+﻿package com.example.geodouro_project.ui.screens
 
 import android.content.Context
 import android.location.Geocoder
@@ -82,7 +82,6 @@ import com.example.geodouro_project.di.AppContainer
 import com.example.geodouro_project.ui.theme.GeodouroBg
 import com.example.geodouro_project.ui.theme.GeodouroBrandGreen
 import com.example.geodouro_project.ui.theme.GeodouroLightBg
-import com.example.geodouro_project.ui.theme.GeodouroLightGreen
 import com.example.geodouro_project.ui.theme.GeodouroOutline
 import com.example.geodouro_project.ui.theme.GeodouroTextPrimary
 import com.example.geodouro_project.ui.theme.GeodouroTextSecondary
@@ -96,9 +95,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// ──────────────────────────────────────────────
-// ViewModel (sem alterações)
-// ──────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ViewModel (sem alteraÃ§Ãµes)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class CommunityViewModel(
     private val repository: PlantRepository
@@ -146,9 +145,9 @@ enum class CommunityFilter(val label: String) {
     WITHOUT_LOCATION("Sem GPS")
 }
 
-// ──────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Screen
-// ──────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -210,7 +209,7 @@ fun CommunityScreen(
                             )
                             if (!uiState.isLoading) {
                                 Text(
-                                    text = "${uiState.publications.size} observações partilhadas",
+                                    text = "${uiState.publications.size} observaÃ§Ãµes partilhadas",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = GeodouroTextSecondary,
                                     letterSpacing = 0.3.sp
@@ -238,7 +237,7 @@ fun CommunityScreen(
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                // ── Barra de pesquisa + filtros (fundo branco fixo) ──
+                // â”€â”€ Barra de pesquisa + filtros (fundo branco fixo) â”€â”€
                 item {
                     Surface(
                         color = GeodouroWhite,
@@ -298,7 +297,7 @@ fun CommunityScreen(
                                 },
                                 placeholder = {
                                     Text(
-                                        "Pesquisar publicações…",
+                                        "Pesquisar publicaÃ§Ãµesâ€¦",
                                         color = GeodouroTextSecondary,
                                         style = MaterialTheme.typography.bodyMedium
                                     )
@@ -340,32 +339,29 @@ fun CommunityScreen(
                     }
                 }
 
-                // ── Espaço entre header e lista ──
+                // â”€â”€ EspaÃ§o entre header e lista â”€â”€
                 item { Spacer(Modifier.height(12.dp)) }
 
-                // ── Estados: loading / vazio / sem resultados ──
+                // â”€â”€ Estados: loading / vazio / sem resultados â”€â”€
                 when {
                     uiState.isLoading -> {
                         item {
                             EmptyStateCard(
-                                message = "A carregar publicações…",
-                                isLoading = true
+                                message = "A carregar publicaÃ§Ãµesâ€¦",
                             )
                         }
                     }
                     uiState.publications.isEmpty() -> {
                         item {
                             EmptyStateCard(
-                                message = "Ainda não existem publicações na comunidade.",
-                                isLoading = false
+                                message = "Ainda nÃ£o existem publicaÃ§Ãµes na comunidade.",
                             )
                         }
                     }
                     filteredPublications.isEmpty() -> {
                         item {
                             EmptyStateCard(
-                                message = "Nenhuma publicação corresponde aos filtros atuais.",
-                                isLoading = false
+                                message = "Nenhuma publicaÃ§Ã£o corresponde aos filtros atuais.",
                             )
                         }
                     }
@@ -400,12 +396,12 @@ fun CommunityScreen(
     }
 }
 
-// ──────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Empty / loading state
-// ──────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @Composable
-private fun EmptyStateCard(message: String, isLoading: Boolean) {
+private fun EmptyStateCard(message: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -446,9 +442,9 @@ private fun EmptyStateCard(message: String, isLoading: Boolean) {
     }
 }
 
-// ──────────────────────────────────────────────
-// Post card — redesenhado
-// ──────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Post card â€” redesenhado
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @Composable
 fun CommunityPostCard(
@@ -476,7 +472,7 @@ fun CommunityPostCard(
         shape = RoundedCornerShape(20.dp)
     ) {
         Column {
-            // ── Imagem com gradiente sobreposto em baixo ──
+            // â”€â”€ Imagem com gradiente sobreposto em baixo â”€â”€
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -541,12 +537,12 @@ fun CommunityPostCard(
                 }
             }
 
-            // ── Conteúdo textual ──
+            // â”€â”€ ConteÃºdo textual â”€â”€
             Column(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Nome científico + comum
+                // Nome cientÃ­fico + comum
                 Text(
                     text = post.scientificName,
                     style = MaterialTheme.typography.titleMedium,
@@ -557,7 +553,7 @@ fun CommunityPostCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = post.commonName ?: "Nome comum indisponível",
+                    text = post.commonName ?: "Nome comum indisponÃ­vel",
                     style = MaterialTheme.typography.bodySmall,
                     color = GeodouroBrandGreen,
                     fontWeight = FontWeight.Medium,
@@ -569,7 +565,7 @@ fun CommunityPostCard(
                 HorizontalDivider(color = GeodouroLightBg, thickness = 1.dp)
                 Spacer(Modifier.height(4.dp))
 
-                // Autor + tempo + localização
+                // Autor + tempo + localizaÃ§Ã£o
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -590,7 +586,7 @@ fun CommunityPostCard(
                         )
                     }
 
-                    // Coordenadas (apenas se disponíveis)
+                    // Coordenadas (apenas se disponÃ­veis)
                     if (locationLabel != null) {
                         Text(
                             text = locationLabel,
@@ -606,17 +602,10 @@ fun CommunityPostCard(
     }
 }
 
-// ──────────────────────────────────────────────
-// Helpers (sem alterações)
-// ──────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Helpers (sem alteraÃ§Ãµes)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-private fun formatLocation(observation: CommunityPublication): String {
-    return if (observation.latitude != null && observation.longitude != null) {
-        "GPS %.5f, %.5f".format(observation.latitude, observation.longitude)
-    } else {
-        "Localização indisponível"
-    }
-}
 
 @Composable
 private fun rememberCommunityLocationLabel(publication: CommunityPublication): String? {
@@ -671,9 +660,9 @@ private fun formatTimeAgo(timestamp: String): String {
 
     return when {
         minutes < 1 -> "agora mesmo"
-        minutes < 60 -> "há ${minutes} min"
-        hours < 24 -> "há ${hours} h"
-        else -> "há ${days} d"
+        minutes < 60 -> "hÃ¡ ${minutes} min"
+        hours < 24 -> "hÃ¡ ${hours} h"
+        else -> "hÃ¡ ${days} d"
     }
 }
 

@@ -1,4 +1,4 @@
-package com.example.geodouro_project.ui.screens
+﻿package com.example.geodouro_project.ui.screens
 
 import android.location.Geocoder
 import android.content.Context
@@ -127,7 +127,7 @@ class ObservationDetailViewModel(
             if (updated) refresh()
             _uiState.value = _uiState.value.copy(
                 isSaving = false,
-                statusMessage = if (updated) "Observação atualizada." else "Não foi possível atualizar."
+                statusMessage = if (updated) "ObservaÃ§Ã£o atualizada." else "NÃ£o foi possÃ­vel atualizar."
             )
         }
     }
@@ -149,13 +149,13 @@ class ObservationDetailViewModel(
 // Helpers
 // Helpers
 private fun formatObservationDate(observation: ObservationEntity): String =
-    SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", Locale.getDefault())
+    SimpleDateFormat("dd/MM/yyyy 'Ã s' HH:mm", Locale.getDefault())
         .format(Date(observation.capturedAt))
 
 private fun formatSyncStatus(observation: ObservationEntity): String = when {
     observation.isPublished -> "Publicada"
     observation.syncStatus == com.example.geodouro_project.domain.model.ObservationSyncStatus.SYNCED.name -> "Sincronizada"
-    observation.syncStatus == com.example.geodouro_project.domain.model.ObservationSyncStatus.FAILED.name -> "Falha de sincronização"
+    observation.syncStatus == com.example.geodouro_project.domain.model.ObservationSyncStatus.FAILED.name -> "Falha de sincronizaÃ§Ã£o"
     else -> "Pendente"
 }
 
@@ -199,9 +199,9 @@ private fun buildFallbackLocationContext(observation: ObservationEntity?): Obser
     val lat = observation?.latitude
     val lon = observation?.longitude
     return if (lat != null && lon != null) {
-        ObservationLocationContext("Localização com GPS", "%.5f, %.5f".format(lat, lon))
+        ObservationLocationContext("LocalizaÃ§Ã£o com GPS", "%.5f, %.5f".format(lat, lon))
     } else {
-        ObservationLocationContext("Localização indisponível", null)
+        ObservationLocationContext("LocalizaÃ§Ã£o indisponÃ­vel", null)
     }
 }
 
@@ -254,7 +254,7 @@ fun ObservationDetailScreen(
     }
 
     LaunchedEffect(uiState.statusMessage, uiState.isSaving) {
-        if (!uiState.isSaving && uiState.statusMessage == "Observação atualizada.") isEditing = false
+        if (!uiState.isSaving && uiState.statusMessage == "ObservaÃ§Ã£o atualizada.") isEditing = false
     }
     LaunchedEffect(refreshTrigger, observationId) {
         if (refreshTrigger > 0) viewModel.refresh()
@@ -292,13 +292,13 @@ fun ObservationDetailScreen(
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             CircularProgressIndicator(color = GreenHero, strokeWidth = 2.dp)
-                            Text("A carregar observação...", color = TextSecondary, fontSize = 13.sp)
+                            Text("A carregar observaÃ§Ã£o...", color = TextSecondary, fontSize = 13.sp)
                         }
                     }
                 }
                 observation == null -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Observação não encontrada.", color = TextSecondary)
+                        Text("ObservaÃ§Ã£o nÃ£o encontrada.", color = TextSecondary)
                     }
                 }
                 else -> {
@@ -317,7 +317,7 @@ fun ObservationDetailScreen(
 
                         // Taxonomic context
                         item {
-                            SectionLabel("Contexto taxonómico")
+                            SectionLabel("Contexto taxonÃ³mico")
                             Spacer(Modifier.height(6.dp))
                             TaxonomicContextCard(
                                 observation = observation,
@@ -331,14 +331,14 @@ fun ObservationDetailScreen(
                         // Manual edit
                         observation.notes?.takeIf { it.isNotBlank() }?.let { notes ->
                             item {
-                                SectionLabel("Descrição")
+                                SectionLabel("DescriÃ§Ã£o")
                                 Spacer(Modifier.height(6.dp))
                                 ObservationNotesCard(notes = notes)
                             }
                         }
                         if (canEdit) {
                             item {
-                                SectionLabel("Editar observação")
+                                SectionLabel("Editar observaÃ§Ã£o")
                                 Spacer(Modifier.height(6.dp))
                                 ManualEditCard(
                                     isEditing = isEditing,
@@ -370,7 +370,7 @@ fun ObservationDetailScreen(
                         if (!hideSpeciesAction) {
                             item {
                                 GeoButton(
-                                    label = "Ver espécie",
+                                    label = "Ver espÃ©cie",
                                     icon = Icons.Default.Image,
                                     primary = true,
                                     modifier = Modifier.fillMaxWidth(),
@@ -509,9 +509,9 @@ private fun HeroCard(
                     )
                     val commonName = observation.enrichedCommonName?.takeIf { it.isNotBlank() }
                     val family = observation.enrichedFamily?.takeIf { it.isNotBlank() }
-                    val subtitle = listOfNotNull(commonName, family?.let { "Família $it" })
-                        .joinToString(" • ")
-                        .ifBlank { "Nome comum indisponível" }
+                    val subtitle = listOfNotNull(commonName, family?.let { "FamÃ­lia $it" })
+                        .joinToString(" â€¢ ")
+                        .ifBlank { "Nome comum indisponÃ­vel" }
                     Text(
                         text = subtitle,
                         fontSize = 13.sp,
@@ -612,7 +612,7 @@ private fun TaxonomicContextCard(
                 ) {
                     Icon(Icons.Default.Info, contentDescription = null, tint = GreenHero, modifier = Modifier.size(16.dp))
                 }
-                Text("Informação da espécie", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                Text("InformaÃ§Ã£o da espÃ©cie", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
             }
 
             HorizontalDivider(thickness = 0.5.dp, color = BorderColor)
@@ -626,15 +626,15 @@ private fun TaxonomicContextCard(
                 Row(Modifier.fillMaxWidth()) {
                     ContextCell(
                         modifier = Modifier.weight(1f),
-                        label = "Espécie",
+                        label = "EspÃ©cie",
                         value = speciesValue,
                         borderRight = true,
                         borderBottom = true
                     )
                     ContextCell(
                         modifier = Modifier.weight(1f),
-                        label = "Família",
-                        value = observation.enrichedFamily ?: "Indisponível",
+                        label = "FamÃ­lia",
+                        value = observation.enrichedFamily ?: "IndisponÃ­vel",
                         borderRight = false,
                         borderBottom = true
                     )
@@ -642,7 +642,7 @@ private fun TaxonomicContextCard(
                 Row(Modifier.fillMaxWidth()) {
                     ContextCell(
                         modifier = Modifier.weight(1f),
-                        label = "Localização",
+                        label = "LocalizaÃ§Ã£o",
                         value = locationContext.primaryLabel,
                         supporting = locationContext.coordinatesLabel,
                         icon = Icons.Default.LocationOn,
@@ -652,7 +652,7 @@ private fun TaxonomicContextCard(
                     ContextCellLink(
                         modifier = Modifier.weight(1f),
                         label = "Wikipedia",
-                        linkLabel = if (onOpenWikipedia != null) "Abrir referência" else "Sem referência",
+                        linkLabel = if (onOpenWikipedia != null) "Abrir referÃªncia" else "Sem referÃªncia",
                         enabled = onOpenWikipedia != null,
                         onClick = onOpenWikipedia,
                         borderBottom = false
@@ -790,9 +790,9 @@ private fun ManualEditCard(
                     Icon(Icons.Default.Edit, contentDescription = null, tint = GreenHero, modifier = Modifier.size(14.dp))
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Correção antes de publicar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                    Text("CorreÃ§Ã£o antes de publicar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
                     Text(
-                        "Atualiza apenas a descrição desta observação.",
+                        "Atualiza apenas a descriÃ§Ã£o desta observaÃ§Ã£o.",
                         fontSize = 11.sp,
                         color = TextSecondary,
                         lineHeight = 15.sp
@@ -802,7 +802,7 @@ private fun ManualEditCard(
 
             if (isEditing) {
                 Text(
-                    text = "Descrição",
+                    text = "DescriÃ§Ã£o",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 0.08.sp,
@@ -812,7 +812,7 @@ private fun ManualEditCard(
                     value = notesInput,
                     onValueChange = onNotesChange,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Descrição") },
+                    label = { Text("DescriÃ§Ã£o") },
                     minLines = 3,
                     maxLines = 5,
                     colors = geodouroOutlinedTextFieldColors()
@@ -855,36 +855,6 @@ private fun ManualEditCard(
     }
 }
 
-// Published banner
-@Composable
-private fun PublishedBanner() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(GreenPale, RoundedCornerShape(14.dp))
-            .border(0.5.dp, GreenHero.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .background(GreenHero, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Default.Public, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-        }
-        Text(
-            text = "Esta observação já foi publicada na comunidade GeoFlora.",
-            fontSize = 12.sp,
-            color = GreenHero,
-            fontWeight = FontWeight.Medium,
-            lineHeight = 17.sp,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
 
 // Shared small components
 @Composable
