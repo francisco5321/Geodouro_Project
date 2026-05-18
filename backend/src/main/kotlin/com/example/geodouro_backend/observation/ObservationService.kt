@@ -130,11 +130,12 @@ class ObservationService(
         }
 
         val previousPlantSpeciesId = current.plantSpeciesId
+        val providedPlantSpeciesId = request.plantSpeciesId?.takeIf { it > 0 }?.also { ensurePlantSpeciesExists(it) }
         val scientificName = request.scientificName?.trim().orEmpty().ifBlank { current.scientificName }
         val commonName = request.commonName?.trim()?.takeIf { it.isNotBlank() }
         val family = request.family?.trim()?.takeIf { it.isNotBlank() } ?: current.family ?: "Unknown"
         val notes = request.notes?.trim()?.takeIf { it.isNotBlank() } ?: current.notes
-        val plantSpeciesId = upsertPlantSpecies(scientificName, commonName, family)
+        val plantSpeciesId = providedPlantSpeciesId ?: upsertPlantSpecies(scientificName, commonName, family)
 
         jdbcTemplate.update(
             UPDATE_OBSERVATION_METADATA_SQL,
@@ -316,6 +317,17 @@ class ObservationService(
         val commonName = request.enrichedCommonName?.trim()?.takeIf { it.isNotBlank() }
         val family = request.enrichedFamily?.trim()?.takeIf { it.isNotBlank() } ?: "Unknown"
         return upsertPlantSpecies(scientificName, commonName, family)
+    }
+
+    private fun ensurePlantSpeciesExists(plantSpeciesId: Int) {
+        val exists = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM plant_species WHERE plant_species_id = :plantSpeciesId",
+            MapSqlParameterSource("plantSpeciesId", plantSpeciesId),
+            Int::class.java
+        ) ?: 0
+        if (exists <= 0) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "EspÃ©cie nÃ£o encontrada")
+        }
     }
 
     private fun upsertPlantSpecies(scientificName: String, commonName: String?, family: String): Int {

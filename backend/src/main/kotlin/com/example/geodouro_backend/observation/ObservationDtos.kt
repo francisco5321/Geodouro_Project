@@ -37,6 +37,7 @@ data class UpsertObservationRequest(
 )
 
 data class UpdateObservationMetadataRequest(
+    val plantSpeciesId: Int? = null,
     val scientificName: String?,
     val commonName: String?,
     val family: String?,

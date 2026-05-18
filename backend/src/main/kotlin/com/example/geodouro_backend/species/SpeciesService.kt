@@ -28,6 +28,32 @@ class SpeciesService(
         return getSpeciesDetailByPlantSpeciesId(plantSpeciesId)
     }
 
+    fun createSpecies(requesterId: Int, request: CreatePlantSpeciesRequest): PlantSpeciesResponse {
+        ensureAdmin(requesterId)
+
+        val scientificName = request.scientificName.trim()
+        val family = request.family.trim()
+        val genus = request.genus.trim()
+        val specificEpithet = request.species.trim()
+        if (scientificName.isBlank() || family.isBlank() || genus.isBlank() || specificEpithet.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "scientificName, family, genus and species are required")
+        }
+
+        val plantSpeciesId = jdbcTemplate.queryForObject(
+            UPSERT_PLANT_SPECIES_SQL,
+            MapSqlParameterSource()
+                .addValue("scientificName", scientificName)
+                .addValue("commonName", request.commonName?.trim()?.takeIf { it.isNotBlank() })
+                .addValue("family", family)
+                .addValue("genus", genus)
+                .addValue("species", specificEpithet)
+                .addValue("description", request.description?.trim()?.takeIf { it.isNotBlank() }),
+            Int::class.java
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not create plant species")
+
+        return getSpeciesSummaryByPlantSpeciesId(plantSpeciesId)
+    }
+
     fun updateSpecies(speciesId: String, requesterId: Int, request: UpdatePlantSpeciesRequest): PlantSpeciesDetailResponse {
         ensureAdmin(requesterId)
         val plantSpeciesId = findPlantSpeciesIdBySlug(speciesId.trim().lowercase())
@@ -90,6 +116,17 @@ class SpeciesService(
         return summary.copy(
             galleryImagePaths = galleryImagePaths,
             observations = observations
+        )
+    }
+
+    private fun getSpeciesSummaryByPlantSpeciesId(plantSpeciesId: Int): PlantSpeciesResponse {
+        return jdbcTemplate.query(
+            SPECIES_SUMMARY_BY_ID_SQL,
+            MapSqlParameterSource("plantSpeciesId", plantSpeciesId),
+            speciesRowMapper
+        ).firstOrNull() ?: throw ResponseStatusException(
+            HttpStatus.NOT_FOUND,
+            "Species not found for plantSpeciesId=$plantSpeciesId"
         )
     }
 
@@ -241,6 +278,39 @@ class SpeciesService(
             )
         """
 
+        private const val SPECIES_BASE_SELECT_NO_FILTER = """
+            SELECT ps.plant_species_id,
+                   lower(replace(trim(ps.scientific_name), ' ', '_')) AS species_id,
+                   ps.scientific_name,
+                   ps.common_name,
+                   ps.family,
+                   ps.genus,
+                   ps.species,
+                   ps.image_count,
+                   ps.description,
+                   ps.updated_at,
+                   COALESCE(obs_image.image_path, latest_observation.image_uri, latest_observation.enriched_photo_url) AS thumbnail_path,
+                   latest_observation.enriched_wikipedia_url AS wikipedia_url
+            FROM plant_species ps
+            LEFT JOIN LATERAL (
+                SELECT o.observation_id,
+                       o.image_uri,
+                       o.enriched_photo_url,
+                       o.enriched_wikipedia_url
+                FROM observation o
+                WHERE o.plant_species_id = ps.plant_species_id
+                ORDER BY o.observed_at DESC, o.observation_id DESC
+                LIMIT 1
+            ) latest_observation ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT oi.image_path
+                FROM observation_image oi
+                WHERE oi.observation_id = latest_observation.observation_id
+                ORDER BY oi.observation_image_id ASC
+                LIMIT 1
+            ) obs_image ON TRUE
+        """
+
         private const val LIST_SPECIES_SQL = SPECIES_BASE_SELECT + """
             ORDER BY ps.scientific_name ASC
         """
@@ -311,6 +381,24 @@ class SpeciesService(
             LIMIT 1
         """
 
+        private const val SPECIES_SUMMARY_BY_ID_SQL = SPECIES_BASE_SELECT_NO_FILTER + """
+            WHERE ps.plant_species_id = :plantSpeciesId
+        """
+
+        private const val UPSERT_PLANT_SPECIES_SQL = """
+            INSERT INTO plant_species (scientific_name, common_name, family, genus, species, description)
+            VALUES (:scientificName, :commonName, :family, :genus, :species, :description)
+            ON CONFLICT (scientific_name)
+            DO UPDATE SET
+                common_name = COALESCE(EXCLUDED.common_name, plant_species.common_name),
+                family = COALESCE(EXCLUDED.family, plant_species.family),
+                genus = COALESCE(EXCLUDED.genus, plant_species.genus),
+                species = COALESCE(EXCLUDED.species, plant_species.species),
+                description = COALESCE(EXCLUDED.description, plant_species.description),
+                updated_at = NOW()
+            RETURNING plant_species_id
+        """
+
         private const val UPDATE_SPECIES_SQL = """
             UPDATE plant_species
             SET scientific_name = :scientificName,
@@ -379,4 +467,3 @@ class SpeciesService(
         """
     }
 }
-

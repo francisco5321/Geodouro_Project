@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
@@ -29,6 +30,17 @@ class SpeciesController(
     fun getSpeciesDetail(@PathVariable speciesId: String): PlantSpeciesDetailResponse {
         logger.info("GET /api/species/{}", speciesId)
         return speciesService.getSpeciesDetail(speciesId)
+    }
+
+    @PostMapping
+    fun createSpecies(
+        @RequestHeader(name = "Authorization", required = false) authorizationHeader: String?,
+        @RequestBody request: CreatePlantSpeciesRequest
+    ): PlantSpeciesResponse {
+        val requesterId = authTokenService.resolveUserId(authorizationHeader)
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "AutenticaÃ§Ã£o necessÃ¡ria")
+        logger.info("POST /api/species requesterId={}", requesterId)
+        return speciesService.createSpecies(requesterId, request)
     }
 
     @PatchMapping("/{speciesId}")

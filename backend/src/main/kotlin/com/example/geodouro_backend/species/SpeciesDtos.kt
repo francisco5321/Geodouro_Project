@@ -58,3 +58,12 @@ data class UpdatePlantSpeciesRequest(
     val species: String,
     val description: String?
 )
+
+data class CreatePlantSpeciesRequest(
+    val scientificName: String,
+    val commonName: String?,
+    val family: String,
+    val genus: String,
+    val species: String,
+    val description: String? = null
+)
