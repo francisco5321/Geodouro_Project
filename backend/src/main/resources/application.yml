@@ -4,7 +4,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/Geodouro}
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:123}
+    password: ${DB_PASSWORD:GeoFlora_BD123}
     driver-class-name: org.postgresql.Driver
   sql:
     init:

@@ -7,7 +7,7 @@ rm -f backend/backend.log
 nohup env \
   DB_URL='jdbc:postgresql://localhost:5432/geodouro' \
   DB_USERNAME='postgres' \
-  DB_PASSWORD='postgres' \
+  DB_PASSWORD='GeoFlora_BD123' \
   SERVER_PORT='8080' \
   APP_AUTH_TOKEN_SECRET='geodouro-auth-key' \
   OBSERVATION_IMAGES_DIR='/opt/geodouro/uploads' \
