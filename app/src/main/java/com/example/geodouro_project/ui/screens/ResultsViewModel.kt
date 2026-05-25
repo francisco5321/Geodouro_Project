@@ -178,15 +178,8 @@ class ResultsViewModel(
                     enrichedData = lastEnrichedData,
                     notes = notes,
                     allowManualReview = allowManualReview,
-                    syncImmediately = false
+                    syncImmediately = true
                 )
-
-                viewModelScope.launch {
-                    runCatching { repository.syncPendingObservations() }
-                        .onFailure { error ->
-                            Log.w(TAG, "Background sync failed after local save", error)
-                        }
-                }
 
                 Log.d(
                     TAG,
