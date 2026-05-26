@@ -90,7 +90,7 @@ class ObservationService(
         ).firstOrNull()?.let(::withObservationImages)
             ?: throw ResponseStatusException(
                 HttpStatus.NOT_FOUND,
-                "Observation not found for deviceObservationId=$deviceObservationId"
+                "Observação não encontrada para deviceObservationId=$deviceObservationId"
             )
 
         val canAccess = detail.isPublished ||
@@ -119,7 +119,7 @@ class ObservationService(
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Não tens permissão para editar esta observação")
         }
         if (current.isPublished) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot update a published observation")
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Não é possível atualizar uma observação publicada")
         }
 
         if (current.requiresManualIdentification && request.scientificName.isNullOrBlank()) {
@@ -263,9 +263,9 @@ class ObservationService(
                 "SELECT user_id FROM app_user WHERE guest_label = :guestLabel",
                 MapSqlParameterSource("guestLabel", label)
             ) { rs, _ -> rs.getInt("user_id") }.firstOrNull()
-                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found for guestLabel=$label")
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Utilizador não encontrado para guestLabel=$label")
         }
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Either userId or guestLabel must be provided")
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "É necessário fornecer userId ou guestLabel")
     }
 
     private fun resolveUserId(request: UpsertObservationRequest): Int {
@@ -274,7 +274,7 @@ class ObservationService(
                 "SELECT user_id FROM app_user WHERE user_id = :userId",
                 MapSqlParameterSource("userId", providedUserId)
             ) { rs, _ -> rs.getInt("user_id") }.firstOrNull()
-            return existing ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "User with id=$providedUserId does not exist")
+            return existing ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Utilizador com id=$providedUserId não existe")
         }
 
         val guestLabel = request.guestLabel?.trim()?.takeIf { it.isNotBlank() } ?: "guest-${UUID.randomUUID()}"
@@ -292,7 +292,7 @@ class ObservationService(
             """.trimIndent(),
             MapSqlParameterSource("guestLabel", guestLabel),
             Int::class.java
-        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not create guest user")
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Não foi possível criar utilizador convidado")
     }
 
     private fun resolvePlantSpeciesId(request: UpsertObservationRequest): Int? {
@@ -326,7 +326,7 @@ class ObservationService(
             Int::class.java
         ) ?: 0
         if (exists <= 0) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "EspÃ©cie nÃ£o encontrada")
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Espécie não encontrada")
         }
     }
 
@@ -341,7 +341,7 @@ class ObservationService(
                 .addValue("genus", genus)
                 .addValue("species", species),
             Int::class.java
-        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not upsert plant species")
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Não foi possível inserir/atualizar a espécie")
     }
 
     private fun withObservationImages(summary: ObservationDetailResponse): ObservationDetailResponse {
@@ -431,17 +431,17 @@ class ObservationService(
     private fun normalizeSyncStatus(syncStatus: String?): String {
         val normalized = syncStatus?.trim()?.uppercase() ?: "PENDING"
         if (normalized !in allowedSyncStatuses) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "syncStatus must be one of $allowedSyncStatuses")
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "syncStatus deve ser um dos $allowedSyncStatuses")
         }
         return normalized
     }
 
     private fun validateCoordinates(latitude: Double?, longitude: Double?) {
         if (latitude != null && (latitude < -90.0 || latitude > 90.0)) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "latitude must be between -90 and 90")
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "A latitude deve estar entre -90 e 90")
         }
         if (longitude != null && (longitude < -180.0 || longitude > 180.0)) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "longitude must be between -180 and 180")
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "A longitude deve estar entre -180 e 180")
         }
     }
 

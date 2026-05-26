@@ -12,7 +12,7 @@ import pandas as pd
 UNKNOWN_LABELS = {
     "Nao conhecemos essa planta",
     "Não conhecemos essa planta",
-    "NÃƒÂ£o conhecemos essa planta",
+    "Não conhecemos essa planta",
 }
 
 

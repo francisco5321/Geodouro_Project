@@ -582,7 +582,7 @@ class RoutePlanService(
                            publication_target.plant_species_id
                        ) IS NOT NULL THEN COALESCE(
                            NULLIF(species_target.scientific_name, ''),
-                           'Sem classificação científ ica'
+                           'Sem classificação científica'
                        )
                       ELSE NULLIF(svt.notes, '')
                      END AS subtitle,

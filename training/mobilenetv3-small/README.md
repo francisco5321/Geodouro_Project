@@ -95,7 +95,7 @@ data/processed/splits/test.csv
 
 ## 3b. Usar iNaturalist 2021
 
-Se quiseres treinar com o iNaturalist 2021, nÃ£o precisas de passar pelo `data/raw/`.
+Se quiseres treinar com o iNaturalist 2021, não precisas de passar pelo `data/raw/`.
 O projeto tem um helper que descarrega/prepara o dataset com `torchvision` e gera logo os CSVs no formato esperado pelo treino.
 
 No `config.local.json`, define pelo menos:
@@ -121,10 +121,10 @@ python scripts/prepare_inat2021_splits.py --config config.local.json --download
 
 Notas:
 
-- `2021_train_mini` Ã© o melhor ponto de partida. O split oficial `train` tem cerca de 2.7M imagens e mais de 300 GiB.
-- `2021_valid` jÃ¡ traz labels; o script divide esse split em `val.csv` e `test.csv`.
+- `2021_train_mini` é o melhor ponto de partida. O split oficial `train` tem cerca de 2.7M imagens e mais de 300 GiB.
+- `2021_valid` já traz labels; o script divide esse split em `val.csv` e `test.csv`.
 - `inat_kingdom_filter: "Plantae"` evita treinar a app com animais, fungos e outros grupos irrelevantes.
-- `inat_allowed_labels_path` pode apontar para um ficheiro `.txt` com uma espÃ©cie por linha, se quiseres restringir o modelo Ã  tua lista alvo.
+- `inat_allowed_labels_path` pode apontar para um ficheiro `.txt` com uma espécie por linha, se quiseres restringir o modelo à tua lista alvo.
 
 ## 4. Treinar
 

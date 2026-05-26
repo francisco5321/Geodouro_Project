@@ -185,7 +185,7 @@ class PlantRepository(
             !isNonPlantPrediction(localResult.predictedSpecies) &&
                 (allowManualReview || !isRejectedPrediction(localResult.predictedSpecies, localResult.rejectionReason))
         ) {
-            "Não e possível guardar uma observação sem planta reconhecida ou com planta desconhecida"
+            "Não é possível guardar uma observação sem planta reconhecida ou com planta desconhecida"
         }
 
         val resolvedLocation = resolveBestEffortLocation(localResult.latitude, localResult.longitude)

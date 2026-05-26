@@ -38,7 +38,7 @@ class SpeciesController(
         @RequestBody request: CreatePlantSpeciesRequest
     ): PlantSpeciesResponse {
         val requesterId = authTokenService.resolveUserId(authorizationHeader)
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "AutenticaÃ§Ã£o necessÃ¡ria")
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Autenticação necessária")
         logger.info("POST /api/species requesterId={}", requesterId)
         return speciesService.createSpecies(requesterId, request)
     }

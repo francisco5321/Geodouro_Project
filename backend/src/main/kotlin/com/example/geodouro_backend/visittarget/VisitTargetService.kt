@@ -84,7 +84,7 @@ class VisitTargetService(
         )
 
         if (affected == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nÃ£o encontrado")
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita não encontrado")
         }
     }
 
@@ -99,9 +99,9 @@ class VisitTargetService(
                     .addValue("userId", userId)
                     .addValue("savedVisitTargetId", savedVisitTargetId),
                 visitTargetRowMapper
-            ) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nÃ£o encontrado")
+            ) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita não encontrado")
         } catch (_: EmptyResultDataAccessException) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nÃ£o encontrado")
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita não encontrado")
         }
     }
 
@@ -110,7 +110,7 @@ class VisitTargetService(
             "species", "plant_species", "plant-species" -> "species"
             "publication" -> "publication"
             "observation" -> "observation"
-            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo invÃ¡lido")
+            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo inválido")
         }
     }
 
@@ -134,7 +134,7 @@ class VisitTargetService(
                   AND latitude IS NOT NULL
                   AND longitude IS NOT NULL
             """.trimIndent() to "targetId"
-            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo invÃ¡lido")
+            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo inválido")
         }
 
         val count = jdbcTemplate.queryForObject(
@@ -153,7 +153,7 @@ class VisitTargetService(
             "species" -> "plant_species_id"
             "publication" -> "publication_id"
             "observation" -> "observation_id"
-            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo invÃ¡lido")
+            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo inválido")
         }
 
         return try {
@@ -196,7 +196,7 @@ class VisitTargetService(
         ) ?: 0
 
         if (count == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita nÃ£o encontrado")
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Alvo de visita não encontrado")
         }
     }
 
@@ -234,7 +234,7 @@ class VisitTargetService(
             "species" -> "plant_species_id"
             "publication" -> "publication_id"
             "observation" -> "observation_id"
-            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo invÃ¡lido")
+            else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo de alvo inválido")
         }
 
         return jdbcTemplate.queryForObject(
@@ -247,28 +247,28 @@ class VisitTargetService(
                 .addValue("userId", userId)
                 .addValue("targetId", targetId),
             Int::class.java
-        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "NÃ£o foi possÃ­vel guardar o alvo")
+        ) ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Não foi possível guardar o alvo")
     }
 
     private fun addedMessage(targetType: String): String = when (targetType) {
-        "species" -> "EspÃ©cie adicionada a Quero visitar."
-        "publication" -> "PublicaÃ§Ã£o adicionada a Quero visitar."
-        "observation" -> "ObservaÃ§Ã£o adicionada a Quero visitar."
-        else -> "Alvo adicionado a Quero visitar."
+        "species" -> "Espécie adicionada à lista 'Quero visitar'."
+        "publication" -> "Publicação adicionada à lista 'Quero visitar'."
+        "observation" -> "Observação adicionada à lista 'Quero visitar'."
+        else -> "Alvo adicionado à lista 'Quero visitar'."
     }
 
     private fun removedMessage(targetType: String): String = when (targetType) {
-        "species" -> "EspÃ©cie removida da tua lista de visita."
-        "publication" -> "PublicaÃ§Ã£o removida da tua lista de visita."
-        "observation" -> "ObservaÃ§Ã£o removida da tua lista de visita."
-        else -> "Alvo removido da tua lista de visita."
+        "species" -> "Espécie removida da tua lista 'Quero visitar'."
+        "publication" -> "Publicação removida da tua lista 'Quero visitar'."
+        "observation" -> "Observação removida da tua lista 'Quero visitar'."
+        else -> "Alvo removido da tua lista 'Quero visitar'."
     }
 
     private fun notFoundMessage(targetType: String): String = when (targetType) {
-        "species" -> "EspÃ©cie nÃ£o encontrada."
-        "publication" -> "PublicaÃ§Ã£o nÃ£o encontrada."
-        "observation" -> "ObservaÃ§Ã£o nÃ£o encontrada."
-        else -> "Alvo nÃ£o encontrado."
+        "species" -> "Espécie não encontrada."
+        "publication" -> "Publicação não encontrada."
+        "observation" -> "Observação não encontrada."
+        else -> "Alvo não encontrado."
     }
 
     companion object {
