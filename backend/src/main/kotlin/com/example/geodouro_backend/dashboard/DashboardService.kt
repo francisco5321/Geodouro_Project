@@ -10,7 +10,7 @@ class DashboardService(
     fun getStats(): DashboardStatsResponse {
         return DashboardStatsResponse(
             speciesCount = countPublicSpecies(),
-            observationCount = countPublicObservations(),
+            observationCount = count("observation"),
             manualReviewCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM observation WHERE requires_manual_identification = TRUE",
                 emptyMap<String, Any>(),
