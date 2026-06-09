@@ -561,8 +561,8 @@ class PlantRepository(
     }
 
     suspend fun fetchCommunityObservationStatsRemoteFirst(): ObservationStats {
-        fetchPublicRemoteObservationStats()?.let { return it }
         fetchRemoteDashboardStats()?.let { return it }
+        fetchPublicRemoteObservationStats()?.let { return it }
 
         return fetchCommunityObservationStatsLocal()
     }
