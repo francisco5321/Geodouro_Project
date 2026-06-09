@@ -120,6 +120,19 @@ interface ObservationDao {
     @Query(
         """
         SELECT * FROM observation
+        WHERE requiresManualIdentification = 0
+          AND (
+              isPublished = 1
+              OR syncStatus = 'SYNCED'
+          )
+        ORDER BY capturedAt DESC
+        """
+    )
+    suspend fun getPublicCommunityObservations(): List<ObservationEntity>
+
+    @Query(
+        """
+        SELECT * FROM observation
         WHERE (:ownerUserId IS NOT NULL AND ownerUserId = :ownerUserId)
            OR (:ownerGuestLabel IS NOT NULL AND ownerGuestLabel = :ownerGuestLabel)
         ORDER BY capturedAt DESC

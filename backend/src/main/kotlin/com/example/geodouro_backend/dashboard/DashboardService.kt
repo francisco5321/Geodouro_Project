@@ -10,7 +10,7 @@ class DashboardService(
     fun getStats(): DashboardStatsResponse {
         return DashboardStatsResponse(
             speciesCount = count("plant_species"),
-            observationCount = count("observation"),
+            observationCount = countPublicObservations(),
             manualReviewCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM observation WHERE requires_manual_identification = TRUE",
                 emptyMap<String, Any>(),
@@ -28,6 +28,22 @@ class DashboardService(
     private fun count(tableName: String): Int {
         return jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM $tableName",
+            emptyMap<String, Any>(),
+            Int::class.java
+        ) ?: 0
+    }
+
+    private fun countPublicObservations(): Int {
+        return jdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM observation
+            WHERE requires_manual_identification = FALSE
+              AND (
+                  is_published = TRUE
+                  OR sync_status = 'SYNCED'
+              )
+            """.trimIndent(),
             emptyMap<String, Any>(),
             Int::class.java
         ) ?: 0

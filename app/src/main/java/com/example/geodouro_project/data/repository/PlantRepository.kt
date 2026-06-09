@@ -559,7 +559,17 @@ class PlantRepository(
     }
 
     suspend fun fetchCommunityObservationStatsRemoteFirst(): ObservationStats {
-        return fetchPublicRemoteObservationStats() ?: fetchCommunityObservationStatsLocal()
+        fetchPublicRemoteObservationStats()?.let { return it }
+
+        return if (connectivityChecker.hasInternetConnection() && remoteObservationCatalogService.isConfigured()) {
+            ObservationStats(
+                observationsCount = 0,
+                publishedCount = 0,
+                speciesCount = 0
+            )
+        } else {
+            fetchCommunityObservationStatsLocal()
+        }
     }
 
     suspend fun fetchObservationStatsRemoteFirst(includeManualReview: Boolean = false): ObservationStats {
@@ -1288,7 +1298,7 @@ class PlantRepository(
 
     private suspend fun fetchCommunityObservationStatsLocal(): ObservationStats {
         val observations = withContext(Dispatchers.IO) {
-            observationDao.getAll()
+            observationDao.getPublicCommunityObservations()
         }
         return buildObservationStats(observations)
     }
