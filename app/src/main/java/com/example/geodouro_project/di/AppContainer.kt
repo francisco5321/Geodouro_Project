@@ -9,6 +9,7 @@ import com.example.geodouro_project.core.network.ConnectivityChecker
 import com.example.geodouro_project.data.local.AuthSessionStorage
 import com.example.geodouro_project.data.local.GeodouroDatabase
 import com.example.geodouro_project.data.remote.RemoteAuthService
+import com.example.geodouro_project.data.remote.RemoteDashboardService
 import com.example.geodouro_project.data.remote.RemoteDbConfig
 import com.example.geodouro_project.data.remote.RemoteObservationCatalogService
 import com.example.geodouro_project.data.remote.RemoteObservationSyncService
@@ -183,6 +184,15 @@ object AppContainer {
                 defaultUserId = BuildConfig.BACKEND_DEFAULT_USER_ID
             )
         )
+        val remoteDashboardService = RemoteDashboardService(
+            httpClient = okHttpClient,
+            gson = Gson(),
+            config = RemoteDbConfig(
+                baseUrl = BuildConfig.BACKEND_BASE_URL,
+                guestLabel = BuildConfig.BACKEND_GUEST_LABEL,
+                defaultUserId = BuildConfig.BACKEND_DEFAULT_USER_ID
+            )
+        )
         val remoteObservationCatalogService = RemoteObservationCatalogService(
             httpClient = okHttpClient,
             gson = Gson(),
@@ -206,6 +216,7 @@ object AppContainer {
             remoteObservationSyncService = remoteDbSyncService,
             remotePublicationService = remotePublicationService,
             remoteSpeciesService = remoteSpeciesService,
+            remoteDashboardService = remoteDashboardService,
             remoteObservationCatalogService = remoteObservationCatalogService,
             inferenceEngine = providePlantInferenceEngine(appContext),
             classifier = provideMobileNetV3Classifier(appContext),

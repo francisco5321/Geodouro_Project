@@ -9,7 +9,7 @@ class DashboardService(
 ) {
     fun getStats(): DashboardStatsResponse {
         return DashboardStatsResponse(
-            speciesCount = count("plant_species"),
+            speciesCount = countPublicSpecies(),
             observationCount = countPublicObservations(),
             manualReviewCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM observation WHERE requires_manual_identification = TRUE",
@@ -43,6 +43,25 @@ class DashboardService(
                   is_published = TRUE
                   OR sync_status = 'SYNCED'
               )
+            """.trimIndent(),
+            emptyMap<String, Any>(),
+            Int::class.java
+        ) ?: 0
+    }
+
+    private fun countPublicSpecies(): Int {
+        return jdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(DISTINCT COALESCE(o.plant_species_id, ps.plant_species_id))
+            FROM observation o
+            LEFT JOIN plant_species ps
+              ON ps.scientific_name = COALESCE(o.enriched_scientific_name, o.predicted_scientific_name)
+            WHERE o.requires_manual_identification = FALSE
+              AND (
+                  o.is_published = TRUE
+                  OR o.sync_status = 'SYNCED'
+              )
+              AND COALESCE(o.plant_species_id, ps.plant_species_id) IS NOT NULL
             """.trimIndent(),
             emptyMap<String, Any>(),
             Int::class.java

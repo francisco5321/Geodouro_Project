@@ -24,6 +24,7 @@ import com.example.geodouro_project.data.local.entity.CachedSpeciesCatalogEntity
 import com.example.geodouro_project.data.remote.RemoteObservationSyncService
 import com.example.geodouro_project.data.remote.RemoteObservationCatalogService
 import com.example.geodouro_project.data.remote.RemoteCommunityPublication
+import com.example.geodouro_project.data.remote.RemoteDashboardService
 import com.example.geodouro_project.data.remote.RemoteObservationDetail
 import com.example.geodouro_project.data.remote.RemotePublicationService
 import com.example.geodouro_project.data.remote.RemotePlantSpecies
@@ -69,6 +70,7 @@ class PlantRepository(
     private val remoteObservationSyncService: RemoteObservationSyncService,
     private val remotePublicationService: RemotePublicationService,
     private val remoteSpeciesService: RemoteSpeciesService,
+    private val remoteDashboardService: RemoteDashboardService,
     private val remoteObservationCatalogService: RemoteObservationCatalogService,
     private val inferenceEngine: PlantInferenceEngine,
     private val classifier: MobileNetV3Classifier,
@@ -560,16 +562,9 @@ class PlantRepository(
 
     suspend fun fetchCommunityObservationStatsRemoteFirst(): ObservationStats {
         fetchPublicRemoteObservationStats()?.let { return it }
+        fetchRemoteDashboardStats()?.let { return it }
 
-        return if (connectivityChecker.hasInternetConnection() && remoteObservationCatalogService.isConfigured()) {
-            ObservationStats(
-                observationsCount = 0,
-                publishedCount = 0,
-                speciesCount = 0
-            )
-        } else {
-            fetchCommunityObservationStatsLocal()
-        }
+        return fetchCommunityObservationStatsLocal()
     }
 
     suspend fun fetchObservationStatsRemoteFirst(includeManualReview: Boolean = false): ObservationStats {
@@ -1301,6 +1296,22 @@ class PlantRepository(
             observationDao.getPublicCommunityObservations()
         }
         return buildObservationStats(observations)
+    }
+
+    private suspend fun fetchRemoteDashboardStats(): ObservationStats? {
+        return withContext(Dispatchers.IO) {
+            if (!connectivityChecker.hasInternetConnection() || !remoteDashboardService.isConfigured()) {
+                return@withContext null
+            }
+
+            remoteDashboardService.fetchStats()?.let { stats ->
+                ObservationStats(
+                    observationsCount = stats.observationCount,
+                    publishedCount = stats.publicationCount,
+                    speciesCount = stats.speciesCount
+                )
+            }
+        }
     }
 
     private fun buildObservationStats(
